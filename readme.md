@@ -28,6 +28,13 @@ be) in the official app.
 - **Cross-library downloaded-item recognition** — if the same book exists in more than one of
   your libraries, downloading it once now shows it as downloaded everywhere it appears, instead
   of only in the library you downloaded it from.
+- **Rescan a local folder** — a "Rescan Folder" action on the local folder detail page picks up
+  books that already exist on disk (from before cross-library recognition existed, from another
+  install, or from the official app's own download folder) and links them back to your library
+  without re-downloading.
+- **Distinct app identity** — installs as "Audiobookshelf+" with its own icon (a bronze plus
+  badge over the official icon), so it's visually distinguishable from the official app and can
+  be installed alongside it.
 
 ### Getting builds
 
