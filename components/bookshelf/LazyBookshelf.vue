@@ -208,7 +208,8 @@ export default {
             this.entityComponentRefs[index].setEntity(this.entities[index])
 
             if (this.isBookEntity) {
-              const localLibraryItem = this.localLibraryItems.find((lli) => lli.libraryItemId == this.entities[index].id)
+              const entity = this.entities[index]
+              const localLibraryItem = this.localLibraryItems.find((lli) => lli.libraryItemId == entity.id || (entity.ino && lli.ino && lli.ino == entity.ino))
               if (localLibraryItem) {
                 this.entityComponentRefs[index].setLocalLibraryItem(localLibraryItem)
               }
@@ -460,7 +461,7 @@ export default {
             this.entityComponentRefs[indexOf].setEntity(libraryItem)
 
             if (this.isBookEntity) {
-              var localLibraryItem = this.localLibraryItems.find((lli) => lli.libraryItemId == libraryItem.id)
+              var localLibraryItem = this.localLibraryItems.find((lli) => lli.libraryItemId == libraryItem.id || (libraryItem.ino && lli.ino && lli.ino == libraryItem.ino))
               if (localLibraryItem) {
                 this.entityComponentRefs[indexOf].setLocalLibraryItem(localLibraryItem)
               }

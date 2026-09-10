@@ -1447,8 +1447,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
             // to show download icon
             val localLibraryItem =
-                    DeviceManager.dbManager.getLocalLibraryItemByLId(
-                            itemInProgress.libraryItemWrapper.id
+                    DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(
+                            itemInProgress.libraryItemWrapper.id,
+                            (itemInProgress.libraryItemWrapper as LibraryItem).ino
                     )
             localLibraryItem?.let { lli ->
               val localEpisode =
@@ -1477,8 +1478,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                     }
 
             val localLibraryItem =
-                    DeviceManager.dbManager.getLocalLibraryItemByLId(
-                            itemInProgress.libraryItemWrapper.id
+                    DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(
+                            itemInProgress.libraryItemWrapper.id,
+                            (itemInProgress.libraryItemWrapper as LibraryItem).ino
                     )
             (itemInProgress.libraryItemWrapper as LibraryItem).localLibraryItemId =
                     localLibraryItem?.id // To show downloaded icon
@@ -1743,7 +1745,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                                   it.libraryItemId == libraryItem.id
                                 }
                         val localLibraryItem =
-                                DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                                DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                         libraryItem.localLibraryItemId = localLibraryItem?.id
                         val description =
                                 libraryItem.getMediaDescription(progress, ctx, null, false)
@@ -1769,8 +1771,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
                         // to show download icon
                         val localLibraryItem =
-                                DeviceManager.dbManager.getLocalLibraryItemByLId(
-                                        libraryItem.recentEpisode!!.id
+                                DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(
+                                        libraryItem.recentEpisode!!.id,
+                                        libraryItem.ino
                                 )
                         localLibraryItem?.let { lli ->
                           val localEpisode =
@@ -1942,7 +1945,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               it.libraryItemId == libraryItem.id
                             }
                     val localLibraryItem =
-                            DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                            DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                     libraryItem.localLibraryItemId = localLibraryItem?.id
                     val description = libraryItem.getMediaDescription(progress, ctx, null, true)
                     MediaBrowserCompat.MediaItem(
@@ -2036,7 +2039,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               it.libraryItemId == libraryItem.id
                             }
                     val localLibraryItem =
-                            DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                            DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                     libraryItem.localLibraryItemId = localLibraryItem?.id
                     if (libraryItem.collapsedSeries != null) {
                       val description =
@@ -2074,7 +2077,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               it.libraryItemId == libraryItem.id
                             }
                     val localLibraryItem =
-                            DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                            DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                     libraryItem.localLibraryItemId = localLibraryItem?.id
                     val description = libraryItem.getMediaDescription(progress, ctx, null, true)
                     if (libraryItem.collapsedSeries != null) {
@@ -2117,7 +2120,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               it.libraryItemId == libraryItem.id
                             }
                     val localLibraryItem =
-                            DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                            DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                     libraryItem.localLibraryItemId = localLibraryItem?.id
                     val description = libraryItem.getMediaDescription(progress, ctx)
                     MediaBrowserCompat.MediaItem(
@@ -2138,7 +2141,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               it.libraryItemId == libraryItem.id
                             }
                     val localLibraryItem =
-                            DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+                            DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
                     libraryItem.localLibraryItemId = localLibraryItem?.id
                     val description = libraryItem.getMediaDescription(progress, ctx)
                     MediaBrowserCompat.MediaItem(

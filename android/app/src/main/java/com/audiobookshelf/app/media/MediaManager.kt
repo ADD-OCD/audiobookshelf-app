@@ -687,7 +687,7 @@ class MediaManager(private var apiHandler: ApiHandler, var ctx: Context) {
                 val progress = serverUserMediaProgress.find { it.libraryItemId == libraryItemWrapper.id && it.episodeId == podcastEpisode.id }
 
                 // to show download icon
-                val localLibraryItem = DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItemWrapper.id)
+                val localLibraryItem = DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItemWrapper.id, libraryItemWrapper.ino)
                 localLibraryItem?.let { lli ->
                   val localEpisode = (lli.media as Podcast).episodes?.find { it.serverEpisodeId == podcastEpisode.id }
                   podcastEpisode.localEpisodeId = localEpisode?.id
@@ -920,7 +920,7 @@ class MediaManager(private var apiHandler: ApiHandler, var ctx: Context) {
               serverLibraryItems.add(libraryItem)
             }
             val progress = serverUserMediaProgress.find { it.libraryItemId == libraryItem.id }
-            val localLibraryItem = DeviceManager.dbManager.getLocalLibraryItemByLId(libraryItem.id)
+            val localLibraryItem = DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItem.id, libraryItem.ino)
             libraryItem.localLibraryItemId = localLibraryItem?.id
             val description = libraryItem.getMediaDescription(progress, ctx, null, null, "Books (${serverLibrary?.name})")
             MediaBrowserCompat.MediaItem(description, MediaBrowserCompat.MediaItem.FLAG_PLAYABLE)
