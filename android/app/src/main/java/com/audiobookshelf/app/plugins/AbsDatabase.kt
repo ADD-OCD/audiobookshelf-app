@@ -99,6 +99,20 @@ class AbsDatabase : Plugin() {
   }
 
   @PluginMethod
+  fun getLocalLibraryItemByLIdOrIno(call:PluginCall) {
+    val libraryItemId = call.getString("libraryItemId", "").toString()
+    val ino = call.getString("ino")
+    GlobalScope.launch(Dispatchers.IO) {
+      val localLibraryItem = DeviceManager.dbManager.getLocalLibraryItemByLIdOrIno(libraryItemId, ino)
+      if (localLibraryItem == null) {
+        call.resolve()
+      } else {
+        call.resolve(JSObject(jacksonMapper.writeValueAsString(localLibraryItem)))
+      }
+    }
+  }
+
+  @PluginMethod
   fun getLocalLibraryItems(call:PluginCall) {
     val mediaType = call.getString("mediaType", "").toString()
 

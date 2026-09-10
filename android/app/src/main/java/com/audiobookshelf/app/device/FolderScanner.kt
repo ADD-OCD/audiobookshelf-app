@@ -107,7 +107,8 @@ class FolderScanner(private val ctx: Context) {
                   downloadItem.serverConnectionConfigId,
                   downloadItem.serverAddress,
                   downloadItem.serverUserId,
-                  downloadItem.libraryItemId
+                  downloadItem.libraryItemId,
+                  downloadItem.ino
           )
 
   private fun scanParts(

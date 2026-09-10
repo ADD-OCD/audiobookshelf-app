@@ -20,6 +20,7 @@ data class DownloadItem(
         val itemSubfolder: String,
         val media: MediaType,
         val downloadItemParts: MutableList<DownloadItemPart>,
+        val ino: String? = null,
         @JsonIgnore var terminalFailureAt: Long? = null,
         @JsonIgnore var stagingCleanupAt: Long? = null
 ) {

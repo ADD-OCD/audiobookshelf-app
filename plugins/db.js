@@ -80,6 +80,10 @@ class DbService {
     return AbsDatabase.getLocalLibraryItemByLId({ libraryItemId })
   }
 
+  getLocalLibraryItemByLIdOrIno(libraryItemId, ino) {
+    return AbsDatabase.getLocalLibraryItemByLIdOrIno({ libraryItemId, ino })
+  }
+
   getAllLocalMediaProgress() {
     return AbsDatabase.getAllLocalMediaProgress().then((data) => data.value)
   }

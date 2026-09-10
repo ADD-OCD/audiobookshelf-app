@@ -52,6 +52,17 @@ class DbManager {
     return getLocalLibraryItems().find { it.libraryItemId == libraryItemId }
   }
 
+  // Cross-library fallback: the same physical book scanned into two libraries has a different
+  // libraryItemId in each, but the server preserves the same filesystem ino for both.
+  fun getLocalLibraryItemByIno(ino: String?): LocalLibraryItem? {
+    if (ino.isNullOrEmpty()) return null
+    return getLocalLibraryItems().find { it.ino == ino }
+  }
+
+  fun getLocalLibraryItemByLIdOrIno(libraryItemId: String, ino: String?): LocalLibraryItem? {
+    return getLocalLibraryItemByLId(libraryItemId) ?: getLocalLibraryItemByIno(ino)
+  }
+
   fun getLocalLibraryItem(localLibraryItemId: String): LocalLibraryItem? {
     return Paper.book("localLibraryItems").read(localLibraryItemId)
   }

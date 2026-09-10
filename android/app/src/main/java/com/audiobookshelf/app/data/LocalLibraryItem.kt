@@ -39,7 +39,8 @@ class LocalLibraryItem(
   var serverConnectionConfigId:String?,
   var serverAddress:String?,
   var serverUserId:String?,
-  var libraryItemId:String?
+  var libraryItemId:String?,
+  var ino:String? = null
   ) : LibraryItemWrapper(id) {
   @get:JsonIgnore
   val title get() = media.metadata.title
