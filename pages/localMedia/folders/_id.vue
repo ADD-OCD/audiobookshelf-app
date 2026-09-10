@@ -48,6 +48,7 @@ export default {
       localLibraryItems: [],
       folder: null,
       removingFolder: false,
+      rescanning: false,
       showDialog: false
     }
   },
@@ -64,6 +65,10 @@ export default {
     dialogItems() {
       if (this.isInternalStorage) return []
       const items = []
+      items.push({
+        text: this.$strings.ButtonRescanFolder,
+        value: 'rescan'
+      })
       items.push({
         text: this.$strings.ButtonRemove,
         value: 'remove'
@@ -91,8 +96,21 @@ export default {
       console.log('Dialog action', action)
       if (action == 'remove') {
         this.removeFolder()
+      } else if (action == 'rescan') {
+        this.rescanFolder()
       }
       this.showDialog = false
+    },
+    async rescanFolder() {
+      this.rescanning = true
+      const result = await AbsFileSystem.rescanFolder({ folderId: this.folderId })
+      this.rescanning = false
+      if (result?.error) {
+        this.$toast.error(result.error)
+        return
+      }
+      await this.init()
+      this.$toast.success(this.$getString('MessageRescanFolderResult', [result?.matched || 0, result?.unmatched?.length || 0]))
     },
     async removeFolder() {
       var deleteMessage = 'Are you sure you want to remove this folder? (does not delete anything in your file system)'

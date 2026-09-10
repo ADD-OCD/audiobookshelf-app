@@ -276,6 +276,220 @@ class FolderScanner(private val ctx: Context) {
             }
   }
 
+  data class RescanResult(
+          val matched: MutableList<LocalLibraryItem> = mutableListOf(),
+          val unmatchedFolders: MutableList<String> = mutableListOf()
+  )
+
+  // Item filenames could be the same if they are in sub-folders, this will make them unique.
+  // Mirrors AbsDownloader's filename derivation so rescanned folders match real download output.
+  private fun getFilenameFromRelPath(relPath: String): String {
+    var cleanedRelPath = relPath.replace("\\", "_").replace("/", "_")
+    cleanedRelPath = cleanStringForFileSystem(cleanedRelPath)
+    return if (cleanedRelPath.startsWith("_")) cleanedRelPath.substring(1) else cleanedRelPath
+  }
+
+  private fun cleanStringForFileSystem(str: String): String {
+    val reservedCharacters = listOf("?", "\"", "*", "|", "/", "\\", "<", ">")
+    var newTitle = str.replace(":", " -")
+    reservedCharacters.forEach { newTitle = newTitle.replace(it, "") }
+    return newTitle
+  }
+
+  private fun makeExistingPart(
+          downloadItemId: String,
+          filename: String,
+          subfolder: String,
+          localFolder: LocalFolder,
+          ebookFile: EBookFile?,
+          audioTrack: AudioTrack?
+  ): DownloadItemPart {
+    val dummyFile = File(filename)
+    val part =
+            DownloadItemPart.make(
+                    downloadItemId,
+                    filename,
+                    0L,
+                    dummyFile,
+                    dummyFile,
+                    subfolder,
+                    "",
+                    localFolder,
+                    ebookFile,
+                    audioTrack,
+                    null
+            )
+    // Not from an active download -- resolveExternalFile() (called inside scanParts) still has
+    // to find the real file on disk by this filename for the part to end up populated.
+    part.completed = true
+    part.moved = true
+    return part
+  }
+
+  /**
+   * Builds a LocalLibraryItem for a book whose files already exist on disk (not from an active
+   * download) by matching [libraryItem]'s expected track/ebook/cover filenames against what's
+   * actually present in [itemFolder]. Reuses scanParts so missing files are skipped the same way
+   * an in-progress download would, and a folder with none of the expected files resolves to null.
+   */
+  private fun scanExistingFolder(
+          itemFolder: DocumentFile,
+          libraryItem: LibraryItem,
+          localFolder: LocalFolder,
+          callback: (DownloadItemScanResult?) -> Unit
+  ) {
+    val bookTitle = cleanStringForFileSystem(libraryItem.media.metadata.title)
+    val bookAuthor = cleanStringForFileSystem(libraryItem.media.metadata.getAuthorDisplayName())
+    val itemSubfolder = "$bookAuthor/$bookTitle"
+
+    val downloadItem =
+            DownloadItem(
+                    libraryItem.id,
+                    libraryItem.id,
+                    null,
+                    libraryItem.userMediaProgress,
+                    DeviceManager.serverConnectionConfig?.id ?: "",
+                    DeviceManager.serverAddress,
+                    DeviceManager.serverUserId,
+                    libraryItem.mediaType,
+                    itemFolder.getAbsolutePath(ctx),
+                    localFolder,
+                    bookTitle,
+                    itemSubfolder,
+                    libraryItem.media,
+                    mutableListOf(),
+                    libraryItem.ino
+            )
+
+    val book = libraryItem.media as Book
+    book.ebookFile?.let { ebookFile ->
+      val destinationFilename = getFilenameFromRelPath(ebookFile.metadata?.relPath ?: "")
+      downloadItem.downloadItemParts.add(
+              makeExistingPart(
+                      downloadItem.id,
+                      destinationFilename,
+                      itemSubfolder,
+                      localFolder,
+                      ebookFile,
+                      null
+              )
+      )
+    }
+
+    libraryItem.media.getAudioTracks().forEach { audioTrack ->
+      val destinationFilename = getFilenameFromRelPath(audioTrack.relPath)
+      downloadItem.downloadItemParts.add(
+              makeExistingPart(
+                      downloadItem.id,
+                      destinationFilename,
+                      itemSubfolder,
+                      localFolder,
+                      null,
+                      audioTrack
+              )
+      )
+    }
+
+    if (!libraryItem.media.coverPath.isNullOrEmpty()) {
+      val destinationFilename = "cover-${libraryItem.id}.jpg"
+      downloadItem.downloadItemParts.add(
+              makeExistingPart(
+                      downloadItem.id,
+                      destinationFilename,
+                      itemSubfolder,
+                      localFolder,
+                      null,
+                      null
+              )
+      )
+    }
+
+    val id = localLibraryItemId(itemFolder.id)
+    val localItem =
+            DeviceManager.dbManager.getLocalLibraryItem(id)
+                    ?: newLocalLibraryItem(
+                            id,
+                            downloadItem,
+                            itemFolder.getBasePath(ctx),
+                            itemFolder.getAbsolutePath(ctx),
+                            itemFolder.uri.toString()
+                    )
+    scanParts(downloadItem, localItem, itemFolder, callback)
+  }
+
+  /**
+   * Walks [localFolder] two levels deep (author/title, the same layout used for downloads)
+   * looking for book folders not yet backed by a LocalLibraryItem, matches each against
+   * [itemsByLibrary] by sanitized author/title, and builds a LocalLibraryItem for every match.
+   * Podcasts are not supported by rescan (out of scope -- per-episode local items in a shared
+   * folder are a materially different matching problem).
+   */
+  fun rescanFolder(
+          localFolder: LocalFolder,
+          itemsByLibrary: Map<String, List<LibraryItem>>,
+          fetchFullItem: (libraryItemId: String, cb: (LibraryItem?) -> Unit) -> Unit,
+          callback: (RescanResult) -> Unit
+  ) {
+    val result = RescanResult()
+    val root = DocumentFileCompat.fromUri(ctx, Uri.parse(localFolder.contentUrl))
+    if (root == null) {
+      Log.e(tag, "rescanFolder: Invalid SAF root ${localFolder.contentUrl}")
+      callback(result)
+      return
+    }
+
+    val existingPaths =
+            DeviceManager.dbManager.getLocalLibraryItemsInFolder(localFolder.id)
+                    .map { it.absolutePath }
+                    .toSet()
+
+    val byAuthorTitlePath =
+            itemsByLibrary.values.flatten().filter { it.mediaType == "book" }.associateBy { item
+                ->
+              val author = cleanStringForFileSystem(item.media.metadata.getAuthorDisplayName())
+              val title = cleanStringForFileSystem(item.media.metadata.title)
+              "$author/$title"
+            }
+
+    val candidates = mutableListOf<Pair<DocumentFile, String>>()
+    root.listFiles().filter { it.isDirectory }.forEach { authorFolder ->
+      authorFolder.listFiles().filter { it.isDirectory }.forEach { titleFolder ->
+        candidates.add(titleFolder to "${authorFolder.name}/${titleFolder.name}")
+      }
+    }
+    val pending = candidates.filter { (folder, _) -> folder.getAbsolutePath(ctx) !in existingPaths }
+
+    fun processNext(index: Int) {
+      if (index >= pending.size) {
+        callback(result)
+        return
+      }
+      val (folder, relPath) = pending[index]
+      val matchedItem = byAuthorTitlePath[relPath]
+      if (matchedItem == null) {
+        result.unmatchedFolders.add(relPath)
+        processNext(index + 1)
+        return
+      }
+      fetchFullItem(matchedItem.id) { fullItem ->
+        if (fullItem == null) {
+          result.unmatchedFolders.add(relPath)
+          processNext(index + 1)
+          return@fetchFullItem
+        }
+        scanExistingFolder(folder, fullItem, localFolder) { scanResult ->
+          if (scanResult != null) {
+            result.matched.add(scanResult.localLibraryItem)
+          } else {
+            result.unmatchedFolders.add(relPath)
+          }
+          processNext(index + 1)
+        }
+      }
+    }
+    processNext(0)
+  }
+
   fun scanDownloadItem(item: DownloadItem, callback: (DownloadItemScanResult?) -> Unit) {
     if (item.isInternalStorage) {
       val id = "local_${item.libraryItemId}"
