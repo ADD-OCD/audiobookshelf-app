@@ -12,13 +12,17 @@ import com.anggrayudi.storage.callback.FolderPickerCallback
 import com.anggrayudi.storage.callback.StorageAccessCallback
 import com.anggrayudi.storage.file.*
 import com.audiobookshelf.app.MainActivity
+import com.audiobookshelf.app.data.LibraryItem
 import com.audiobookshelf.app.data.LocalFolder
 import com.audiobookshelf.app.device.DeviceManager
+import com.audiobookshelf.app.device.FolderScanner
+import com.audiobookshelf.app.server.ApiHandler
 import com.fasterxml.jackson.core.json.JsonReadFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.getcapacitor.*
 import com.getcapacitor.annotation.CapacitorPlugin
 import java.io.File
+import org.json.JSONArray
 
 @CapacitorPlugin(name = "AbsFileSystem")
 class AbsFileSystem : Plugin() {
@@ -29,9 +33,13 @@ class AbsFileSystem : Plugin() {
                   .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS.mappedFeature())
 
   lateinit var mainActivity: MainActivity
+  lateinit var apiHandler: ApiHandler
+  lateinit var folderScanner: FolderScanner
 
   override fun load() {
     mainActivity = (activity as MainActivity)
+    apiHandler = ApiHandler(mainActivity)
+    folderScanner = FolderScanner(context)
 
     mainActivity.storage.storageAccessCallback =
             object : StorageAccessCallback {
@@ -201,6 +209,42 @@ class AbsFileSystem : Plugin() {
     val jsObject = JSObject()
     jsObject.put("version", Build.VERSION.SDK_INT)
     call.resolve(jsObject)
+  }
+
+  @PluginMethod
+  fun rescanFolder(call: PluginCall) {
+    val folderId = call.data.getString("folderId", "").toString()
+    val localFolder = DeviceManager.dbManager.getLocalFolder(folderId)
+    if (localFolder == null) {
+      call.resolve(JSObject("{\"error\":\"Folder not found\"}"))
+      return
+    }
+
+    apiHandler.getLibraries { libraries ->
+      val itemsByLibrary = mutableMapOf<String, List<LibraryItem>>()
+
+      fun fetchNextLibrary(index: Int) {
+        if (index >= libraries.size) {
+          folderScanner.rescanFolder(
+                  localFolder,
+                  itemsByLibrary,
+                  { libraryItemId, cb -> apiHandler.getLibraryItem(libraryItemId, cb) }
+          ) { result ->
+            val jsobj = JSObject()
+            jsobj.put("matched", result.matched.size)
+            jsobj.put("unmatched", JSONArray(result.unmatchedFolders))
+            call.resolve(jsobj)
+          }
+          return
+        }
+        val lib = libraries[index]
+        apiHandler.getLibraryItems(lib.id) { items ->
+          itemsByLibrary[lib.id] = items
+          fetchNextLibrary(index + 1)
+        }
+      }
+      fetchNextLibrary(0)
+    }
   }
 
   @PluginMethod
