@@ -1,22 +1,46 @@
-# Audiobookshelf Mobile App
+# Audiobookshelf Plus (unofficial mobile app fork)
 
-Audiobookshelf is a self-hosted audiobook and podcast server.
+**Plus** is an unofficial fork of the [Audiobookshelf](https://audiobookshelf.org) mobile app,
+built and maintained independently of the official project. Audiobookshelf itself is a
+self-hosted audiobook and podcast server.
 
-### Android (beta)
+This fork tracks [upstream `master`](https://github.com/advplyr/audiobookshelf-app) and is
+periodically rebased onto each new official release, so it stays current with all official
+fixes and features while adding the changes below on top.
 
-Get the Android app on the [Google Play Store](https://play.google.com/store/apps/details?id=com.audiobookshelf.app)
+**Not affiliated with or endorsed by the official Audiobookshelf project.** All credit for the
+original app goes to [advplyr](https://github.com/advplyr) and the Audiobookshelf contributors.
+This fork exists to carry a small set of additional fixes/features that aren't (yet, or won't
+be) in the official app.
 
-### iOS (early beta)
+### What's different from official
 
-**Beta is currently full. Apple has a hard limit of 10k beta testers. Updates will be posted in Discord.**
+- **Continuous playback for downloaded series/collections** — automatically advances to the
+  next downloaded book in a series instead of stopping after one.
+- **More reliable background playlist advancement for podcasts** — survives Android Doze mode,
+  keeps CPU/network awake during transitions, correctly forwards playback-ended state to the UI
+  when backgrounded, and pauses properly on Bluetooth disconnect instead of continuing to play
+  through the phone speaker.
+- **Auto-play next episode** when playing through a podcast playlist.
+- **Fixed a bug where downloading a series would silently stall** after the first book
+  (a race condition/permanent lock in the download queue) — inherited for free from an upstream
+  rewrite this fork rebases onto.
+- **Cross-library downloaded-item recognition** — if the same book exists in more than one of
+  your libraries, downloading it once now shows it as downloaded everywhere it appears, instead
+  of only in the library you downloaded it from.
 
-Using Test Flight: https://testflight.apple.com/join/wiic7QIW **_(beta is full)_**
+### Getting builds
+
+This fork does not publish to the Play Store or TestFlight. Debug APKs are built from the
+`plus` branch — see the build instructions below, or check
+[Releases](https://github.com/ADD-OCD/audiobookshelf-app/releases) if any are published.
 
 ---
 
-[Go to the main project repo github.com/advplyr/audiobookshelf](https://github.com/advplyr/audiobookshelf) or the project site [audiobookshelf.org](https://audiobookshelf.org)
+[Official project repo: github.com/advplyr/audiobookshelf](https://github.com/advplyr/audiobookshelf) or the project site [audiobookshelf.org](https://audiobookshelf.org)
 
-Join us on [discord](https://discord.gg/pJsjuNCKRq)
+Join the official community on [discord](https://discord.gg/pJsjuNCKRq) — this fork is not
+supported there; open an issue on this repo instead for fork-specific problems.
 
 **Requires an Audiobookshelf server to connect with**
 
