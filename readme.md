@@ -8,6 +8,9 @@ This fork tracks [upstream `master`](https://github.com/advplyr/audiobookshelf-a
 periodically rebased onto each new official release, so it stays current with all official
 fixes and features while adding the changes below on top.
 
+**This fork is Android-only.** The iOS side is not maintained here — changes, builds, and
+testing are focused entirely on Android.
+
 **Not affiliated with or endorsed by the official Audiobookshelf project.** All credit for the
 original app goes to [advplyr](https://github.com/advplyr) and the Audiobookshelf contributors.
 This fork exists to carry a small set of additional fixes/features that aren't (yet, or won't
