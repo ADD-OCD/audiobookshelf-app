@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Audiobookshelf mobile app built with **NuxtJS 2** (SSR disabled, static target) and **Capacitor 7**, sharing one JS codebase across Android and iOS. Requires a running Audiobookshelf server to connect to.
 
+This repo (`plus` branch) is an unofficial fork that is **Android-only** — the iOS project is not maintained here. Don't spend effort on iOS builds, native iOS code, or iOS-specific testing unless explicitly asked.
+
 ## Development Commands
 
 ```bash
