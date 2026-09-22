@@ -1,10 +1,11 @@
 <template>
   <div>
-    <app-audio-player ref="audioPlayer" :bookmarks="bookmarks" :sleep-timer-running="isSleepTimerRunning" :sleep-time-remaining="sleepTimeRemaining" :serverLibraryItemId="serverLibraryItemId" @selectPlaybackSpeed="showPlaybackSpeedModal = true" @updateTime="(t) => (currentTime = t)" @showSleepTimer="showSleepTimer" @showBookmarks="showBookmarks" />
+    <app-audio-player ref="audioPlayer" :bookmarks="bookmarks" :sleep-timer-running="isSleepTimerRunning" :sleep-time-remaining="sleepTimeRemaining" :serverLibraryItemId="serverLibraryItemId" @selectPlaybackSpeed="showPlaybackSpeedModal = true" @updateTime="(t) => (currentTime = t)" @showSleepTimer="showSleepTimer" @showBookmarks="showBookmarks" @showQueue="showQueueModal = true" />
 
     <modals-playback-speed-modal v-model="showPlaybackSpeedModal" :playback-rate.sync="playbackSpeed" @update:playbackRate="updatePlaybackSpeed" @change="changePlaybackSpeed" />
     <modals-sleep-timer-modal v-model="showSleepTimerModal" :current-time="sleepTimeRemaining" :sleep-timer-running="isSleepTimerRunning" :current-end-of-chapter-time="currentEndOfChapterTime" :is-auto="isAutoSleepTimer" @change="selectSleepTimeout" @cancel="cancelSleepTimer" @increase="increaseSleepTimer" @decrease="decreaseSleepTimer" />
     <modals-bookmarks-modal v-model="showBookmarksModal" :bookmarks="bookmarks" :current-time="currentTime" :library-item-id="serverLibraryItemId" :playback-rate="playbackSpeed" @select="selectBookmark" />
+    <modals-queue-modal v-model="showQueueModal" :queue="playbackQueue" @reorder="reorderQueue" @remove="removeFromQueue" />
   </div>
 </template>
 
@@ -12,7 +13,7 @@
 import { AbsAudioPlayer, AbsLogger } from '@/plugins/capacitor'
 import { Dialog } from '@capacitor/dialog'
 import CellularPermissionHelpers from '@/mixins/cellularPermissionHelpers'
-import { nativeQueueItems, resolvePlaybackQueue } from '@/utils/playbackQueue'
+import { nativeQueueItems, resolvePlaybackQueue, resolveQueueSourceAppendItems, sessionToQueueItem } from '@/utils/playbackQueue'
 
 export default {
   data() {
@@ -26,6 +27,7 @@ export default {
       showPlaybackSpeedModal: false,
       showBookmarksModal: false,
       showSleepTimerModal: false,
+      showQueueModal: false,
       playbackSpeed: 1,
       currentTime: 0,
       isSleepTimerRunning: false,
@@ -53,6 +55,9 @@ export default {
     },
     currentPlaybackSession() {
       return this.$store.state.currentPlaybackSession
+    },
+    playbackQueue() {
+      return this.$store.state.playbackQueue
     }
   },
   watch: {
@@ -217,6 +222,92 @@ export default {
         }
       } catch (error) {
         console.error('Failed to read playback queue', error)
+      }
+    },
+    // Single choke point for reorder/remove/append so native is never written to with a stale index.
+    async mutateQueue(newItems) {
+      const queue = this.$store.state.playbackQueue
+      if (!queue || this.$platform !== 'android') return
+      try {
+        const native = await AbsAudioPlayer.getPlaylistQueue()
+        // A native auto-advance raced this edit - resync instead of writing over it.
+        if (native.currentIndex !== queue.currentIndex || native.items.length <= queue.currentIndex) {
+          await this.onPlaybackEnded()
+          this.$toast.error('Queue changed, try again')
+          return
+        }
+        await AbsAudioPlayer.setPlaylistQueue({ items: nativeQueueItems(newItems), currentIndex: queue.currentIndex })
+        this.$store.commit('setPlaybackQueue', { ...queue, items: newItems })
+      } catch (error) {
+        console.error('[AudioPlayerContainer] Failed to mutate playback queue', error)
+        this.$toast.error('Failed to update queue')
+      }
+    },
+    reorderQueue(newUpcomingOrder) {
+      const queue = this.$store.state.playbackQueue
+      if (!queue) return
+      this.mutateQueue(queue.items.slice(0, queue.currentIndex + 1).concat(newUpcomingOrder))
+    },
+    removeFromQueue(item) {
+      const queue = this.$store.state.playbackQueue
+      if (!queue) return
+      const key = nativeQueueItems([item])[0]
+      const newItems = queue.items.filter((queueItem, index) => {
+        if (index <= queue.currentIndex) return true
+        const queueItemKey = nativeQueueItems([queueItem])[0]
+        return queueItemKey.libraryItemId !== key.libraryItemId || queueItemKey.episodeId !== key.episodeId
+      })
+      this.mutateQueue(newItems)
+    },
+    isAlreadyQueued(items, item) {
+      const key = nativeQueueItems([item])[0]
+      return items.some((queueItem) => {
+        const queueItemKey = nativeQueueItems([queueItem])[0]
+        return queueItemKey.libraryItemId === key.libraryItemId && queueItemKey.episodeId === key.episodeId
+      })
+    },
+    async addSingleItemToQueue(item) {
+      if (!this.currentPlaybackSession) {
+        // Nothing playing - a queue with nothing playing isn't a meaningful state, just play it.
+        this.$eventBus.$emit('play-item', item)
+        return
+      }
+      const queue = this.$store.state.playbackQueue
+      if (!queue) {
+        const newQueue = { sourceType: 'adhoc', sourceId: null, items: [sessionToQueueItem(this.currentPlaybackSession), item], currentIndex: 0 }
+        if (this.$platform === 'android') await AbsAudioPlayer.setPlaylistQueue({ items: nativeQueueItems(newQueue.items), currentIndex: 0 })
+        this.$store.commit('setPlaybackQueue', newQueue)
+        return
+      }
+      if (this.isAlreadyQueued(queue.items, item)) {
+        this.$toast.info('Already in queue')
+        return
+      }
+      this.mutateQueue([...queue.items, item])
+    },
+    async addQueueSourceToQueue(source) {
+      if (!this.currentPlaybackSession) {
+        this.$eventBus.$emit('play-item', { queueSource: source })
+        return
+      }
+      const queue = this.$store.state.playbackQueue
+      const existingItems = queue ? queue.items : [sessionToQueueItem(this.currentPlaybackSession)]
+      try {
+        const appendItems = await resolveQueueSourceAppendItems(this, source, existingItems)
+        if (!appendItems.length) {
+          this.$toast.info('Nothing new to add to the queue')
+          return
+        }
+        if (!queue) {
+          const newQueue = { sourceType: 'adhoc', sourceId: null, items: [...existingItems, ...appendItems], currentIndex: 0 }
+          if (this.$platform === 'android') await AbsAudioPlayer.setPlaylistQueue({ items: nativeQueueItems(newQueue.items), currentIndex: 0 })
+          this.$store.commit('setPlaybackQueue', newQueue)
+          return
+        }
+        this.mutateQueue([...queue.items, ...appendItems])
+      } catch (error) {
+        console.error('[AudioPlayerContainer] Failed to add source to queue', error)
+        this.$toast.error(error.message || 'Failed to add to queue')
       }
     },
     async playLibraryItem(payload) {
@@ -509,6 +600,8 @@ export default {
     this.$eventBus.$on('device-focus-update', this.deviceFocused)
     this.$eventBus.$on('socket-reconnected', this.socketReconnected)
     this.$eventBus.$on('playback-ended', this.onPlaybackEnded)
+    this.$eventBus.$on('add-to-queue', this.addSingleItemToQueue)
+    this.$eventBus.$on('add-queue-source-to-queue', this.addQueueSourceToQueue)
   },
   beforeDestroy() {
     this.onLocalMediaProgressUpdateListener?.remove()
@@ -526,6 +619,8 @@ export default {
     this.$eventBus.$off('device-focus-update', this.deviceFocused)
     this.$eventBus.$off('socket-reconnected', this.socketReconnected)
     this.$eventBus.$off('playback-ended', this.onPlaybackEnded)
+    this.$eventBus.$off('add-to-queue', this.addSingleItemToQueue)
+    this.$eventBus.$off('add-queue-source-to-queue', this.addQueueSourceToQueue)
   }
 }
 </script>

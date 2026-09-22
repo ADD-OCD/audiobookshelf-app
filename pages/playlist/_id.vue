@@ -14,6 +14,7 @@
             <span class="material-symbols text-2xl fill">{{ playerIsPlaying ? 'pause' : 'play_arrow' }}</span>
             <span class="px-1 text-sm">{{ playerIsPlaying ? $strings.ButtonPause : $strings.ButtonPlay }}</span>
           </ui-btn>
+          <span v-if="showPlayButton" class="material-symbols text-2xl text-fg-muted cursor-pointer mx-1" @click="addToQueueClick">queue_music</span>
         </div>
 
         <div class="my-8 max-w-2xl px-3">
@@ -155,6 +156,10 @@ export default {
           queueSource: { sourceType: 'playlist', sourceId: this.playlist.id, items: this.playableItems }
         })
       }
+    },
+    async addToQueueClick() {
+      await this.$hapticsImpact()
+      this.$eventBus.$emit('add-queue-source-to-queue', { sourceType: 'playlist', sourceId: this.playlist.id, items: this.playableItems })
     },
     playlistUpdated(playlist) {
       if (this.playlist.id !== playlist.id) return

@@ -65,6 +65,11 @@
       <!-- Top controls bar - fullscreen only: bookmarks, speed, sleep timer, chapters -->
       <div v-if="showFullscreen" class="absolute bottom-4 left-0 right-0 w-full pb-4 pt-2 mx-auto px-6" style="max-width: 414px">
         <div class="flex items-center justify-between pointer-events-auto">
+          <!-- Optional queue icon: list glyph with a bordered "Q" badge, matches the chapters icon style -->
+          <div v-if="playerSettings.showQueueIcon" class="relative cursor-pointer" @click="$emit('showQueue')">
+            <span class="material-symbols text-3xl text-fg-muted">format_list_bulleted</span>
+            <span class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-full border border-fg-muted bg-bg text-fg-muted" style="width: 14px; height: 14px; font-size: 9px; line-height: 1">Q</span>
+          </div>
           <span v-if="!isPodcast && serverLibraryItemId && socketConnected" class="material-symbols text-3xl text-fg-muted cursor-pointer" :class="{ fill: bookmarks.length }" @click="$emit('showBookmarks')">bookmark</span>
           <!-- hidden for podcasts but still using this as a placeholder -->
           <span v-else class="material-symbols text-3xl text-white text-opacity-0">bookmark</span>
@@ -173,7 +178,8 @@ export default {
         useChapterTrack: false,
         useTotalTrack: true,
         scaleElapsedTimeBySpeed: true,
-        lockUi: false
+        lockUi: false,
+        showQueueIcon: false
       },
       isLoading: false,
       isCheckingServerProgress: false,
@@ -217,8 +223,21 @@ export default {
         })
       }
 
+      if (this.$store.state.playbackQueue) {
+        items.push({
+          text: 'View Queue',
+          value: 'queue',
+          icon: 'queue_music'
+        })
+      }
+
       items.push(
         ...[
+          {
+            text: this.playerSettings.showQueueIcon ? 'Hide Queue Icon' : 'Show Queue Icon',
+            value: 'show_queue_icon',
+            icon: this.playerSettings.showQueueIcon ? 'check_box' : 'check_box_outline_blank'
+          },
           {
             text: this.$strings.LabelTotalTrack,
             value: 'total_track',
@@ -769,6 +788,11 @@ export default {
         if (action === 'history') {
           this.$router.push(`/media/${this.mediaId}/history?title=${this.title}`)
           this.showFullscreen = false
+        } else if (action === 'queue') {
+          this.$emit('showQueue')
+        } else if (action === 'show_queue_icon') {
+          this.playerSettings.showQueueIcon = !this.playerSettings.showQueueIcon
+          this.savePlayerSettings()
         } else if (action === 'scale_elapsed_time') {
           this.playerSettings.scaleElapsedTimeBySpeed = !this.playerSettings.scaleElapsedTimeBySpeed
           this.updateTimestamp()
@@ -840,6 +864,7 @@ export default {
         this.playerSettings.useTotalTrack = !!savedPlayerSettings.useTotalTrack
         this.playerSettings.lockUi = !!savedPlayerSettings.lockUi
         this.playerSettings.scaleElapsedTimeBySpeed = !!savedPlayerSettings.scaleElapsedTimeBySpeed
+        this.playerSettings.showQueueIcon = !!savedPlayerSettings.showQueueIcon
       }
     },
     savePlayerSettings() {

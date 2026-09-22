@@ -42,19 +42,70 @@ export async function fetchSeriesBooks(http, libraryId, seriesId, encode) {
   }
 }
 
-export async function resolvePlaybackQueue(context, payload) {
-  const source = payload.queueSource
-  if (!source || context.$platform !== 'android') return { payload, queue: null }
-  let items
+export async function buildQueueSourceItems(context, source) {
   if (source.sourceType === 'playlist') {
-    items = source.items
+    return source.items
   } else if (source.sourceType === 'series' || source.sourceType === 'collection') {
     const books = source.sourceType === 'series' ? await fetchSeriesBooks(context.$nativeHttp, source.libraryId, source.sourceId, context.$encode) : source.books
     const localItems = (await context.$db.getLocalLibraryItems('book')) || []
-    items = downloadedBookItems(books, localItems, context.$store.getters['user/getServerConnectionConfigId'])
+    return downloadedBookItems(books, localItems, context.$store.getters['user/getServerConnectionConfigId'])
   } else {
     throw new Error('Unknown playback queue source')
   }
+}
+
+// Items to append to an already-playing queue: same source resolution as resolvePlaybackQueue,
+// but filtered to unfinished items and deduped against what's already queued.
+export async function resolveQueueSourceAppendItems(context, source, existingItems) {
+  const items = await buildQueueSourceItems(context, source)
+  const unfinished = items.filter((item) => {
+    const localProgress = item.localLibraryItem && context.$store.getters['globals/getLocalMediaProgressById'](item.localLibraryItem.id, item.localEpisode?.id)
+    const progress = localProgress || context.$store.getters['user/getUserMediaProgress'](item.libraryItemId, item.episodeId)
+    return !progress?.isFinished
+  })
+  const existingKeys = new Set(nativeQueueItems(existingItems).map((i) => `${i.libraryItemId}|${i.episodeId || ''}`))
+  return unfinished.filter((item) => {
+    const key = nativeQueueItems([item])[0]
+    return !existingKeys.has(`${key.libraryItemId}|${key.episodeId || ''}`)
+  })
+}
+
+// Shapes the active playback session as a queue item, for synthesizing a fresh queue
+// when the user adds to queue while playing something with no existing playbackQueue.
+export function sessionToQueueItem(session) {
+  return {
+    libraryItemId: session.libraryItemId,
+    episodeId: session.episodeId || null,
+    localLibraryItem: session.localLibraryItem || null,
+    localEpisode: session.localEpisodeId ? { id: session.localEpisodeId } : null,
+    displayTitle: session.displayTitle,
+    displayAuthor: session.displayAuthor,
+    coverPath: session.coverPath
+  }
+}
+
+// Normalizes the three queue item shapes (session-synthesized, playlist-sourced with a
+// nested .libraryItem/.episode, series/collection-sourced with only .localLibraryItem)
+// into a consistent display shape for the queue UI.
+export function queueItemDisplay(item) {
+  if (item.displayTitle) {
+    return { title: item.displayTitle, subtitle: item.displayAuthor || '', libraryItemForCover: item.localLibraryItem || item.libraryItem || null, coverPath: item.coverPath || null }
+  }
+  if (item.libraryItem) {
+    const metadata = item.libraryItem.media?.metadata || {}
+    return { title: item.episode?.title || metadata.title || 'Unknown', subtitle: metadata.authorName || metadata.author || '', libraryItemForCover: item.localLibraryItem || item.libraryItem, coverPath: null }
+  }
+  if (item.localLibraryItem) {
+    const metadata = item.localLibraryItem.media?.metadata || {}
+    return { title: metadata.title || 'Unknown', subtitle: metadata.authorName || metadata.author || '', libraryItemForCover: item.localLibraryItem, coverPath: null }
+  }
+  return { title: 'Unknown', subtitle: '', libraryItemForCover: null, coverPath: null }
+}
+
+export async function resolvePlaybackQueue(context, payload) {
+  const source = payload.queueSource
+  if (!source || context.$platform !== 'android') return { payload, queue: null }
+  const items = await buildQueueSourceItems(context, source)
   let currentIndex
   if (payload.libraryItemId) {
     currentIndex = items.findIndex((item) => {

@@ -45,6 +45,11 @@ export default {
       this.$store.commit('setPlayerIsStartingPlayback', this.seriesId)
       this.$eventBus.$emit('play-item', { queueSource: { sourceType: 'series', sourceId: this.seriesId, libraryId: this.series.libraryId } })
     },
+    async addSeriesToQueue() {
+      if (this.$platform !== 'android') return
+      await this.$hapticsImpact()
+      this.$eventBus.$emit('add-queue-source-to-queue', { sourceType: 'series', sourceId: this.seriesId, libraryId: this.series.libraryId })
+    },
     async downloadSeriesClick() {
       console.log('Download Series clicked')
       if (this.startingDownload) return
@@ -181,10 +186,12 @@ export default {
   },
   mounted() {
     this.$eventBus.$on('play-series-click', this.playSeries)
+    this.$eventBus.$on('add-series-to-queue-click', this.addSeriesToQueue)
     this.$eventBus.$on('download-series-click', this.downloadSeriesClick)
   },
   beforeDestroy() {
     this.$eventBus.$off('play-series-click', this.playSeries)
+    this.$eventBus.$off('add-series-to-queue-click', this.addSeriesToQueue)
     this.$eventBus.$off('download-series-click', this.downloadSeriesClick)
   }
 }

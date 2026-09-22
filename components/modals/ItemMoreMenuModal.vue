@@ -80,6 +80,14 @@ export default {
         }
       }
 
+      if ((!this.isPodcast && (this.serverLibraryItemId || this.localLibraryItemId)) || (this.episode && (this.serverEpisodeId || this.localEpisodeId))) {
+        items.push({
+          text: 'Add to Queue',
+          value: 'queueAdd',
+          icon: 'queue_music'
+        })
+      }
+
       if ((!this.isPodcast && this.serverLibraryItemId) || (this.episode && this.serverEpisodeId)) {
         items.push({
           text: this.$strings.LabelAddToPlaylist,
@@ -273,6 +281,16 @@ export default {
         })
       } else if (action === 'details') {
         this.showDetailsModal = true
+      } else if (action === 'queueAdd') {
+        this.$eventBus.$emit('add-to-queue', {
+          libraryItemId: this.serverLibraryItemId || this.localLibraryItemId,
+          episodeId: this.serverEpisodeId || this.localEpisodeId,
+          localLibraryItem: this.localLibraryItem,
+          localEpisode: this.localEpisode,
+          libraryItem: this.isLocal ? null : this.libraryItem,
+          displayTitle: this.episode?.title || this.title,
+          displayAuthor: this.mediaMetadata.authorName
+        })
       } else if (action === 'playlist') {
         this.$store.commit('globals/setSelectedPlaylistItems', [{ libraryItem: this.libraryItem, episode: this.episode }])
         this.$store.commit('globals/setShowPlaylistsAddCreateModal', true)

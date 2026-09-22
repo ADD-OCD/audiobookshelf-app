@@ -100,6 +100,14 @@ export const getters = {
     const majorVersion = parseInt(versionParts[0])
     const minorVersion = parseInt(versionParts[1])
     return majorVersion < 2 || (majorVersion == 2 && minorVersion < 17)
+  },
+  getPlaybackQueueCurrentItem: (state) => {
+    if (!state.playbackQueue) return null
+    return state.playbackQueue.items[state.playbackQueue.currentIndex] || null
+  },
+  getPlaybackQueueUpcomingItems: (state) => {
+    if (!state.playbackQueue) return []
+    return state.playbackQueue.items.slice(state.playbackQueue.currentIndex + 1)
   }
 }
 

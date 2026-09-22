@@ -14,6 +14,7 @@
           <span class="material-symbols text-2xl px-2" @click="showSortModal = true">sort</span>
         </template>
         <button v-if="seriesBookPage && $platform === 'android'" type="button" class="flex items-center px-2 text-success" :disabled="$store.state.playerIsStartingPlayback" @click="$eventBus.$emit('play-series-click')"><span class="material-symbols text-2xl">play_arrow</span>{{ $strings.ButtonPlay }}</button>
+        <span v-if="seriesBookPage && $platform === 'android'" class="material-symbols text-2xl px-2" @click="$eventBus.$emit('add-series-to-queue-click')">queue_music</span>
         <span v-if="seriesBookPage" class="material-symbols text-2xl px-2" @click="downloadSeries">download</span>
         <span v-if="(page == 'library' && isBookLibrary) || seriesBookPage" class="material-symbols text-2xl px-2" @click="showMoreMenuDialog = true">more_vert</span>
       </div>
