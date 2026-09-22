@@ -28,6 +28,8 @@ data class DownloadItemPart(
   var moved:Boolean,
   var isMoving:Boolean,
   var failed:Boolean,
+  var failureReason: String? = null,
+  var permissionLost: Boolean = false,
   @JsonIgnore val uri: Uri,
   @JsonIgnore val destinationUri: Uri,
   @JsonIgnore val finalDestinationUri: Uri,

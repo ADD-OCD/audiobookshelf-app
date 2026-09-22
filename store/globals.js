@@ -136,7 +136,8 @@ export const mutations = {
     state.itemDownloads = state.itemDownloads.filter((i) => i.id != id)
   },
   clearItemDownloads(state) {
-    state.itemDownloads = []
+    // Keep items with a failed part visible so the user sees why, instead of them silently vanishing
+    state.itemDownloads = state.itemDownloads.filter((i) => i.downloadItemParts.some((dip) => dip.failed))
   },
   setBookshelfListView(state, val) {
     state.bookshelfListView = val

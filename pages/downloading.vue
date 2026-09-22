@@ -8,10 +8,12 @@
         <div class="flex">
           <div class="w-14">
             <span v-if="itemPart.completed" class="material-symbols text-success">check_circle</span>
+            <span v-else-if="itemPart.failed" class="material-symbols text-error">error</span>
             <span v-else class="font-semibold text-fg">{{ Math.round(itemPart.progress) }}%</span>
           </div>
           <div class="flex-grow px-2">
             <p class="break-all">{{ itemPart.filename }}</p>
+            <p v-if="itemPart.failed" class="text-xs text-error mt-1">{{ failureMessage(itemPart) }}</p>
           </div>
         </div>
 
@@ -34,6 +36,12 @@ export default {
       let parts = []
       this.downloadItems.forEach((di) => parts.push(...di.downloadItemParts))
       return parts
+    }
+  },
+  methods: {
+    failureMessage(itemPart) {
+      if (itemPart.permissionLost) return this.$getString('MessageDownloadFolderAccessLost', [itemPart.localFolderName])
+      return itemPart.failureReason || ''
     }
   },
   mounted() {},

@@ -312,6 +312,7 @@
   "MessageConfirmStreamingUsingCellular": "You are about to stream using cellular data. This may include carrier data charges. Do you wish to continue?",
   "MessageDiscardProgress": "Discard Progress",
   "MessageDownloadCompleteProcessing": "Download complete. Processing...",
+  "MessageDownloadFolderAccessLost": "Lost access to \"{0}\". Re-select the folder in Local Folders to resume this download.",
   "MessageDownloading": "Downloading...",
   "MessageDownloadingEpisode": "Downloading episode",
   "MessageDownloadingFile": "Downloading {0}",

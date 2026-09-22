@@ -1,6 +1,7 @@
 <template>
-  <div v-if="downloadItemPartsRemaining.length" @click="clickedIt">
-    <widgets-circle-progress :value="progress" :count="downloadItemPartsRemaining.length" />
+  <div v-if="downloadItemPartsRemaining.length || downloadItemPartsFailed.length" @click="clickedIt">
+    <span v-if="!downloadItemPartsRemaining.length" class="material-symbols text-error text-3xl">error</span>
+    <widgets-circle-progress v-else :value="progress" :count="downloadItemPartsRemaining.length" />
   </div>
 </template>
 
@@ -26,7 +27,11 @@ export default {
       return parts
     },
     downloadItemPartsRemaining() {
-      return this.downloadItemParts.filter((dip) => !dip.completed)
+      // Exclude failed parts so a permanently failed download doesn't leave the header badge stuck spinning
+      return this.downloadItemParts.filter((dip) => !dip.completed && !dip.failed)
+    },
+    downloadItemPartsFailed() {
+      return this.downloadItemParts.filter((dip) => dip.failed)
     },
     progress() {
       let totalBytes = 0

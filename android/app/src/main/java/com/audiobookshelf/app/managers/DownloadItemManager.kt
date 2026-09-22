@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.StatFs
 import androidx.documentfile.provider.DocumentFile
+import com.anggrayudi.storage.SimpleStorage
 import com.anggrayudi.storage.file.fullName
 import com.audiobookshelf.app.device.DeviceManager
 import com.audiobookshelf.app.device.FolderScanner
@@ -228,6 +229,10 @@ class DownloadItemManager(
           return@forEach
         }
         if (completeFromExistingInternalCover(item, part)) return@forEach
+        if (!part.isInternalStorage && !SimpleStorage.hasStorageAccess(context, part.localFolderUrl, true)) {
+          failPermissionLost(item, part)
+          return@forEach
+        }
         if (hasActiveDestinationConflict(part)) {
           leaveQueued(item, part)
         } else if (part.fileSize <= 0L && currentDownloadItemParts.any { it.fileSize <= 0L }) {
@@ -448,6 +453,17 @@ class DownloadItemManager(
     }
   }
 
+  /** Retrying can't fix a revoked SAF grant, so this fails immediately instead of burning retries. */
+  private fun failPermissionLost(item: DownloadItem, part: DownloadItemPart) {
+    part.isMoving = false
+    part.permissionLost = true
+    markTerminalFailure(
+            item,
+            part,
+            "Lost access to \"${part.localFolderName}\" — re-select the folder in Local Folders to resume this download"
+    )
+  }
+
   @Synchronized
   private fun markTerminalFailure(item: DownloadItem, part: DownloadItemPart, reason: String) {
     AbsLogger.error(tag, "$reason: ${part.filename}")
@@ -457,6 +473,7 @@ class DownloadItemManager(
     part.completed = false
     part.downloadId = null
     part.isMoving = false
+    part.failureReason = reason
     item.terminalFailureAt = item.terminalFailureAt ?: System.currentTimeMillis()
     item.stagingCleanupAt = null
     persist(item, force = true)
@@ -492,6 +509,10 @@ class DownloadItemManager(
 
   private fun moveDownloadedFile(item: DownloadItem, part: DownloadItemPart) {
     if (part.moved || part.isMoving) return
+    if (!SimpleStorage.hasStorageAccess(context, part.localFolderUrl, true)) {
+      failPermissionLost(item, part)
+      return
+    }
     val root =
             DocumentFile.fromTreeUri(context, Uri.parse(part.localFolderUrl))
                     ?: return failFinalization(item, part, "Could not resolve SAF destination")
