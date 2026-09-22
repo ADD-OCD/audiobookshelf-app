@@ -38,12 +38,25 @@ be) in the official app.
 - **Distinct app identity** — installs as "Audiobookshelf+" with its own icon (a bronze plus
   badge over the official icon), so it's visually distinguishable from the official app and can
   be installed alongside it.
+- **Fixed downloads silently stalling when a local folder's permission is lost** — instead of
+  retrying forever and re-downloading the whole file from scratch on every app restart, the app
+  now detects a lost/invalid folder permission immediately and shows a clear error telling you to
+  re-select the folder.
+- **Fixed playback progress tracking the wrong book during continuous series playback** — after
+  the queue advanced to the next book, progress kept being recorded against the previous book
+  (wrong position, book never marked finished, series progress not shown); progress now follows
+  whichever book is actually playing.
+- **A visible, reorderable "Up Next" queue** — see what's playing next from the player's menu (or
+  an optional icon in the player itself), reorder or remove upcoming items, and add individual
+  books/episodes or a whole series/playlist/collection to the queue while something is already
+  playing.
 
 ### Getting builds
 
 This fork does not publish to the Play Store or TestFlight. Debug APKs are built from the
-`plus` branch — see the build instructions below, or check
-[Releases](https://github.com/ADD-OCD/audiobookshelf-app/releases) if any are published.
+`plus` branch and published on the
+[Releases](https://github.com/ADD-OCD/audiobookshelf-app/releases) page, or build it yourself
+with the instructions below.
 
 ---
 
