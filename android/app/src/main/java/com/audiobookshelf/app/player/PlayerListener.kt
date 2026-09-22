@@ -96,7 +96,10 @@ class PlayerListener(var playerNotificationService:PlayerNotificationService) : 
 
     // Start/stop progress sync interval
     if (isPlaying) {
-      val playbackSession: PlaybackSession? = playerNotificationService.mediaProgressSyncer.currentPlaybackSession ?: playerNotificationService.currentPlaybackSession
+      // Prefer PNS's session: preparePlayer() always sets it fresh, so it reflects a queue
+      // advance (e.g. continuous series) immediately. The syncer's copy only updates once play()
+      // below runs, so falling back to it first would keep re-confirming the stale prior item.
+      val playbackSession: PlaybackSession? = playerNotificationService.currentPlaybackSession ?: playerNotificationService.mediaProgressSyncer.currentPlaybackSession
       playbackSession?.let {
         // Handles auto-starting sleep timer and resetting sleep timer
         playerNotificationService.sleepTimerManager.handleMediaPlayEvent(it.id)
