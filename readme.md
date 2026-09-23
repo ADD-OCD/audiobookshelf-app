@@ -56,6 +56,9 @@ be) in the official app.
   checked server-synced progress, so a downloaded book's real progress (before it synced to the
   server, or if it never needed to) could show as barely started even though it was finished;
   it now checks local device progress too.
+- **Podcasts now auto-advance from the podcast page's Play button** — it already found the next
+  unfinished episode, but never queued anything after it, so playback stopped after one episode.
+  Now queues and continues through the remaining unfinished episodes, same as playlists already did.
 
 ### Getting builds
 
