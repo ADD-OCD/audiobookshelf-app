@@ -58,7 +58,10 @@ export default {
     seriesBookProgress() {
       return this.books
         .map((libraryItem) => {
-          return this.store.getters['user/getUserMediaProgress'](libraryItem.id)
+          // Prefer local device progress - a downloaded book's real progress may not have
+          // synced to the server yet, and server-only progress would show this book as
+          // unstarted/less-finished than it actually is.
+          return this.store.getters['globals/getLocalMediaProgressByServerItemId'](libraryItem.id) || this.store.getters['user/getUserMediaProgress'](libraryItem.id)
         })
         .filter((p) => !!p)
     },

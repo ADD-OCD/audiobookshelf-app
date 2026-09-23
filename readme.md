@@ -50,6 +50,12 @@ be) in the official app.
   an optional icon in the player itself), reorder or remove upcoming items, and add individual
   books/episodes or a whole series/playlist/collection to the queue while something is already
   playing.
+- **Bigger, clearer home screen widget buttons** — rewind/play/fast-forward now have a visible
+  rounded-rectangle outline and a larger tap target, instead of bare icons that were easy to miss.
+- **Fixed series progress not reflecting locally downloaded books** — the series shelf card only
+  checked server-synced progress, so a downloaded book's real progress (before it synced to the
+  server, or if it never needed to) could show as barely started even though it was finished;
+  it now checks local device progress too.
 
 ### Getting builds
 

@@ -57,7 +57,7 @@
         android:id="@+id/widgetButtonContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="3"
+        android:layout_weight="4"
         android:orientation="horizontal"
         android:background="?android:attr/colorAccent"
         android:theme="@style/MediaPlayerWidgetTheme">
@@ -67,16 +67,19 @@
           android:layout_width="0dp"
           android:layout_height="match_parent"
           android:layout_weight="1"
-          android:layout_margin="8dp"
-          android:src="@drawable/exo_icon_rewind"
-          style="@style/Widget.Android.AppWidget.InnerView"/>
+          android:layout_margin="4dp"
+          android:padding="8dp"
+          android:background="@drawable/widget_button_bg"
+          android:src="@drawable/exo_icon_rewind" />
 
         <ImageView
           android:id="@+id/widgetPlayPauseButton"
           android:layout_width="0dp"
           android:layout_height="match_parent"
           android:layout_weight="1"
-          android:layout_margin="6dp"
+          android:layout_margin="4dp"
+          android:padding="8dp"
+          android:background="@drawable/widget_button_bg"
           android:src="@drawable/ic_media_play_dark" />
 
         <ImageView
@@ -84,7 +87,9 @@
           android:layout_width="0dp"
           android:layout_height="match_parent"
           android:layout_weight="1"
-          android:layout_margin="8dp"
+          android:layout_margin="4dp"
+          android:padding="8dp"
+          android:background="@drawable/widget_button_bg"
           android:src="@drawable/exo_icon_fastforward" />
       </LinearLayout>
 
