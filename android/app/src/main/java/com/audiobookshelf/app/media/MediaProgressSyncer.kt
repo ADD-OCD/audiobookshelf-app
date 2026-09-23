@@ -235,6 +235,15 @@ class MediaProgressSyncer(
     }
     val listeningTimeToAdd = diffSinceLastSync / 1000L
 
+    // Captured now, not read live, so log lines in the async callbacks below stay correct even
+    // if the syncer moves on to the next queue item before the network response arrives.
+    // TODO(review): the server-sync branch further down (search "sendProgressSync") still reads
+    // currentSessionId live inside its async callback, including for removePlaybackSession(...) -
+    // that's not just a log cosmetics issue like this one was, it could remove the wrong session
+    // from the db if the syncer moves on before that network response arrives. Left as-is for now
+    // since it wasn't the mechanism observed causing confusion; revisit if it causes problems.
+    val syncedTitle = currentDisplayTitle
+
     val syncData = MediaProgressSyncData(listeningTimeToAdd, currentPlaybackDuration, currentTime)
     currentPlaybackSession?.syncData(syncData)
 
@@ -262,7 +271,7 @@ class MediaProgressSyncer(
                 tag,
                 "Sync local device current serverConnectionConfigId=${DeviceManager.serverConnectionConfig?.id}"
         )
-        AbsLogger.info("MediaProgressSyncer", "sync: Saved local progress (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${it.id})")
+        AbsLogger.info("MediaProgressSyncer", "sync: Saved local progress (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${it.id})")
 
         // Local library item is linked to a server library item
         // Send sync to server also if connected to this server and local item belongs to this
@@ -278,29 +287,29 @@ class MediaProgressSyncer(
               failedSyncs = 0
               playerNotificationService.alertSyncSuccess()
               DeviceManager.dbManager.removePlaybackSession(it.id) // Remove session from db
-              AbsLogger.info("MediaProgressSyncer", "sync: Successfully synced local progress (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${it.id})")
+              AbsLogger.info("MediaProgressSyncer", "sync: Successfully synced local progress (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${it.id})")
             } else {
               failedSyncs++
               if (failedSyncs == 2) {
                 playerNotificationService.alertSyncFailing() // Show alert in client
                 failedSyncs = 0
               }
-              AbsLogger.error("MediaProgressSyncer", "sync: Local progress sync failed (count: $failedSyncs) (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${it.id}) (${DeviceManager.serverConnectionConfigName})")
+              AbsLogger.error("MediaProgressSyncer", "sync: Local progress sync failed (count: $failedSyncs) (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${it.id}) (${DeviceManager.serverConnectionConfigName})")
             }
 
             cb(SyncResult(true, syncSuccess, errorMsg))
           }
         } else {
-          AbsLogger.info("MediaProgressSyncer", "sync: Not sending local progress to server (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${it.id}) (hasNetworkConnection: $hasNetworkConnection) (isConnectedToSameServer: $isConnectedToSameServer)")
+          AbsLogger.info("MediaProgressSyncer", "sync: Not sending local progress to server (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${it.id}) (hasNetworkConnection: $hasNetworkConnection) (isConnectedToSameServer: $isConnectedToSameServer)")
           cb(SyncResult(false, null, null))
         }
       }
     } else if (hasNetworkConnection && shouldSyncServer) {
-      AbsLogger.info("MediaProgressSyncer", "sync: Sending progress sync to server (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${currentSessionId}) (${DeviceManager.serverConnectionConfigName})")
+      AbsLogger.info("MediaProgressSyncer", "sync: Sending progress sync to server (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${currentSessionId}) (${DeviceManager.serverConnectionConfigName})")
 
       apiHandler.sendProgressSync(currentSessionId, syncData) { syncSuccess, errorMsg ->
         if (syncSuccess) {
-          AbsLogger.info("MediaProgressSyncer", "sync: Successfully synced progress (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: ${currentSessionId}) (${DeviceManager.serverConnectionConfigName})")
+          AbsLogger.info("MediaProgressSyncer", "sync: Successfully synced progress (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${currentSessionId}) (${DeviceManager.serverConnectionConfigName})")
 
           failedSyncs = 0
           playerNotificationService.alertSyncSuccess()
@@ -312,12 +321,12 @@ class MediaProgressSyncer(
             playerNotificationService.alertSyncFailing() // Show alert in client
             failedSyncs = 0
           }
-          AbsLogger.error("MediaProgressSyncer", "sync: Progress sync failed (count: $failedSyncs) (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: $currentSessionId) (${DeviceManager.serverConnectionConfigName})")
+          AbsLogger.error("MediaProgressSyncer", "sync: Progress sync failed (count: $failedSyncs) (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: $currentSessionId) (${DeviceManager.serverConnectionConfigName})")
         }
         cb(SyncResult(true, syncSuccess, errorMsg))
       }
     } else {
-      AbsLogger.info("MediaProgressSyncer", "sync: Not sending progress to server (title: \"$currentDisplayTitle\") (currentTime: $currentTime) (session id: $currentSessionId) (${DeviceManager.serverConnectionConfigName}) (hasNetworkConnection: $hasNetworkConnection)")
+      AbsLogger.info("MediaProgressSyncer", "sync: Not sending progress to server (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: $currentSessionId) (${DeviceManager.serverConnectionConfigName}) (hasNetworkConnection: $hasNetworkConnection)")
       cb(SyncResult(false, null, null))
     }
   }
