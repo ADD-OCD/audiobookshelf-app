@@ -59,6 +59,11 @@ be) in the official app.
 - **Podcasts now auto-advance from the podcast page's Play button** — it already found the next
   unfinished episode, but never queued anything after it, so playback stopped after one episode.
   Now queues and continues through the remaining unfinished episodes, same as playlists already did.
+- **Fixed offline listening progress getting silently wiped on reconnect** — the server/local
+  progress sync only compared timestamps, so a newer server timestamp would overwrite local
+  progress even when the server's actual position was behind (e.g. after a long offline listening
+  session). A newer server timestamp is now only trusted when its progress is actually caught up;
+  otherwise local's progress is pushed to the server instead of being overwritten.
 
 ### Getting builds
 
