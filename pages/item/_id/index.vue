@@ -535,7 +535,7 @@ export default {
           }
         })
 
-        let episode = this.episodes.find((ep) => {
+        const startIndex = this.episodes.findIndex((ep) => {
           var podcastProgress = null
           if (!this.isLocal) {
             podcastProgress = this.$store.getters['user/getUserMediaProgress'](this.libraryItemId, ep.id)
@@ -545,7 +545,9 @@ export default {
           return !podcastProgress?.isFinished
         })
 
-        if (!episode) episode = this.episodes[0]
+        const episode = startIndex >= 0 ? this.episodes[startIndex] : this.episodes[0]
+        // All caught up (or nothing has progress yet) - just play this one episode, no queue.
+        const remainingEpisodes = startIndex >= 0 ? this.episodes.slice(startIndex) : [episode]
 
         const episodeId = episode.id
 
@@ -557,15 +559,41 @@ export default {
         }
         const serverEpisodeId = !this.isLocal ? episodeId : localEpisode?.serverEpisodeId || null
 
+        // Queue the remaining unfinished episodes so playback auto-advances through the podcast,
+        // same as the series/collection Play buttons already do. Shaped like playlist items
+        // ({libraryItemId, episodeId, libraryItem, episode, localLibraryItem, localEpisode}) so
+        // the queue UI and native advancement work with zero changes on that side.
+        // NOTE: for a purely local episode with no connected server copy (this.isLocal with no
+        // serverLibraryItemId), queueItemDisplay() falls back to the parent podcast's title for
+        // every queued row instead of each episode's own title - cosmetic only, playback and
+        // advancement themselves are unaffected. Revisit if this confuses offline-only users.
+        const queueItems = remainingEpisodes.map((ep) => {
+          let epLocalEpisode = null
+          if (this.hasLocal && !this.isLocal) {
+            epLocalEpisode = this.localLibraryItem.media.episodes.find((le) => le.serverEpisodeId == ep.id)
+          } else if (this.isLocal) {
+            epLocalEpisode = ep
+          }
+          return {
+            libraryItemId: !this.isLocal ? this.libraryItemId : this.serverLibraryItemId || this.libraryItemId,
+            episodeId: !this.isLocal ? ep.id : epLocalEpisode?.serverEpisodeId || ep.id,
+            libraryItem: !this.isLocal ? this.libraryItem : null,
+            episode: !this.isLocal ? ep : null,
+            localLibraryItem: this.localLibraryItem,
+            localEpisode: epLocalEpisode
+          }
+        })
+        const queueSource = queueItems.length > 1 ? { sourceType: 'podcast', sourceId: this.libraryItemId, items: queueItems } : null
+
         this.episodeStartingPlayback = serverEpisodeId
         this.$store.commit('setPlayerIsStartingPlayback', serverEpisodeId)
         if (serverEpisodeId && this.serverLibraryItemId && this.isCasting) {
           // If casting and connected to server for local library item then send server library item id
-          this.$eventBus.$emit('play-item', { libraryItemId: this.serverLibraryItemId, episodeId: serverEpisodeId })
+          this.$eventBus.$emit('play-item', { libraryItemId: this.serverLibraryItemId, episodeId: serverEpisodeId, queueSource })
         } else if (localEpisode) {
-          this.$eventBus.$emit('play-item', { libraryItemId: this.localLibraryItem.id, episodeId: localEpisode.id, serverLibraryItemId: this.serverLibraryItemId, serverEpisodeId })
+          this.$eventBus.$emit('play-item', { libraryItemId: this.localLibraryItem.id, episodeId: localEpisode.id, serverLibraryItemId: this.serverLibraryItemId, serverEpisodeId, queueSource })
         } else {
-          this.$eventBus.$emit('play-item', { libraryItemId: this.libraryItemId, episodeId })
+          this.$eventBus.$emit('play-item', { libraryItemId: this.libraryItemId, episodeId, queueSource })
         }
       } else {
         // Audiobook

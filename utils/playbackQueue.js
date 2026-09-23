@@ -43,7 +43,8 @@ export async function fetchSeriesBooks(http, libraryId, seriesId, encode) {
 }
 
 export async function buildQueueSourceItems(context, source) {
-  if (source.sourceType === 'playlist') {
+  // 'podcast' items are pre-built by the caller (pages/item/_id/index.vue), same as 'playlist'.
+  if (source.sourceType === 'playlist' || source.sourceType === 'podcast') {
     return source.items
   } else if (source.sourceType === 'series' || source.sourceType === 'collection') {
     const books = source.sourceType === 'series' ? await fetchSeriesBooks(context.$nativeHttp, source.libraryId, source.sourceId, context.$encode) : source.books
