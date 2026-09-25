@@ -1,11 +1,16 @@
 <template>
-  <bookshelf-lazy-bookshelf page="series-books" :series-id="seriesId" v-on:downloadSeriesClick="downloadSeriesClick" />
+  <div>
+    <bookshelf-lazy-bookshelf page="series-books" :series-id="seriesId" v-on:downloadSeriesClick="downloadSeriesClick" />
+    <modals-download-or-stream-modal v-model="showDownloadOrStreamModal" :any-local="pendingAnyLocal" @play="onDownloadOrStreamPlay" @downloadAndPlay="onDownloadOrStreamDownloadAndPlay" />
+  </div>
 </template>
 
 <script>
 import { Dialog } from '@capacitor/dialog'
 import { AbsDownloader } from '@/plugins/capacitor'
 import cellularPermissionHelpers from '@/mixins/cellularPermissionHelpers'
+import { buildQueueSourceItems } from '@/utils/playbackQueue'
+import { downloadMissingItems } from '@/utils/bulkDownload'
 
 export default {
   async asyncData({ params, app, store, redirect }) {
@@ -30,7 +35,10 @@ export default {
       books: 0,
       missingFiles: 0,
       missingFilesSize: 0,
-      libraryIds: []
+      libraryIds: [],
+      showDownloadOrStreamModal: false,
+      pendingQueueItems: [],
+      pendingAnyLocal: false
     }
   },
   mixins: [cellularPermissionHelpers],
@@ -40,10 +48,38 @@ export default {
     }
   },
   methods: {
-    playSeries() {
+    async playSeries() {
       if (this.$platform !== 'android' || this.$store.state.playerIsStartingPlayback) return
       this.$store.commit('setPlayerIsStartingPlayback', this.seriesId)
-      this.$eventBus.$emit('play-item', { queueSource: { sourceType: 'series', sourceId: this.seriesId, libraryId: this.series.libraryId } })
+      let items
+      try {
+        items = await buildQueueSourceItems(this, { sourceType: 'series', sourceId: this.seriesId, libraryId: this.series.libraryId })
+      } catch (error) {
+        console.error('Failed to resolve series queue', error)
+        this.$store.commit('setPlayerDoneStartingPlayback')
+        this.$toast.error(error.message || 'Failed to load series')
+        return
+      }
+      const missingCount = items.filter((item) => !item.localLibraryItem).length
+      if (missingCount && this.$store.getters['getAskBeforeStreamingIncomplete']) {
+        this.$store.commit('setPlayerDoneStartingPlayback')
+        this.pendingQueueItems = items
+        this.pendingAnyLocal = items.length > missingCount
+        this.showDownloadOrStreamModal = true
+        return
+      }
+      this.startSeriesPlayback(items)
+    },
+    startSeriesPlayback(items) {
+      this.$store.commit('setPlayerIsStartingPlayback', this.seriesId)
+      this.$eventBus.$emit('play-item', { queueSource: { sourceType: 'series', sourceId: this.seriesId, items } })
+    },
+    onDownloadOrStreamPlay() {
+      this.startSeriesPlayback(this.pendingQueueItems)
+    },
+    onDownloadOrStreamDownloadAndPlay() {
+      downloadMissingItems(this, this.pendingQueueItems)
+      this.startSeriesPlayback(this.pendingQueueItems)
     },
     async addSeriesToQueue() {
       if (this.$platform !== 'android') return
@@ -68,6 +104,9 @@ export default {
     buildSearchParams() {
       let searchParams = new URLSearchParams()
       searchParams.set('filter', `series.${this.$encode(this.seriesId)}`)
+      // Sorted by series sequence so downloads start in the order they'll actually be needed.
+      searchParams.set('sort', 'sequence')
+      searchParams.set('desc', '0')
       return searchParams.toString()
     },
     async fetchSeriesEntities(page) {

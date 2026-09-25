@@ -101,6 +101,9 @@ export const getters = {
     const minorVersion = parseInt(versionParts[1])
     return majorVersion < 2 || (majorVersion == 2 && minorVersion < 17)
   },
+  getAskBeforeStreamingIncomplete: (state) => {
+    return !!state.deviceData?.deviceSettings?.askBeforeStreamingIncomplete
+  },
   getPlaybackQueueCurrentItem: (state) => {
     if (!state.playbackQueue) return null
     return state.playbackQueue.items[state.playbackQueue.currentIndex] || null

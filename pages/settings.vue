@@ -67,6 +67,12 @@
       </div>
       <p class="pl-4">{{ $strings.LabelAllowSeekingOnMediaControls }}</p>
     </div>
+    <div class="flex items-center py-3">
+      <div class="w-10 flex justify-center" @click="toggleAskBeforeStreamingIncomplete">
+        <ui-toggle-switch v-model="settings.askBeforeStreamingIncomplete" @input="saveSettings" />
+      </div>
+      <p class="pl-4">Ask before streaming incomplete series/collections/playlists</p>
+    </div>
 
     <!-- Sleep timer settings -->
     <template v-if="!isiOS">
@@ -223,7 +229,8 @@ export default {
         downloadUsingCellular: 'ALWAYS',
         streamingUsingCellular: 'ALWAYS',
         androidAutoBrowseLimitForGrouping: 100,
-        androidAutoBrowseSeriesSequenceOrder: 'ASC'
+        androidAutoBrowseSeriesSequenceOrder: 'ASC',
+        askBeforeStreamingIncomplete: false
       },
       theme: 'dark',
       lockCurrentOrientation: false,
@@ -611,6 +618,10 @@ export default {
       this.settings.allowSeekingOnMediaControls = !this.settings.allowSeekingOnMediaControls
       this.saveSettings()
     },
+    toggleAskBeforeStreamingIncomplete() {
+      this.settings.askBeforeStreamingIncomplete = !this.settings.askBeforeStreamingIncomplete
+      this.saveSettings()
+    },
     getCurrentOrientation() {
       const orientation = window.screen?.orientation || {}
       const type = orientation.type || ''
@@ -643,6 +654,7 @@ export default {
       this.settings.disableAutoRewind = !!deviceSettings.disableAutoRewind
       this.settings.enableAltView = !!deviceSettings.enableAltView
       this.settings.allowSeekingOnMediaControls = !!deviceSettings.allowSeekingOnMediaControls
+      this.settings.askBeforeStreamingIncomplete = !!deviceSettings.askBeforeStreamingIncomplete
       this.settings.jumpForwardTime = deviceSettings.jumpForwardTime || 10
       this.settings.jumpBackwardsTime = deviceSettings.jumpBackwardsTime || 10
       this.settings.enableMp3IndexSeeking = !!deviceSettings.enableMp3IndexSeeking

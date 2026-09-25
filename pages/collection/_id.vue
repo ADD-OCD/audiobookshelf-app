@@ -29,10 +29,12 @@
     <div v-show="processingRemove" class="absolute top-0 left-0 w-full h-full z-10 bg-black bg-opacity-40 flex items-center justify-center">
       <ui-loading-indicator />
     </div>
+    <modals-download-or-stream-modal v-model="showDownloadOrStreamModal" :any-local="pendingAnyLocal" @play="onDownloadOrStreamPlay" @downloadAndPlay="onDownloadOrStreamDownloadAndPlay" />
   </div>
 </template>
 
 <script>
+import { downloadMissingItems } from '@/utils/bulkDownload'
 export default {
   async asyncData({ store, params, app, redirect, route }) {
     if (!store.state.user.user) {
@@ -67,7 +69,10 @@ export default {
   data() {
     return {
       mediaIdStartingPlayback: null,
-      processingRemove: false
+      processingRemove: false,
+      showDownloadOrStreamModal: false,
+      pendingQueueItems: [],
+      pendingAnyLocal: false
     }
   },
   computed: {
@@ -123,9 +128,15 @@ export default {
     },
     playNextItem() {
       if (this.$platform === 'android') {
-        this.$store.commit('setPlayerIsStartingPlayback', this.collection.id)
-        this.mediaIdStartingPlayback = this.collection.id
-        this.$eventBus.$emit('play-item', { queueSource: { sourceType: 'collection', sourceId: this.collection.id, books: this.bookItems } })
+        const items = this.playableItems.map((book) => ({ libraryItemId: book.id, episodeId: null, localLibraryItem: book.localLibraryItem || null }))
+        const missingCount = items.filter((item) => !item.localLibraryItem).length
+        if (missingCount && this.$store.getters['getAskBeforeStreamingIncomplete']) {
+          this.pendingQueueItems = items
+          this.pendingAnyLocal = items.length > missingCount
+          this.showDownloadOrStreamModal = true
+          return
+        }
+        this.startCollectionPlayback(items)
         return
       }
       const nextBookNotRead = this.playableItems.find((pb) => {
@@ -142,6 +153,18 @@ export default {
           this.$eventBus.$emit('play-item', { libraryItemId: nextBookNotRead.id })
         }
       }
+    },
+    startCollectionPlayback(items) {
+      this.$store.commit('setPlayerIsStartingPlayback', this.collection.id)
+      this.mediaIdStartingPlayback = this.collection.id
+      this.$eventBus.$emit('play-item', { queueSource: { sourceType: 'collection', sourceId: this.collection.id, items } })
+    },
+    onDownloadOrStreamPlay() {
+      this.startCollectionPlayback(this.pendingQueueItems)
+    },
+    onDownloadOrStreamDownloadAndPlay() {
+      downloadMissingItems(this, this.pendingQueueItems)
+      this.startCollectionPlayback(this.pendingQueueItems)
     },
     async addToQueueClick() {
       await this.$hapticsImpact()

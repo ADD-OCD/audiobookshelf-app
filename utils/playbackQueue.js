@@ -15,12 +15,16 @@ export function queueItemPayload(item) {
   }
 }
 
+// Prefers a local copy of each book when one exists and is complete, but no longer drops a book
+// from the queue just because it isn't downloaded - it's included as a server-only (streamable)
+// item instead, so a gap in the downloads doesn't skip that book during continuous playback.
 export function downloadedBookItems(books, localItems, serverConnectionConfigId) {
   return books.flatMap((book) => {
+    if (book.isMissing || book.isInvalid) return []
     const localLibraryItem = localItems.find((local) => local.libraryItemId === book.id && local.serverConnectionConfigId === serverConnectionConfigId && local.id?.startsWith('local') && local.mediaType === 'book' && !local.isInvalid && local.media?.tracks?.length)
     const expectedTracks = book.media?.numTracks || book.media?.tracks?.length || 0
-    if (!localLibraryItem || book.isMissing || book.isInvalid || localLibraryItem.media.tracks.length < expectedTracks) return []
-    return [{ libraryItemId: book.id, episodeId: null, localLibraryItem }]
+    const hasCompleteLocalCopy = localLibraryItem && localLibraryItem.media.tracks.length >= expectedTracks
+    return [{ libraryItemId: book.id, episodeId: null, localLibraryItem: hasCompleteLocalCopy ? localLibraryItem : null }]
   })
 }
 
@@ -43,16 +47,15 @@ export async function fetchSeriesBooks(http, libraryId, seriesId, encode) {
 }
 
 export async function buildQueueSourceItems(context, source) {
-  // 'podcast' items are pre-built by the caller (pages/item/_id/index.vue), same as 'playlist'.
-  if (source.sourceType === 'playlist' || source.sourceType === 'podcast') {
-    return source.items
-  } else if (source.sourceType === 'series' || source.sourceType === 'collection') {
+  // Already resolved by the caller (playlist/podcast sources, or a series/collection resolved
+  // up front by the Play-prompt flow to decide whether to prompt without a second fetch here).
+  if (source.items) return source.items
+  if (source.sourceType === 'series' || source.sourceType === 'collection') {
     const books = source.sourceType === 'series' ? await fetchSeriesBooks(context.$nativeHttp, source.libraryId, source.sourceId, context.$encode) : source.books
     const localItems = (await context.$db.getLocalLibraryItems('book')) || []
     return downloadedBookItems(books, localItems, context.$store.getters['user/getServerConnectionConfigId'])
-  } else {
-    throw new Error('Unknown playback queue source')
   }
+  throw new Error('Unknown playback queue source')
 }
 
 // Items to append to an already-playing queue: same source resolution as resolvePlaybackQueue,

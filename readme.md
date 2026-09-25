@@ -64,6 +64,14 @@ be) in the official app.
   progress even when the server's actual position was behind (e.g. after a long offline listening
   session). A newer server timestamp is now only trusted when its progress is actually caught up;
   otherwise local's progress is pushed to the server instead of being overwritten.
+- **Continuous series/collection playback now streams past gaps in your downloads** instead of
+  silently skipping undownloaded books — local is still always preferred when present.
+- **Optional prompt when playing an incomplete series/collection/playlist** — off by default; when
+  enabled (Settings), tapping Play on something that isn't fully downloaded offers a choice
+  between playing now (streaming the gaps) or downloading the missing pieces while playback starts
+  immediately. Downloads are triggered in the order they'll actually be needed.
+- **Fixed the "Download Series" button downloading in arbitrary order** — it now downloads in
+  series sequence, same order continuous playback already uses.
 
 ### Getting builds
 
