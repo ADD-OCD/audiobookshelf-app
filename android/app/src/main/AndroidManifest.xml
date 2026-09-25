@@ -54,7 +54,7 @@
             android:resource="@xml/automotive_app_desc" /> <!-- Support for Cast -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="com.audiobookshelf.app.CastOptionsProvider" />
+            android:value="app.absplus.android.CastOptionsProvider" />
 
         <activity
             android:name=".MainActivity"
