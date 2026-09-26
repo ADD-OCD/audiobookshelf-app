@@ -579,7 +579,11 @@ export default {
             episodeId: !this.isLocal ? ep.id : epLocalEpisode?.serverEpisodeId || ep.id,
             libraryItem: !this.isLocal ? this.libraryItem : null,
             episode: !this.isLocal ? ep : null,
-            localLibraryItem: this.localLibraryItem,
+            // Only pair with the local podcast item when this specific episode is also
+            // downloaded - otherwise nativeQueueItems() sees a truthy localLibraryItem with no
+            // localEpisode and resolves to the local item with a null episode id, which native
+            // then plays as every downloaded episode of the podcast concatenated together.
+            localLibraryItem: epLocalEpisode ? this.localLibraryItem : null,
             localEpisode: epLocalEpisode
           }
         })

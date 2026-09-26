@@ -57,7 +57,7 @@ export default {
       const localLibraryItems = (await app.$db.getLocalLibraryItems(playlist.items[0].libraryItem.mediaType)) || []
       if (localLibraryItems.length) {
         playlist.items.forEach((playlistItem) => {
-          const matchingLocalLibraryItem = localLibraryItems.find((lli) => lli.libraryItemId === playlistItem.libraryItemId)
+          const matchingLocalLibraryItem = localLibraryItems.find((lli) => lli.libraryItemId === playlistItem.libraryItemId || (playlistItem.libraryItem?.ino && lli.ino && lli.ino === playlistItem.libraryItem.ino))
           if (!matchingLocalLibraryItem) return
           if (playlistItem.episode) {
             const matchingLocalEpisode = matchingLocalLibraryItem.media.episodes?.find((lep) => lep.serverEpisodeId === playlistItem.episodeId)

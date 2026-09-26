@@ -35,6 +35,7 @@
 
 <script>
 import { downloadMissingItems } from '@/utils/bulkDownload'
+import { buildQueueSourceItems } from '@/utils/playbackQueue'
 export default {
   async asyncData({ store, params, app, redirect, route }) {
     if (!store.state.user.user) {
@@ -55,7 +56,7 @@ export default {
       const localLibraryItems = (await app.$db.getLocalLibraryItems('book')) || []
       if (localLibraryItems.length) {
         collection.books.forEach((collectionItem) => {
-          const matchingLocalLibraryItem = localLibraryItems.find((lli) => lli.libraryItemId === collectionItem.id)
+          const matchingLocalLibraryItem = localLibraryItems.find((lli) => lli.libraryItemId === collectionItem.id || (collectionItem.ino && lli.ino && lli.ino === collectionItem.ino))
           if (!matchingLocalLibraryItem) return
           collectionItem.localLibraryItem = matchingLocalLibraryItem
         })
@@ -126,11 +127,26 @@ export default {
         this.playNextItem()
       }
     },
-    playNextItem() {
+    async playNextItem() {
       if (this.$platform === 'android') {
-        const items = this.playableItems.map((book) => ({ libraryItemId: book.id, episodeId: null, localLibraryItem: book.localLibraryItem || null }))
+        if (this.$store.state.playerIsStartingPlayback) return
+        this.$store.commit('setPlayerIsStartingPlayback', this.collection.id)
+        let items
+        try {
+          // Re-resolves local copies with the same completeness/ino-aware check continuous
+          // series playback and Add-to-Queue already use, instead of trusting the asyncData
+          // attachment as-is (which only checked libraryItemId and didn't verify the local copy
+          // was actually complete).
+          items = await buildQueueSourceItems(this, { sourceType: 'collection', sourceId: this.collection.id, books: this.bookItems })
+        } catch (error) {
+          console.error('Failed to resolve collection queue', error)
+          this.$store.commit('setPlayerDoneStartingPlayback')
+          this.$toast.error(error.message || 'Failed to load collection')
+          return
+        }
         const missingCount = items.filter((item) => !item.localLibraryItem).length
         if (missingCount && this.$store.getters['getAskBeforeStreamingIncomplete']) {
+          this.$store.commit('setPlayerDoneStartingPlayback')
           this.pendingQueueItems = items
           this.pendingAnyLocal = items.length > missingCount
           this.showDownloadOrStreamModal = true

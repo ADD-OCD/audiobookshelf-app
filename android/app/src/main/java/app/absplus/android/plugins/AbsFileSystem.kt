@@ -238,7 +238,7 @@ class AbsFileSystem : Plugin() {
           return
         }
         val lib = libraries[index]
-        apiHandler.getLibraryItems(lib.id) { items ->
+        apiHandler.getAllLibraryItems(lib.id) { items ->
           itemsByLibrary[lib.id] = items
           fetchNextLibrary(index + 1)
         }

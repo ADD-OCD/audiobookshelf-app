@@ -482,6 +482,34 @@ class ApiHandler(var ctx:Context) {
     }
   }
 
+  // Unlike getLibraryItems() (capped at 100 for Android Auto browsing), this pages through the
+  // entire library - used by Rescan Folder, which needs to find a match regardless of how many
+  // items are in the library, not just the first page.
+  fun getAllLibraryItems(libraryId:String, cb: (List<LibraryItem>) -> Unit) {
+    val allItems = mutableListOf<LibraryItem>()
+    val limit = 100
+
+    fun fetchPage(page: Int) {
+      getRequest("/api/libraries/$libraryId/items?limit=$limit&page=$page&minified=1", null, null) {
+        if (!it.has("results")) {
+          cb(allItems)
+          return@getRequest
+        }
+        val array = it.getJSONArray("results")
+        for (i in 0 until array.length()) {
+          allItems.add(jacksonMapper.readValue<LibraryItem>(array.get(i).toString()))
+        }
+        val total = it.optInt("total", allItems.size)
+        if (array.length() < limit || allItems.size >= total) {
+          cb(allItems)
+        } else {
+          fetchPage(page + 1)
+        }
+      }
+    }
+    fetchPage(0)
+  }
+
   fun getLibrarySeries(libraryId:String, cb: (List<LibrarySeriesItem>) -> Unit) {
     Log.d(tag, "Getting series")
     getRequest("/api/libraries/$libraryId/series?minified=1&sort=name&limit=10000", null, null) {

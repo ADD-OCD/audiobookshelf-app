@@ -31,8 +31,18 @@ export async function downloadMissingItems(context, items) {
       libraryItemId: item.libraryItemId,
       episodeId: item.episodeId || undefined,
       localFolderId: folderByMediaType[mediaType].id
-    }).catch((error) => {
-      console.error('[bulkDownload] Failed to start download for', item.libraryItemId, error)
     })
+      .then((result) => {
+        // downloadLibraryItem resolves (does not reject) with an `error` field for expected
+        // failures (e.g. lost folder permission) - the promise-level .catch below never sees these.
+        if (result?.error) {
+          console.error('[bulkDownload] Failed to start download for', item.libraryItemId, result.error)
+          context.$toast.error(result.error)
+        }
+      })
+      .catch((error) => {
+        console.error('[bulkDownload] Failed to start download for', item.libraryItemId, error)
+        context.$toast.error(error.message || 'Failed to start download')
+      })
   }
 }

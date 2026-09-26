@@ -786,10 +786,32 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         return
       }
       val playbackSession = localItem.getPlaybackSession(episode, getDeviceInfo())
-      Log.d(tag, "advancePlaylistQueue: local session ready, calling preparePlayer")
-      PlayerListener.lazyIsPlaying = false
-      preparePlayer(playbackSession, true, playbackRate)
-      if (wakeLock.isHeld) wakeLock.release()
+      Log.d(tag, "advancePlaylistQueue: local session ready")
+
+      fun startLocalPlayback() {
+        PlayerListener.lazyIsPlaying = false
+        preparePlayer(playbackSession, true, playbackRate)
+        if (wakeLock.isHeld) wakeLock.release()
+      }
+
+      // getPlaybackSession() only checks local progress. If there is none, this item may still
+      // have progress recorded on the server only (e.g. listened to elsewhere before
+      // downloading) - check before assuming a true 0:00 start, using the same lightweight
+      // lookup checkCurrentSessionProgress() already uses for the resume-time check.
+      val serverLibraryItemId = localItem.libraryItemId
+      val serverConnectionConfig = localItem.serverConnectionConfigId?.let { DeviceManager.getServerConnectionConfig(it) }
+      if (playbackSession.currentTime == 0.0 && !serverLibraryItemId.isNullOrEmpty() && serverConnectionConfig != null && DeviceManager.checkConnectivity(ctx)) {
+        Log.d(tag, "advancePlaylistQueue: no local progress, checking server progress for $serverLibraryItemId")
+        apiHandler.getMediaProgress(serverLibraryItemId, episode?.serverEpisodeId, serverConnectionConfig) { mediaProgress ->
+          if (mediaProgress != null && !mediaProgress.isFinished && mediaProgress.currentTime > 0.0) {
+            Log.d(tag, "advancePlaylistQueue: found server progress, resuming from ${mediaProgress.currentTime}")
+            playbackSession.currentTime = mediaProgress.currentTime
+          }
+          Handler(Looper.getMainLooper()).post { startLocalPlayback() }
+        }
+      } else {
+        startLocalPlayback()
+      }
     } else {
       Log.d(tag, "advancePlaylistQueue: requesting server item ${nextItem.libraryItemId}")
       // Acquire WiFi lock for server items to keep network alive during API call
