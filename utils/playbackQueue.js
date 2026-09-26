@@ -26,13 +26,20 @@ export function resolveItemProgress(context, item) {
 // Prefers a local copy of each book when one exists and is complete, but no longer drops a book
 // from the queue just because it isn't downloaded - it's included as a server-only (streamable)
 // item instead, so a gap in the downloads doesn't skip that book during continuous playback.
+// Books with no audio (e.g. an ebook-only series entry) are excluded entirely - there is nothing
+// to play or stream for them. Local matching falls back to `ino` (same convention used for the
+// downloaded-badge elsewhere) so a book downloaded via a different library it also belongs to is
+// still recognized as local instead of being re-downloaded/streamed.
 export function downloadedBookItems(books, localItems, serverConnectionConfigId) {
   return books.flatMap((book) => {
     if (book.isMissing || book.isInvalid) return []
-    const localLibraryItem = localItems.find((local) => local.libraryItemId === book.id && local.serverConnectionConfigId === serverConnectionConfigId && local.id?.startsWith('local') && local.mediaType === 'book' && !local.isInvalid && local.media?.tracks?.length)
     const expectedTracks = book.media?.numTracks || book.media?.tracks?.length || 0
+    if (!expectedTracks) return []
+    const localLibraryItem = localItems.find((local) => (local.libraryItemId === book.id || (book.ino && local.ino && local.ino === book.ino)) && local.serverConnectionConfigId === serverConnectionConfigId && local.id?.startsWith('local') && local.mediaType === 'book' && !local.isInvalid && local.media?.tracks?.length)
     const hasCompleteLocalCopy = localLibraryItem && localLibraryItem.media.tracks.length >= expectedTracks
-    return [{ libraryItemId: book.id, episodeId: null, localLibraryItem: hasCompleteLocalCopy ? localLibraryItem : null }]
+    // Streamable items carry the raw book so the Up Next queue can display a title/cover for
+    // them (queueItemDisplay's `item.libraryItem` branch) instead of falling back to "Unknown".
+    return [{ libraryItemId: book.id, episodeId: null, localLibraryItem: hasCompleteLocalCopy ? localLibraryItem : null, libraryItem: hasCompleteLocalCopy ? null : book }]
   })
 }
 

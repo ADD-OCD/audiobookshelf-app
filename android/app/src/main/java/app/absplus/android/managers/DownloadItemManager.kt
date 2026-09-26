@@ -770,6 +770,10 @@ class DownloadItemManager(
     part.authRetryCount = 0
     part.waitingForSpace = false
     part.reusedExistingFile = false
+    // Clear any terminal-failure state from a prior attempt (e.g. a lost SAF permission the
+    // user has since fixed) so a stale reason/flag doesn't linger and mislead the Downloads UI.
+    part.permissionLost = false
+    part.failureReason = null
     return true
   }
 
