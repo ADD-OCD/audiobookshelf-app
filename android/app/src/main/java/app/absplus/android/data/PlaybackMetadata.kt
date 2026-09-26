@@ -1,0 +1,11 @@
+package app.absplus.android.data
+
+enum class PlayerState {
+  IDLE, BUFFERING, READY, ENDED
+}
+
+data class PlaybackMetadata(
+  val duration:Double,
+  val currentTime:Double,
+  val playerState:PlayerState
+)
