@@ -76,6 +76,9 @@ be) in the official app.
   book with progress recorded only on the server (e.g. listened to elsewhere before downloading)
   now resumes from that progress when played from a playlist, instead of silently ignoring it
   because only local progress was checked.
+- **Fixed the "Ask before streaming incomplete series/collections/playlists" setting not staying
+  enabled** — the native device-settings model was missing this field, so it was silently dropped
+  every time settings saved and the toggle immediately reverted to off.
 
 ### Getting builds
 
