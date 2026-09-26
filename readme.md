@@ -72,6 +72,10 @@ be) in the official app.
   immediately. Downloads are triggered in the order they'll actually be needed.
 - **Fixed the "Download Series" button downloading in arbitrary order** — it now downloads in
   series sequence, same order continuous playback already uses.
+- **Fixed a playlist item restarting from 0:00 despite showing prior progress** — a downloaded
+  book with progress recorded only on the server (e.g. listened to elsewhere before downloading)
+  now resumes from that progress when played from a playlist, instead of silently ignoring it
+  because only local progress was checked.
 
 ### Getting builds
 

@@ -34,7 +34,7 @@
 </template>
 
 <script>
-import { queueItemPayload } from '@/utils/playbackQueue'
+import { queueItemPayload, resolveItemProgress } from '@/utils/playbackQueue'
 import { downloadMissingItems } from '@/utils/bulkDownload'
 
 export default {
@@ -149,7 +149,7 @@ export default {
     },
     playNextItem() {
       const nextIndex = this.playableItems.findIndex((i) => {
-        const prog = this.$store.getters['user/getUserMediaProgress'](i.libraryItemId, i.episodeId)
+        const prog = resolveItemProgress(this, i)
         return !prog?.isFinished
       })
       if (nextIndex < 0) return
@@ -166,10 +166,18 @@ export default {
     startPlaylistPlayback(nextItem) {
       this.mediaIdStartingPlayback = nextItem.episodeId || nextItem.libraryItemId
       this.$store.commit('setPlayerIsStartingPlayback', this.mediaIdStartingPlayback)
-      this.$eventBus.$emit('play-item', {
+      const payload = {
         ...queueItemPayload(nextItem),
         queueSource: { sourceType: 'playlist', sourceId: this.playlist.id, items: this.playableItems }
-      })
+      }
+      // Local playback only resumes from local progress; pass an explicit override when this
+      // item's real progress is server-side (e.g. listened elsewhere before downloading), so it
+      // doesn't silently restart at 0:00 despite the UI showing it as partially listened.
+      if (nextItem.localLibraryItem) {
+        const progress = resolveItemProgress(this, nextItem)
+        if (progress?.currentTime) payload.startTime = progress.currentTime
+      }
+      this.$eventBus.$emit('play-item', payload)
     },
     onDownloadOrStreamPlay() {
       this.startPlaylistPlayback(this.pendingNextItem)

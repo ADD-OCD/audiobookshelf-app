@@ -15,6 +15,14 @@ export function queueItemPayload(item) {
   }
 }
 
+// Local progress takes priority when it exists, matching the precedence used elsewhere in this
+// file (resolveQueueSourceAppendItems, resolvePlaybackQueue's index selection) - falls back to
+// server progress so an item with only server-side progress isn't treated as unstarted.
+export function resolveItemProgress(context, item) {
+  const localProgress = item.localLibraryItem && context.$store.getters['globals/getLocalMediaProgressById'](item.localLibraryItem.id, item.localEpisode?.id)
+  return localProgress || context.$store.getters['user/getUserMediaProgress'](item.libraryItemId, item.episodeId)
+}
+
 // Prefers a local copy of each book when one exists and is complete, but no longer drops a book
 // from the queue just because it isn't downloaded - it's included as a server-only (streamable)
 // item instead, so a gap in the downloads doesn't skip that book during continuous playback.
