@@ -79,6 +79,15 @@ be) in the official app.
 - **Fixed the "Ask before streaming incomplete series/collections/playlists" setting not staying
   enabled** — the native device-settings model was missing this field, so it was silently dropped
   every time settings saved and the toggle immediately reverted to off.
+- **Stability pass**: fixed a batch of playback/download edge cases found during a full audit of
+  existing features. Playlist and podcast auto-advance now correctly resume/play the intended
+  item; a book downloaded via one library now shows as downloaded everywhere it appears, even
+  during continuous series/collection/playlist playback (not just on the bookshelf badge);
+  Collection playback no longer treats a partially-downloaded book as complete; the Up Next queue
+  now shows a proper title and cover for items that are streaming rather than downloaded; a rare
+  situation that could stop all playback until the app was restarted is fixed; failed downloads
+  (e.g. a lost folder permission) now show an error instead of failing silently; and Rescan Folder
+  now checks your whole library instead of only the first 100 books.
 
 ### Getting builds
 
