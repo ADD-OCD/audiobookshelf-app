@@ -1,6 +1,6 @@
 <template>
-  <div class="w-full h-full">
-    <div class="relative flex items-center justify-center min-h-screen sm:pt-0">
+  <div class="w-full h-full overflow-y-auto">
+    <div class="relative flex items-center justify-center min-h-full py-12 sm:pt-0">
       <nuxt-link to="/" class="absolute top-2 left-2 z-20">
         <span class="material-symbols text-4xl">arrow_back</span>
       </nuxt-link>
