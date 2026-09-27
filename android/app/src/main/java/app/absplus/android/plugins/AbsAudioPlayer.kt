@@ -1,5 +1,6 @@
 package app.absplus.android.plugins
 
+import app.absplus.android.diagnostics.DLog
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -43,7 +44,7 @@ class AbsAudioPlayer : Plugin() {
     try {
       initCastManager()
     } catch(e:Exception) {
-      Log.e(tag, "initCastManager exception ${e.printStackTrace()}")
+      DLog.e(tag, "initCastManager exception ${e.printStackTrace()}")
     }
 
     val foregroundServiceReady : () -> Unit = {
@@ -156,7 +157,7 @@ class AbsAudioPlayer : Plugin() {
     queue.put("items", JSArray(jacksonMapper.writeValueAsString(pns.playlistQueue)))
     queue.put("currentIndex", pns.playlistQueueIndex)
     ret.put("queue", queue)
-    Log.i("PlaybackRestore", "UI requested native playback state | hasSession=${session != null} | isPlaying=${session != null && pns.currentPlayer.isPlaying} | queue=${pns.playlistQueue.size}")
+    DLog.i("PlaybackRestore", "UI requested native playback state | hasSession=${session != null} | isPlaying=${session != null && pns.currentPlayer.isPlaying} | queue=${pns.playlistQueue.size}")
     call.resolve(ret)
   }
 
@@ -198,48 +199,48 @@ class AbsAudioPlayer : Plugin() {
 
     if (statusCode != ConnectionResult.SUCCESS) {
         if (statusCode == ConnectionResult.SERVICE_MISSING) {
-          Log.w(tag, "initCastManager: Google Api Missing")
+          DLog.w(tag, "initCastManager: Google Api Missing")
         } else if (statusCode == ConnectionResult.SERVICE_DISABLED) {
-          Log.w(tag, "initCastManager: Google Api Disabled")
+          DLog.w(tag, "initCastManager: Google Api Disabled")
         } else if (statusCode == ConnectionResult.SERVICE_INVALID) {
-          Log.w(tag, "initCastManager: Google Api Invalid")
+          DLog.w(tag, "initCastManager: Google Api Invalid")
         } else if (statusCode == ConnectionResult.SERVICE_UPDATING) {
-          Log.w(tag, "initCastManager: Google Api Updating")
+          DLog.w(tag, "initCastManager: Google Api Updating")
         } else if (statusCode == ConnectionResult.SERVICE_VERSION_UPDATE_REQUIRED) {
-          Log.w(tag, "initCastManager: Google Api Update Required")
+          DLog.w(tag, "initCastManager: Google Api Update Required")
         }
         return
     }
 
     val connListener = object: CastManager.ChromecastListener() {
       override fun onReceiverAvailableUpdate(available: Boolean) {
-        Log.d(tag, "ChromecastListener: CAST Receiver Update Available $available")
+        DLog.d(tag, "ChromecastListener: CAST Receiver Update Available $available")
         isCastAvailable = available
         emit("onCastAvailableUpdate", available)
       }
 
       override fun onSessionRejoin(jsonSession: JSONObject?) {
-        Log.d(tag, "ChromecastListener: CAST onSessionRejoin")
+        DLog.d(tag, "ChromecastListener: CAST onSessionRejoin")
       }
 
       override fun onMediaLoaded(jsonMedia: JSONObject?) {
-        Log.d(tag, "ChromecastListener: CAST onMediaLoaded")
+        DLog.d(tag, "ChromecastListener: CAST onMediaLoaded")
       }
 
       override fun onMediaUpdate(jsonMedia: JSONObject?) {
-        Log.d(tag, "ChromecastListener: CAST onMediaUpdate")
+        DLog.d(tag, "ChromecastListener: CAST onMediaUpdate")
       }
 
       override fun onSessionUpdate(jsonSession: JSONObject?) {
-        Log.d(tag, "ChromecastListener: CAST onSessionUpdate")
+        DLog.d(tag, "ChromecastListener: CAST onSessionUpdate")
       }
 
       override fun onSessionEnd(jsonSession: JSONObject?) {
-        Log.d(tag, "ChromecastListener: CAST onSessionEnd")
+        DLog.d(tag, "ChromecastListener: CAST onSessionEnd")
       }
 
       override fun onMessageReceived(p0: CastDevice, p1: String, p2: String) {
-        Log.d(tag, "ChromecastListener: CAST onMessageReceived")
+        DLog.d(tag, "ChromecastListener: CAST onMessageReceived")
       }
     }
 
@@ -258,7 +259,7 @@ class AbsAudioPlayer : Plugin() {
     AbsLogger.info("AbsAudioPlayer", "prepareLibraryItem: lid=$libraryItemId, startTimeOverride=$startTimeOverride, playbackRate=$playbackRate")
 
     if (libraryItemId.isEmpty()) {
-      Log.e(tag, "Invalid call to play library item no library item id")
+      DLog.e(tag, "Invalid call to play library item no library item id")
       return call.resolve(JSObject("{\"error\":\"Invalid request\"}"))
     }
 
@@ -267,7 +268,7 @@ class AbsAudioPlayer : Plugin() {
       if (localLibraryItem == null) {
         // Must resolve here - an unresolved call leaves AudioPlayerContainer.vue's
         // preparingPlayback guard stuck true, permanently blocking all further playback.
-        Log.e(tag, "prepareLibraryItem: Local library item not found $libraryItemId")
+        DLog.e(tag, "prepareLibraryItem: Local library item not found $libraryItemId")
         return call.resolve(JSObject("{\"error\":\"Local library item not found\"}"))
       }
       localLibraryItem.let {
@@ -276,7 +277,7 @@ class AbsAudioPlayer : Plugin() {
           val podcastMedia = it.media as Podcast
           episode = podcastMedia.episodes?.find { ep -> ep.id == episodeId }
           if (episode == null) {
-            Log.e(tag, "prepareLibraryItem: Podcast episode not found $episodeId")
+            DLog.e(tag, "prepareLibraryItem: Podcast episode not found $episodeId")
             return call.resolve(JSObject("{\"error\":\"Podcast episode not found\"}"))
           }
         }
@@ -285,16 +286,16 @@ class AbsAudioPlayer : Plugin() {
         }
 
         Handler(Looper.getMainLooper()).post {
-          Log.d(tag, "prepareLibraryItem: Preparing Local Media item ${jacksonMapper.writeValueAsString(it)}")
+          DLog.d(tag, "prepareLibraryItem: Preparing Local Media item ${jacksonMapper.writeValueAsString(it)}")
           val playbackSession = it.getPlaybackSession(episode, playerNotificationService.getDeviceInfo())
           if (startTimeOverride != null) {
-            Log.d(tag, "prepareLibraryItem: Using start time override $startTimeOverride")
+            DLog.d(tag, "prepareLibraryItem: Using start time override $startTimeOverride")
             playbackSession.currentTime = startTimeOverride
           }
 
           if (playerNotificationService.mediaProgressSyncer.listeningTimerRunning) { // If progress syncing then first stop before preparing next
             playerNotificationService.mediaProgressSyncer.stop {
-              Log.d(tag, "Media progress syncer was already syncing - stopped")
+              DLog.d(tag, "Media progress syncer was already syncing - stopped")
               PlayerListener.lazyIsPlaying = false
 
               Handler(Looper.getMainLooper()).post { // TODO: This was needed again which is probably a design a flaw
@@ -321,12 +322,12 @@ class AbsAudioPlayer : Plugin() {
               call.resolve(JSObject("{\"error\":\"Server play request failed\"}"))
             } else {
               if (startTimeOverride != null) {
-                Log.d(tag, "prepareLibraryItem: Using start time override $startTimeOverride")
+                DLog.d(tag, "prepareLibraryItem: Using start time override $startTimeOverride")
                 it.currentTime = startTimeOverride
               }
 
               Handler(Looper.getMainLooper()).post {
-                Log.d(tag, "Preparing Player playback session ${jacksonMapper.writeValueAsString(it)}")
+                DLog.d(tag, "Preparing Player playback session ${jacksonMapper.writeValueAsString(it)}")
                 PlayerListener.lazyIsPlaying = false
                 playerNotificationService.preparePlayer(it, playWhenReady, playbackRate)
               }
@@ -377,7 +378,7 @@ class AbsAudioPlayer : Plugin() {
   @PluginMethod
   fun seek(call: PluginCall) {
     val time: Double = call.getDouble("value", 0.0) ?: 0.0 // Value in seconds, fractional
-    Log.d(tag, "seek action to $time")
+    DLog.d(tag, "seek action to $time")
     Handler(Looper.getMainLooper()).post {
       playerNotificationService.seekPlayer((time * 1000L).toLong())
       call.resolve()
@@ -477,23 +478,23 @@ class AbsAudioPlayer : Plugin() {
   @PluginMethod
   fun requestSession(call: PluginCall) {
     // Need to make sure the player service has been started
-    Log.d(tag, "CAST REQUEST SESSION PLUGIN")
+    DLog.d(tag, "CAST REQUEST SESSION PLUGIN")
     call.resolve()
     if (castManager == null) {
-      Log.e(tag, "Cast Manager not initialized")
+      DLog.e(tag, "Cast Manager not initialized")
       return
     }
     castManager?.requestSession(playerNotificationService, object : CastManager.RequestSessionCallback() {
       override fun onError(errorCode: Int) {
-        Log.e(tag, "CAST REQUEST SESSION CALLBACK ERROR $errorCode")
+        DLog.e(tag, "CAST REQUEST SESSION CALLBACK ERROR $errorCode")
       }
 
       override fun onCancel() {
-        Log.d(tag, "CAST REQUEST SESSION ON CANCEL")
+        DLog.d(tag, "CAST REQUEST SESSION ON CANCEL")
       }
 
       override fun onJoin(jsonSession: JSONObject?) {
-        Log.d(tag, "CAST REQUEST SESSION ON JOIN")
+        DLog.d(tag, "CAST REQUEST SESSION ON JOIN")
       }
     })
   }
@@ -513,7 +514,7 @@ class AbsAudioPlayer : Plugin() {
     Handler(Looper.getMainLooper()).post {
       playerNotificationService.playlistQueue = queue
       playerNotificationService.playlistQueueIndex = currentIndex
-      Log.d(tag, "setPlaylistQueue: ${queue.size} items, currentIndex=$currentIndex")
+      DLog.d(tag, "setPlaylistQueue: ${queue.size} items, currentIndex=$currentIndex")
       call.resolve()
     }
   }
@@ -533,7 +534,7 @@ class AbsAudioPlayer : Plugin() {
     Handler(Looper.getMainLooper()).post {
       playerNotificationService.playlistQueue = emptyList()
       playerNotificationService.playlistQueueIndex = -1
-      Log.d(tag, "clearPlaylistQueue: cleared")
+      DLog.d(tag, "clearPlaylistQueue: cleared")
       call.resolve()
     }
   }

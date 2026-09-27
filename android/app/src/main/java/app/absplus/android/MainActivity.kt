@@ -1,5 +1,6 @@
 package app.absplus.android
 
+import app.absplus.android.diagnostics.DLog
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -51,7 +52,8 @@ class MainActivity : BridgeActivity() {
     registerPlugin(AbsLogger::class.java)
 
     super.onCreate(savedInstanceState)
-    Log.d(tag, "onCreate")
+    DLog.d(tag, "onCreate")
+    DLog.marker("App UI started (Activity created)")
 
     // Update the margins to handle edge-to-edge enforced in SDK 35
     // See: https://developer.android.com/develop/ui/views/layout/edge-to-edge
@@ -60,7 +62,7 @@ class MainActivity : BridgeActivity() {
       val (left, top, right, sysBottom, imeBottom) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val sysInsets = insets.getInsets(WindowInsets.Type.systemBars())
         val imeInsets = insets.getInsets(WindowInsets.Type.ime())
-        Log.d(tag, "safe sysInsets: $sysInsets imeInsets: $imeInsets")
+        DLog.d(tag, "safe sysInsets: $sysInsets imeInsets: $imeInsets")
         arrayOf(sysInsets.left, sysInsets.top, sysInsets.right, sysInsets.bottom, imeInsets.bottom)
       } else {
         arrayOf(
@@ -122,21 +124,22 @@ class MainActivity : BridgeActivity() {
   }
 
   override fun onDestroy() {
+    DLog.marker("App UI closed (Activity destroyed, finishing=$isFinishing)")
     super.onDestroy()
   }
 
   override fun onPostCreate(savedInstanceState: Bundle?) {
     super.onPostCreate(savedInstanceState)
-    Log.d(tag, "onPostCreate MainActivity")
+    DLog.d(tag, "onPostCreate MainActivity")
 
     mConnection = object : ServiceConnection {
       override fun onServiceDisconnected(name: ComponentName) {
-        Log.w(tag, "Service Disconnected $name")
+        DLog.w(tag, "Service Disconnected $name")
         mBounded = false
       }
 
       override fun onServiceConnected(name: ComponentName, service: IBinder) {
-        Log.d(tag, "Service Connected $name")
+        DLog.d(tag, "Service Connected $name")
 
         mBounded = true
         val mLocalBinder = service as PlayerNotificationService.LocalBinder
@@ -148,7 +151,7 @@ class MainActivity : BridgeActivity() {
     }
 
     Intent(this, PlayerNotificationService::class.java).also { intent ->
-      Log.d(tag, "Binding PlayerNotificationService")
+      DLog.d(tag, "Binding PlayerNotificationService")
       bindService(intent, mConnection, Context.BIND_AUTO_CREATE)
     }
   }
@@ -185,9 +188,9 @@ class MainActivity : BridgeActivity() {
 
   override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-    Log.d(tag, "onRequestPermissionResult $requestCode")
-    permissions.forEach { Log.d(tag, "PERMISSION $it") }
-    grantResults.forEach { Log.d(tag, "GRANTREUSLTS $it") }
+    DLog.d(tag, "onRequestPermissionResult $requestCode")
+    permissions.forEach { DLog.d(tag, "PERMISSION $it") }
+    grantResults.forEach { DLog.d(tag, "GRANTREUSLTS $it") }
     // Mandatory for Activity, but not for Fragment & ComponentActivity
     storageHelper.onRequestPermissionsResult(requestCode, permissions, grantResults)
   }

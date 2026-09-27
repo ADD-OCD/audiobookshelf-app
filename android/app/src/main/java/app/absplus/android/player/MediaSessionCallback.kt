@@ -1,5 +1,6 @@
 package app.absplus.android.player
 
+import app.absplus.android.diagnostics.DLog
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.*
@@ -18,11 +19,11 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   private var mediaButtonClickTimeout: Long = 1000  //ms
 
   override fun onPrepare() {
-    Log.d(tag, "ON PREPARE MEDIA SESSION COMPAT")
+    DLog.d(tag, "ON PREPARE MEDIA SESSION COMPAT")
     playerNotificationService.mediaManager.getFirstItem()?.let { li ->
       playerNotificationService.mediaManager.play(li, null, playerNotificationService.getPlayItemRequestPayload(false)) {
         if (it == null) {
-          Log.e(tag, "Failed to play library item")
+          DLog.e(tag, "Failed to play library item")
         } else {
           val playbackRate = playerNotificationService.mediaManager.getSavedPlaybackRate()
           Handler(Looper.getMainLooper()).post {
@@ -34,21 +35,21 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   }
 
   override fun onPlay() {
-    Log.d(tag, "ON PLAY MEDIA SESSION COMPAT")
+    DLog.d(tag, "ON PLAY MEDIA SESSION COMPAT")
     playerNotificationService.play()
   }
 
   override fun onPrepareFromSearch(query: String?, extras: Bundle?) {
-    Log.d(tag, "ON PREPARE FROM SEARCH $query")
+    DLog.d(tag, "ON PREPARE FROM SEARCH $query")
     super.onPrepareFromSearch(query, extras)
   }
 
   override fun onPlayFromSearch(query: String?, extras: Bundle?) {
-    Log.d(tag, "ON PLAY FROM SEARCH $query")
+    DLog.d(tag, "ON PLAY FROM SEARCH $query")
     playerNotificationService.mediaManager.getFromSearch(query)?.let { li ->
       playerNotificationService.mediaManager.play(li, null, playerNotificationService.getPlayItemRequestPayload(false)) {
         if (it == null) {
-           Log.e(tag, "Failed to play library item")
+           DLog.e(tag, "Failed to play library item")
         } else {
           val playbackRate = playerNotificationService.mediaManager.getSavedPlaybackRate()
           Handler(Looper.getMainLooper()).post {
@@ -60,7 +61,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   }
 
   override fun onPause() {
-    Log.d(tag, "ON PAUSE MEDIA SESSION COMPAT")
+    DLog.d(tag, "ON PAUSE MEDIA SESSION COMPAT")
     playerNotificationService.pause()
   }
 
@@ -109,7 +110,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   }
 
   override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-    Log.d(tag, "ON PLAY FROM MEDIA ID $mediaId")
+    DLog.d(tag, "ON PLAY FROM MEDIA ID $mediaId")
     val libraryItemWrapper: LibraryItemWrapper?
     var podcastEpisode: PodcastEpisode? = null
 
@@ -123,7 +124,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
       } else {
         libraryItemWrapper = playerNotificationService.mediaManager.getById(mediaId)
         if (libraryItemWrapper == null) {
-          Log.e(tag, "onPlayFromMediaId: Media item not found $mediaId")
+          DLog.e(tag, "onPlayFromMediaId: Media item not found $mediaId")
         }
       }
     }
@@ -131,7 +132,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
     libraryItemWrapper?.let { li ->
       playerNotificationService.mediaManager.play(li, podcastEpisode, playerNotificationService.getPlayItemRequestPayload(false)) {
         if (it == null) {
-         Log.e(tag, "Failed to play library item")
+         DLog.e(tag, "Failed to play library item")
         } else {
           val playbackRate = playerNotificationService.mediaManager.getSavedPlaybackRate()
           Handler(Looper.getMainLooper()).post {
@@ -149,7 +150,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   }
 
   private fun handleCallMediaButton(intent: Intent): Boolean {
-    Log.w(tag, "handleCallMediaButton $intent | ${intent.action}")
+    DLog.w(tag, "handleCallMediaButton $intent | ${intent.action}")
 
     if(Intent.ACTION_MEDIA_BUTTON == intent.action) {
       val keyEvent = if (Build.VERSION.SDK_INT >= 33) {
@@ -159,14 +160,14 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
         intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
       }
 
-      Log.d(tag, "handleCallMediaButton keyEvent = $keyEvent | action ${keyEvent?.action}")
+      DLog.d(tag, "handleCallMediaButton keyEvent = $keyEvent | action ${keyEvent?.action}")
 
       // Widget button intent is only sending the action down event
       if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
-        Log.d(tag, "handleCallMediaButton: key action_down for ${keyEvent.keyCode}")
+        DLog.d(tag, "handleCallMediaButton: key action_down for ${keyEvent.keyCode}")
         when (keyEvent.keyCode) {
           KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-            Log.d(tag, "handleCallMediaButton: Media Play/Pause")
+            DLog.d(tag, "handleCallMediaButton: Media Play/Pause")
             // With no prepared session, play() restores the last session (see restoreLastPlaybackSession)
 
             if (playerNotificationService.mPlayer.isPlaying) {
@@ -180,21 +181,21 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
             }
           }
           KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-            Log.d(tag, "handleCallMediaButton: Media Fast Forward")
+            DLog.d(tag, "handleCallMediaButton: Media Fast Forward")
             playerNotificationService.jumpForward()
           }
           KeyEvent.KEYCODE_MEDIA_REWIND -> {
-            Log.d(tag, "handleCallMediaButton: Media Rewind")
+            DLog.d(tag, "handleCallMediaButton: Media Rewind")
             playerNotificationService.jumpBackward()
           }
         }
       }
 
       if (keyEvent?.action == KeyEvent.ACTION_UP) {
-        Log.d(tag, "handleCallMediaButton: key action_up for ${keyEvent.keyCode}")
+        DLog.d(tag, "handleCallMediaButton: key action_up for ${keyEvent.keyCode}")
         when (keyEvent.keyCode) {
           KeyEvent.KEYCODE_HEADSETHOOK -> {
-            Log.d(tag, "handleCallMediaButton: Headset Hook")
+            DLog.d(tag, "handleCallMediaButton: Headset Hook")
             if (0 == mediaButtonClickCount) {
               if (playerNotificationService.mPlayer.isPlaying)
                 playerNotificationService.pause()
@@ -204,14 +205,14 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
             handleMediaButtonClickCount()
           }
           KeyEvent.KEYCODE_MEDIA_PLAY -> {
-            Log.d(tag, "handleCallMediaButton: Media Play")
+            DLog.d(tag, "handleCallMediaButton: Media Play")
             if (0 == mediaButtonClickCount) {
               playerNotificationService.play()
             }
             handleMediaButtonClickCount()
           }
           KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-            Log.d(tag, "handleCallMediaButton: Media Pause")
+            DLog.d(tag, "handleCallMediaButton: Media Pause")
             if (0 == mediaButtonClickCount) playerNotificationService.pause()
             handleMediaButtonClickCount()
           }
@@ -225,7 +226,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
             playerNotificationService.pause()
           }
           else -> {
-            Log.d(tag, "KeyCode:${keyEvent.keyCode}")
+            DLog.d(tag, "KeyCode:${keyEvent.keyCode}")
             return false
           }
         }

@@ -1,5 +1,6 @@
 package app.absplus.android.managers
 
+import app.absplus.android.diagnostics.DLog
 import android.content.Context
 import android.media.MediaPlayer
 import android.os.*
@@ -99,7 +100,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
    * @return Boolean - true if the sleep timer was set successfully, false otherwise.
    */
   private fun setSleepTimer(time: Long): Boolean {
-    Log.d(tag, "Setting Sleep Timer for $time")
+    DLog.d(tag, "Setting Sleep Timer for $time")
     sleepTimerTask?.cancel()
     sleepTimerRunning = true
     sleepTimerFinishedAt = 0L
@@ -111,13 +112,13 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       val chapterEndTime = this.getChapterEndTime()
 
       if (chapterEndTime == null) {
-        Log.e(tag, "Setting sleep timer to end of chapter/track but there is no current session")
+        DLog.e(tag, "Setting sleep timer to end of chapter/track but there is no current session")
         return false
       }
 
       val currentTime = getCurrentTime()
       if (currentTime > chapterEndTime) {
-        Log.d(tag, "Invalid sleep timer - time is already past chapter time $chapterEndTime")
+        DLog.d(tag, "Invalid sleep timer - time is already past chapter time $chapterEndTime")
         return false
       }
 
@@ -149,7 +150,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
 
                   val sleepTimeSecondsRemaining =
                           getSleepTimerTimeRemainingSeconds(getPlaybackSpeed())
-                  Log.d(
+                  DLog.v(
                           tag,
                           "Timer Elapsed $sleepTimerElapsed | Sleep TIMER time remaining $sleepTimeSecondsRemaining s"
                   )
@@ -166,7 +167,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
                   }
 
                   if (sleepTimeSecondsRemaining <= 0) {
-                    Log.d(tag, "Sleep Timer Pausing Player on Chapter")
+                    DLog.d(tag, "Sleep Timer Pausing Player on Chapter")
                     pause()
 
                     playerNotificationService.clientEventEmitter?.onSleepTimerEnded(
@@ -182,7 +183,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
                     // Start fading out audio down to 10% volume
                     val percentToReduce = 1 - (sleepTimeSecondsRemaining / 60F)
                     val volume = 1f - (percentToReduce * 0.9f)
-                    Log.d(
+                    DLog.v(
                             tag,
                             "SLEEP VOLUME FADE $volume | ${sleepTimeSecondsRemaining}s remaining"
                     )
@@ -207,10 +208,10 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
     sleepTimerSessionId = playbackSessionId
     isAutoSleepTimer = false
     if (isChapterTime) {
-      Log.d(tag, "Setting manual sleep timer for end of chapter")
+      DLog.d(tag, "Setting manual sleep timer for end of chapter")
       return setSleepTimer(0L)
     } else {
-      Log.d(tag, "Setting manual sleep timer for $time")
+      DLog.d(tag, "Setting manual sleep timer for $time")
       return setSleepTimer(time)
     }
   }
@@ -236,10 +237,10 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
 
   /** Cancels the sleep timer. */
   fun cancelSleepTimer() {
-    Log.d(tag, "Canceling Sleep Timer")
+    DLog.d(tag, "Canceling Sleep Timer")
 
     if (isAutoSleepTimer) {
-      Log.i(tag, "Disabling auto sleep timer for this time period")
+      DLog.i(tag, "Disabling auto sleep timer for this time period")
       autoTimerDisabled = true
     }
 
@@ -292,7 +293,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
   private fun getChapterEndTime(): Long? {
     val currentChapterEndTimeMs = playerNotificationService.getEndTimeOfChapterOrTrack()
     if (currentChapterEndTimeMs == null) {
-      Log.e(tag, "Getting chapter sleep timer end of chapter/track but there is no current session")
+      DLog.e(tag, "Getting chapter sleep timer end of chapter/track but there is no current session")
       return null
     }
 
@@ -301,10 +302,10 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
     // This handles the auto-rewind from not playing media for a little bit to select the next
     // chapter
     return if (timeLeftInChapter < 10000L) {
-      Log.i(tag, "Getting chapter sleep timer time and current chapter has less than 10s remaining")
+      DLog.i(tag, "Getting chapter sleep timer time and current chapter has less than 10s remaining")
       val nextChapterEndTimeMs = playerNotificationService.getEndTimeOfNextChapterOrTrack()
       if (nextChapterEndTimeMs == null || currentChapterEndTimeMs == nextChapterEndTimeMs) {
-        Log.e(
+        DLog.e(
                 tag,
                 "Invalid next chapter time. No current session or equal to current chapter. $nextChapterEndTimeMs"
         )
@@ -324,7 +325,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
   private fun tryRewindAutoSleepTimer() {
     DeviceManager.deviceData.deviceSettings?.let { deviceSettings ->
       if (isAutoSleepTimer && deviceSettings.autoSleepTimerAutoRewind) {
-        Log.i(
+        DLog.i(
                 tag,
                 "Auto sleep timer auto rewind seeking back ${deviceSettings.autoSleepTimerAutoRewindTime}ms"
         )
@@ -339,7 +340,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       // Reset the sleep timer if it has been running for at least 3 seconds or it is an end of
       // chapter/track timer
       if (sleepTimerLength == 0L || sleepTimerElapsed > 3000L) {
-        Log.d(tag, "Resetting running sleep timer")
+        DLog.d(tag, "Resetting running sleep timer")
         vibrateFeedback()
         setSleepTimer(sleepTimerLength)
         play()
@@ -351,7 +352,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       val finishedAtDistance = System.currentTimeMillis() - sleepTimerFinishedAt
       if (finishedAtDistance > SLEEP_TIMER_WAKE_UP_EXPIRATION) // 2 minutes
       {
-        Log.d(tag, "Sleep timer finished over 2 mins ago, clearing it")
+        DLog.d(tag, "Sleep timer finished over 2 mins ago, clearing it")
         sleepTimerFinishedAt = 0L
         return
       }
@@ -359,7 +360,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       // If timer was cleared by going negative on time, clear the sleep timer length so pressing
       // play allows playback to continue without the sleep timer continuously setting for 1 second.
       if (sleepTimerLength == 1000L) {
-        Log.d(tag, "Sleep timer cleared by manually subtracting time, clearing sleep timer")
+        DLog.d(tag, "Sleep timer cleared by manually subtracting time, clearing sleep timer")
         sleepTimerFinishedAt = 0L
         return
       }
@@ -368,7 +369,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       tryRewindAutoSleepTimer()
 
       // Set sleep timer
-      Log.d(tag, "Resetting stopped sleep timer")
+      DLog.d(tag, "Resetting stopped sleep timer")
       vibrateFeedback()
       setSleepTimer(sleepTimerLength)
       play()
@@ -382,7 +383,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
   fun handleShake() {
     if ((sleepTimerRunning && getIsPlaying()) || sleepTimerFinishedAt > 0L) {
       if (DeviceManager.deviceData.deviceSettings?.disableShakeToResetSleepTimer == true) {
-        Log.d(tag, "Shake to reset sleep timer is disabled")
+        DLog.d(tag, "Shake to reset sleep timer is disabled")
         return
       }
       checkShouldResetSleepTimer()
@@ -394,7 +395,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
    * @param time Long - the time to increase the sleep timer by.
    */
   fun increaseSleepTime(time: Long) {
-    Log.d(tag, "Increase Sleep time $time")
+    DLog.d(tag, "Increase Sleep time $time")
     if (!sleepTimerRunning) return
 
     // Increase the sleep timer time (if using fixed length) or end time (if using chapter end time)
@@ -421,7 +422,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
    * @param time Long - the time to decrease the sleep timer by.
    */
   fun decreaseSleepTime(time: Long) {
-    Log.d(tag, "Decrease Sleep time $time")
+    DLog.d(tag, "Decrease Sleep time $time")
     if (!sleepTimerRunning) return
 
     // Decrease the sleep timer time (if using fixed length) or end time (if using chapter end time)
@@ -484,18 +485,18 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
       if (autoTimerDisabled) {
         if (!isDuringAutoTime) {
           // Check if sleep timer was disabled during the previous period and enable again
-          Log.i(tag, "Leaving disabled auto sleep time period, enabling for next time period")
+          DLog.i(tag, "Leaving disabled auto sleep time period, enabling for next time period")
           autoTimerDisabled = false
         } else {
           // Auto time is disabled, do not set sleep timer
-          Log.i(tag, "Auto sleep timer is disabled for this time period")
+          DLog.i(tag, "Auto sleep timer is disabled for this time period")
         }
       } else {
         if (isDuringAutoTime) {
           // Start an auto sleep timer
           val currentHour = currentCalendar.get(Calendar.HOUR_OF_DAY)
           val currentMin = currentCalendar.get(Calendar.MINUTE)
-          Log.i(tag, "Starting auto sleep timer at $currentHour:$currentMin")
+          DLog.i(tag, "Starting auto sleep timer at $currentHour:$currentMin")
 
           // Automatically rewind in the book if settings is enabled
           tryRewindAutoSleepTimer()
@@ -505,7 +506,7 @@ constructor(private val playerNotificationService: PlayerNotificationService) {
           isAutoSleepTimer = true
           setSleepTimer(deviceSettings.sleepTimerLength)
         } else {
-          Log.d(tag, "Not in auto sleep time period")
+          DLog.d(tag, "Not in auto sleep time period")
         }
       }
     }

@@ -1,5 +1,6 @@
 package app.absplus.android.managers
 
+import app.absplus.android.diagnostics.DLog
 import android.content.Context
 import android.util.Log
 import app.absplus.android.player.PlayerNotificationService.PlaylistQueueItem
@@ -25,7 +26,7 @@ object PlaybackRestoreStore {
 
   fun setResumable(ctx: Context, resumable: Boolean) {
     if (isResumable(ctx) == resumable) return
-    Log.i(LOG_TAG, "resumable=$resumable")
+    DLog.i(LOG_TAG, "resumable=$resumable")
     prefs(ctx).edit().putBoolean(KEY_RESUMABLE, resumable).apply()
   }
 
@@ -44,7 +45,7 @@ object PlaybackRestoreStore {
       }
       SavedQueue(items, prefs(ctx).getInt(KEY_QUEUE_INDEX, -1))
     } catch (e: Exception) {
-      Log.e(LOG_TAG, "Failed to read saved queue: $e")
+      DLog.e(LOG_TAG, "Failed to read saved queue: $e")
       SavedQueue(emptyList(), -1)
     }
   }

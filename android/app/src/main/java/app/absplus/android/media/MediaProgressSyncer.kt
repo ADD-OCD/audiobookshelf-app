@@ -1,5 +1,6 @@
 package app.absplus.android.media
 
+import app.absplus.android.diagnostics.DLog
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -52,13 +53,13 @@ class MediaProgressSyncer(
 
   fun start(playbackSession: PlaybackSession) {
     if (listeningTimerRunning) {
-      Log.d(tag, "start: Timer already running for $currentDisplayTitle")
+      DLog.d(tag, "start: Timer already running for $currentDisplayTitle")
       if (playbackSession.id != currentSessionId) {
-        Log.d(tag, "Playback session changed, reset timer")
+        DLog.d(tag, "Playback session changed, reset timer")
         currentLocalMediaProgress = null
         listeningTimerTask?.cancel()
         lastSyncTime = 0L
-        Log.d(tag, "start: Set last sync time 0 $lastSyncTime")
+        DLog.d(tag, "start: Set last sync time 0 $lastSyncTime")
         failedSyncs = 0
       } else {
         return
@@ -70,7 +71,7 @@ class MediaProgressSyncer(
     listeningTimerRunning = true
     lastSyncTime = System.currentTimeMillis()
     currentPlaybackSession = playbackSession.clone()
-    Log.d(
+    DLog.d(
             tag,
             "start: init last sync time $lastSyncTime with playback session id=${currentPlaybackSession?.id}"
     )
@@ -92,7 +93,7 @@ class MediaProgressSyncer(
                   val currentTime = playerNotificationService.getCurrentTimeSeconds()
                   if (currentTime > 0) {
                     sync(shouldSyncServer, currentTime) { syncResult ->
-                      Log.d(tag, "Sync complete")
+                      DLog.d(tag, "Sync complete")
 
                       currentPlaybackSession?.let { playbackSession ->
                         MediaEventManager.saveEvent(playbackSession, syncResult)
@@ -105,7 +106,7 @@ class MediaProgressSyncer(
   }
 
   fun play(playbackSession: PlaybackSession) {
-    Log.d(tag, "play ${playbackSession.displayTitle}")
+    DLog.d(tag, "play ${playbackSession.displayTitle}")
     MediaEventManager.playEvent(playbackSession)
 
     start(playbackSession)
@@ -120,7 +121,7 @@ class MediaProgressSyncer(
     listeningTimerTask?.cancel()
     listeningTimerTask = null
     listeningTimerRunning = false
-    Log.d(tag, "stop: Stopping listening for $currentDisplayTitle")
+    DLog.d(tag, "stop: Stopping listening for $currentDisplayTitle")
 
     val currentTime =
             if (shouldSync == true) playerNotificationService.getCurrentTimeSeconds() else 0.0
@@ -149,14 +150,14 @@ class MediaProgressSyncer(
     listeningTimerTask?.cancel()
     listeningTimerTask = null
     listeningTimerRunning = false
-    Log.d(tag, "pause: Pausing progress syncer for $currentDisplayTitle")
-    Log.d(tag, "pause: Last sync time $lastSyncTime")
+    DLog.d(tag, "pause: Pausing progress syncer for $currentDisplayTitle")
+    DLog.d(tag, "pause: Last sync time $lastSyncTime")
 
     val currentTime = playerNotificationService.getCurrentTimeSeconds()
     if (currentTime > 0) { // Current time should always be > 0 on pause
       sync(true, currentTime) { syncResult ->
         lastSyncTime = 0L
-        Log.d(tag, "pause: Set last sync time 0 $lastSyncTime")
+        DLog.d(tag, "pause: Set last sync time 0 $lastSyncTime")
         failedSyncs = 0
 
         currentPlaybackSession?.let { playbackSession ->
@@ -167,7 +168,7 @@ class MediaProgressSyncer(
       }
     } else {
       lastSyncTime = 0L
-      Log.d(tag, "pause: Set last sync time 0 $lastSyncTime (current time < 0)")
+      DLog.d(tag, "pause: Set last sync time 0 $lastSyncTime (current time < 0)")
       failedSyncs = 0
 
       currentPlaybackSession?.let { playbackSession ->
@@ -184,7 +185,7 @@ class MediaProgressSyncer(
     listeningTimerTask?.cancel()
     listeningTimerTask = null
     listeningTimerRunning = false
-    Log.d(tag, "finished: Stopping listening for $currentDisplayTitle")
+    DLog.d(tag, "finished: Stopping listening for $currentDisplayTitle")
 
     sync(true, currentPlaybackSession?.duration ?: 0.0) { syncResult ->
       reset()
@@ -199,10 +200,10 @@ class MediaProgressSyncer(
 
   fun seek() {
     currentPlaybackSession?.currentTime = playerNotificationService.getCurrentTimeSeconds()
-    Log.d(tag, "seek: $currentDisplayTitle, currentTime=${currentPlaybackSession?.currentTime}")
+    DLog.d(tag, "seek: $currentDisplayTitle, currentTime=${currentPlaybackSession?.currentTime}")
 
     if (currentPlaybackSession == null) {
-      Log.e(tag, "seek: Playback session not set")
+      DLog.e(tag, "seek: Playback session not set")
       return
     }
 
@@ -225,7 +226,7 @@ class MediaProgressSyncer(
 
   fun sync(shouldSyncServer: Boolean, currentTime: Double, cb: (SyncResult?) -> Unit) {
     if (lastSyncTime <= 0) {
-      Log.e(tag, "Last sync time is not set $lastSyncTime")
+      DLog.e(tag, "Last sync time is not set $lastSyncTime")
       return cb(null)
     }
 
@@ -248,7 +249,7 @@ class MediaProgressSyncer(
     currentPlaybackSession?.syncData(syncData)
 
     if (currentPlaybackSession?.progress?.isNaN() == true) {
-      Log.e(
+      DLog.e(
               tag,
               "Current Playback Session invalid progress ${currentPlaybackSession?.progress} | Current Time: ${currentPlaybackSession?.currentTime} | Duration: ${currentPlaybackSession?.getTotalDuration()}"
       )
@@ -267,7 +268,7 @@ class MediaProgressSyncer(
         saveLocalProgress(it)
         lastSyncTime = System.currentTimeMillis()
 
-        Log.d(
+        DLog.d(
                 tag,
                 "Sync local device current serverConnectionConfigId=${DeviceManager.serverConnectionConfig?.id}"
         )
@@ -347,11 +348,11 @@ class MediaProgressSyncer(
 
     currentLocalMediaProgress?.let {
       if (it.progress.isNaN()) {
-        Log.e(tag, "Invalid progress on local media progress")
+        DLog.e(tag, "Invalid progress on local media progress")
       } else {
         DeviceManager.dbManager.saveLocalMediaProgress(it)
         playerNotificationService.clientEventEmitter?.onLocalMediaProgressUpdate(it)
-        Log.d(
+        DLog.d(
                 tag,
                 "Saved Local Progress Current Time: ID ${it.id} | ${it.currentTime} | Duration ${it.duration} | Progress ${it.progressPercent}%"
         )
@@ -363,7 +364,7 @@ class MediaProgressSyncer(
     currentPlaybackSession = null
     currentLocalMediaProgress = null
     lastSyncTime = 0L
-    Log.d(tag, "reset: Set last sync time 0 $lastSyncTime")
+    DLog.d(tag, "reset: Set last sync time 0 $lastSyncTime")
     failedSyncs = 0
   }
 }

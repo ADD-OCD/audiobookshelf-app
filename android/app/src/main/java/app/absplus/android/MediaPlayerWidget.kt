@@ -1,5 +1,6 @@
 package app.absplus.android
 
+import app.absplus.android.diagnostics.DLog
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -28,11 +29,11 @@ import com.bumptech.glide.request.transition.Transition
 class MediaPlayerWidget : AppWidgetProvider() {
   val tag = "MediaPlayerWidget"
   override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-    Log.d(tag, "onUpdate $appWidgetIds")
+    DLog.d(tag, "onUpdate $appWidgetIds")
   }
 
   override fun onEnabled(context: Context) {
-    Log.i(tag, "onEnabled check context ${context.packageName}")
+    DLog.i(tag, "onEnabled check context ${context.packageName}")
 
     DbManager.initialize(context)
 
@@ -40,7 +41,7 @@ class MediaPlayerWidget : AppWidgetProvider() {
       val appWidgetManager = AppWidgetManager.getInstance(context)
       val componentName = ComponentName(context, MediaPlayerWidget::class.java)
       val ids = appWidgetManager.getAppWidgetIds(componentName)
-      Log.d(tag, "Setting initial widget state with last playback session ${it.displayTitle}")
+      DLog.d(tag, "Setting initial widget state with last playback session ${it.displayTitle}")
       val showControls = PlaybackRestoreStore.isResumable(context)
       for (widgetId in ids) {
         updateAppWidget(context, appWidgetManager, widgetId, it, false, showControls)
@@ -59,7 +60,7 @@ class MediaPlayerWidget : AppWidgetProvider() {
 internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, playbackSession: PlaybackSession?, isPlaying:Boolean, showControls:Boolean) {
   val tag = "MediaPlayerWidget"
   val views = RemoteViews(context.packageName, R.layout.media_player_widget)
-  Log.i(tag, "updateAppWidget ${playbackSession?.displayTitle ?: "No Title"} isPlaying=$isPlaying showControls=$showControls")
+  DLog.i(tag, "updateAppWidget ${playbackSession?.displayTitle ?: "No Title"} isPlaying=$isPlaying showControls=$showControls")
   val wholeWidgetClickI = Intent(context, MainActivity::class.java)
   wholeWidgetClickI.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
   val wholeWidgetClickPI = PendingIntent.getActivity(
