@@ -66,7 +66,7 @@ satisfies).
 ## Announcements
 
 Audiobookshelf+ has no in-app "what's new"/announcements screen (checked during the v0.14.0
-release — there isn't one to reuse). The [GitHub Discussions "Announcements" category](https://github.com/ADD-OCD/audiobookshelf-app/discussions/categories/announcements)
+release — there isn't one to reuse). The [GitHub Discussions "Announcements" category](https://github.com/ADD-OCD/audiobookshelfplus-app/discussions/categories/announcements)
 on this repo is the established, preferred place for users to read about completed Audiobookshelf+
 changes, and is treated as part of the release itself, not an optional afterthought.
 

@@ -93,7 +93,7 @@ be) in the official app.
 
 This fork does not publish to the Play Store or TestFlight. Debug APKs are built from the
 `plus` branch and published on the
-[Releases](https://github.com/ADD-OCD/audiobookshelf-app/releases) page, or build it yourself
+[Releases](https://github.com/ADD-OCD/audiobookshelfplus-app/releases) page, or build it yourself
 with the instructions below.
 
 ---
