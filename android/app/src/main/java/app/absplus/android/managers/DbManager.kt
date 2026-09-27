@@ -4,8 +4,6 @@ import android.content.Context
 import android.util.Log
 import app.absplus.android.data.*
 import app.absplus.android.models.DownloadItem
-import app.absplus.android.plugins.AbsLog
-import app.absplus.android.plugins.AbsLogger
 import io.paperdb.Paper
 
 class DbManager {
@@ -19,6 +17,9 @@ class DbManager {
       Paper.init(ctx)
       isDbInitialized = true
       Log.i("DbManager", "Initialized Paper db")
+      // Every process entry point (Activity, player service, widget, downloads) initializes the db
+      // first, so this is also where persistent diagnostics start (after Paper, for log migration)
+      app.absplus.android.diagnostics.DiagnosticLog.init(ctx)
     }
   }
 
@@ -301,36 +302,5 @@ class DbManager {
     }
     return sessions
   }
-
-  fun saveLog(log: AbsLog) {
-    Paper.book("log").write(log.id, log)
-  }
-  fun getAllLogs(): List<AbsLog> {
-    val logs: MutableList<AbsLog> = mutableListOf()
-    Paper.book("log").allKeys.forEach { logId ->
-      Paper.book("log").read<AbsLog>(logId)?.let { logs.add(it) }
-    }
-    return logs.sortedBy { it.timestamp }
-  }
-  fun removeAllLogs() {
-    Paper.book("log").destroy()
-  }
-  fun cleanLogs() {
-    val numberOfHoursToKeep = 48
-    val keepLogCutoff = System.currentTimeMillis() - (3600000 * numberOfHoursToKeep)
-    val allLogs = getAllLogs()
-    var logsRemoved = 0
-    allLogs.forEach {
-      if (it.timestamp < keepLogCutoff) {
-        Paper.book("log").delete(it.id)
-        logsRemoved++
-      }
-    }
-    if (logsRemoved > 0) {
-      AbsLogger.info(
-              "DbManager",
-              "cleanLogs: Removed $logsRemoved logs older than $numberOfHoursToKeep hours"
-      )
-    }
-  }
+  // App logs now live in the rolling diagnostic log (DiagnosticLog), which migrates the old "log" book once
 }

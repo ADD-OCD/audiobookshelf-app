@@ -104,6 +104,7 @@ configurations.configureEach {
 }
 
 dependencies {
+  testImplementation "junit:junit:$junitVersion"
   implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
   implementation fileTree(include: ['*.jar'], dir: 'libs')
   implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
