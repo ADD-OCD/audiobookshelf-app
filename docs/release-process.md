@@ -57,6 +57,7 @@ published (release, prerelease, or test build):
 | 123 | Audiobookshelf+ v0.14.0 (current stable baseline) |
 | 124 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `b66f9d96`) — distributed; **FAILED** physical-device testing: the keyboard layout was not scrollable, so lower fields/buttons couldn't be reached. Never merged into `plus`. |
 | 125 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `1596c0f3`) — distributed; keyboard/form behavior corrected, but **REJECTED** because the project/footer links could overlap the Important notice with the keyboard open. Never merged into `plus`. |
+| 126 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `fe30cbac`) — distributed as a new device test; keeps 125's keyboard/form behavior and moves the project links (now separate Official Audiobookshelf / Audiobookshelf+ links) into normal flow below the Important notice. Pending physical-device testing. Not merged into `plus`. |
 
 Before building anything intended for distribution — including a one-off test/RC build — bump
 `versionCode` to the next integer above the value in this table, build, distribute, then update
