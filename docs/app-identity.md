@@ -43,6 +43,26 @@ Server-side data (library, progress recorded on the server, bookmarks) is unaffe
 
 Confirmed via build inspection: the official app (`com.audiobookshelf.app`) and Audiobookshelf+ (`app.absplus.android`) are distinct `applicationId`s and install as fully separate apps with independent storage, notifications, and settings. Both can be installed on the same device simultaneously with no conflict.
 
+## Debug vs release builds of this fork
+
+The debug and release builds of Audiobookshelf+ itself are also distinct package IDs, via Gradle's
+`applicationIdSuffix ".debug"`:
+
+| Build | Package ID |
+| --- | --- |
+| Audiobookshelf+ release | `app.absplus.android` |
+| Audiobookshelf+ debug | `app.absplus.android.debug` |
+
+The same rules as above apply between them: Android treats these as two separate apps.
+- A debug build and a release build can be installed on the same device at the same time.
+- Installing one never replaces or updates the other — each keeps its own local data, settings,
+  downloads, and login/server state, completely independent of the other.
+- A debug install should not be mistaken for "the normal Audiobookshelf+ install" — it's a
+  separate, development-oriented app that happens to share a name and icon.
+
+This is an internal/developer distinction. It is not surfaced in the app's own UI, and end users
+installing a normal release build never need to know it exists.
+
 ## Future upstream merges
 
 When merging future upstream changes, watch for:
