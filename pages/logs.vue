@@ -1,28 +1,26 @@
 <template>
-  <div class="w-full h-full py-4">
-    <div class="flex items-center mb-2 space-x-2 px-4">
+  <div class="w-full h-full py-4 flex flex-col">
+    <div class="flex items-center mb-1 space-x-2 px-4">
       <p class="text-lg font-bold">{{ $strings.ButtonLogs }}</p>
       <ui-icon-btn outlined borderless :icon="isCopied ? 'check' : 'content_copy'" @click="copyToClipboard" />
-      <ui-icon-btn outlined borderless icon="share" @click="shareLogs" />
+      <ui-icon-btn outlined borderless icon="share" :loading="isSharingDiagnosticLog" @click="shareDiagnosticLog" />
       <div class="flex-grow"></div>
       <ui-icon-btn outlined borderless icon="more_vert" @click="showDialog = true" />
     </div>
+    <p class="px-4 text-xs text-fg-muted">
+      {{ $strings.LabelDiagnosticLogging }}: {{ diagnosticLevelOption }}
+      <span v-if="diagnosticLogBytes !== null"> · {{ $strings.LabelDiagnosticLogSize }}: {{ $bytesPretty(diagnosticLogBytes) }}</span>
+    </p>
+    <p v-if="truncated" class="px-4 text-xs text-fg-muted">{{ $strings.MessageDiagnosticLogShowingRecent }}</p>
 
-    <div class="w-full h-[calc(100%-40px)] overflow-y-auto relative" ref="logContainer">
-      <div v-if="!logs.length && !isLoading" class="flex items-center justify-center h-32 p-4">
+    <div class="w-full flex-grow overflow-y-auto relative mt-2 diag-log" ref="logContainer" @scroll="onScroll">
+      <div v-if="!lines.length && !isLoading" class="flex items-center justify-center h-32 p-4">
         <p class="text-gray-400">{{ $strings.MessageNoLogs }}</p>
       </div>
-      <div v-if="hasScrolled" class="sticky top-0 left-0 w-full h-10 bg-gradient-to-t from-transparent to-bg z-10 pointer-events-none"></div>
-
-      <div v-for="(log, index) in logs" :key="log.id" class="py-2 px-4" :class="{ 'bg-white/5': index % 2 === 0 }">
-        <div class="flex items-center space-x-4 mb-1">
-          <div class="text-xs uppercase font-bold" :class="{ 'text-error': log.level === 'error', 'text-blue-500': log.level === 'info' }">{{ log.level }}</div>
-          <div class="text-xs text-gray-400">{{ formatEpochToDatetimeString(log.timestamp) }}</div>
-          <div class="flex-grow"></div>
-          <div class="text-xs text-gray-400">{{ log.tag }}</div>
-        </div>
-        <div class="text-xs break-words">{{ maskServerAddress ? log.maskedMessage : log.message }}</div>
+      <div v-if="truncated" class="flex justify-center py-2">
+        <ui-btn small @click="showMore">{{ $strings.ButtonShowMoreLog }}</ui-btn>
       </div>
+      <div v-for="(line, index) in lines" :key="index" class="px-3 py-0.5 text-xs font-mono break-words whitespace-pre-wrap" :class="lineClass(line)">{{ line }}</div>
     </div>
 
     <modals-dialog v-model="showDialog" :items="dialogItems" @action="dialogAction" />
@@ -30,146 +28,125 @@
 </template>
 <script>
 import { AbsLogger } from '@/plugins/capacitor'
-import { FileSharer } from '@webnativellc/capacitor-filesharer'
+import diagnosticLogMixin from '@/mixins/diagnosticLog'
+
+const INITIAL_BYTES = 256 * 1024
+const MAX_BYTES = 2 * 1024 * 1024
+const MAX_LINES = 6000
 
 export default {
+  mixins: [diagnosticLogMixin],
   data() {
     return {
-      logs: [],
+      text: '',
+      truncated: false,
+      maxBytes: INITIAL_BYTES,
       isLoading: true,
       isCopied: false,
-      hasScrolled: false,
-      maskServerAddress: true,
-      showDialog: false
+      showDialog: false,
+      atBottom: true,
+      refreshInterval: null
     }
   },
   computed: {
+    lines() {
+      // One entry per timestamped line (continuation lines such as stack traces stay attached).
+      // JS entries are written in small batches, so order by timestamp for a single timeline.
+      const entries = []
+      for (const line of this.text.split('\n')) {
+        if (!line) continue
+        if (/^\d{4}-\d{2}-\d{2} /.test(line) || !entries.length) entries.push(line)
+        else entries[entries.length - 1] += '\n' + line
+      }
+      const sortKey = (entry) => entry.slice(0, 23)
+      const sorted = entries.map((entry, index) => ({ entry, index })).sort((a, b) => (sortKey(a.entry) < sortKey(b.entry) ? -1 : sortKey(a.entry) > sortKey(b.entry) ? 1 : a.index - b.index))
+      const lines = sorted.map((e) => e.entry)
+      return lines.length > MAX_LINES ? lines.slice(lines.length - MAX_LINES) : lines
+    },
     dialogItems() {
       return [
-        {
-          text: this.maskServerAddress ? this.$strings.ButtonUnmaskServerAddress : this.$strings.ButtonMaskServerAddress,
-          value: 'toggle-mask-server-address',
-          icon: this.maskServerAddress ? 'remove_moderator' : 'shield'
-        },
-        {
-          text: this.$strings.ButtonClearLogs,
-          value: 'clear-logs',
-          icon: 'delete'
-        }
+        { text: this.$strings.ButtonAddDiagnosticMarker, value: 'marker', icon: 'bookmark_add' },
+        { text: this.$strings.ButtonRefreshLog, value: 'refresh', icon: 'refresh' },
+        { text: this.$strings.ButtonClearDiagnosticLog, value: 'clear', icon: 'delete' }
       ]
     }
   },
   methods: {
     async dialogAction(action) {
       await this.$hapticsImpact()
-
-      if (action === 'clear-logs') {
-        await AbsLogger.clearLogs()
-        this.logs = []
-      } else if (action === 'toggle-mask-server-address') {
-        this.maskServerAddress = !this.maskServerAddress
-      }
       this.showDialog = false
+      if (action === 'clear') await this.clearDiagnosticLog()
+      else if (action === 'marker') await this.addDiagnosticMarker()
+      else if (action === 'refresh') await this.loadLog(true)
     },
-    toggleMaskServerAddress() {
-      this.maskServerAddress = !this.maskServerAddress
+    lineClass(line) {
+      // "yyyy-MM-dd HH:mm:ss.SSS+hh:mm L source/tag (pid): message"
+      const level = (line.match(/^\S+ \S+ ([VDIWE]) /) || [])[1]
+      if (level === 'E') return 'text-error'
+      if (level === 'W') return 'text-warning'
+      if (line.includes('--- ')) return 'text-fg font-semibold'
+      if (level === 'V') return 'text-fg-muted'
+      return 'text-fg'
     },
     async copyToClipboard() {
       await this.$hapticsImpact()
-      this.$copyToClipboard(this.getLogsString()).then(() => {
+      this.$copyToClipboard(this.lines.join('\n')).then(() => {
         this.isCopied = true
         setTimeout(() => {
           this.isCopied = false
         }, 2000)
       })
     },
-    /**
-     * Formats an epoch timestamp to YYYY-MM-DD HH:mm:ss.SSS
-     * Use 24 hour time format
-     * @param {number} epoch
-     * @returns {string}
-     */
-    formatEpochToDatetimeString(epoch) {
-      return new Date(epoch)
-        .toLocaleString('en-US', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          fractionalSecondDigits: 3,
-          hour12: false
-        })
-        .replace(',', '')
-    },
-    getLogsString() {
-      return this.logs
-        .map((log) => {
-          const logMessage = this.maskServerAddress ? log.maskedMessage : log.message
-          return `${this.formatEpochToDatetimeString(log.timestamp)} [${log.level.toUpperCase()}] ${logMessage}`
-        })
-        .join('\n')
-    },
-    async shareLogs() {
-      await this.$hapticsImpact()
-      // Share .txt file with logs
-      const base64Data = Buffer.from(this.getLogsString()).toString('base64')
-
-      FileSharer.share({
-        filename: `abs_logs_${this.$platform}_${this.$config.version}.txt`,
-        contentType: 'text/plain',
-        base64Data
-      }).catch((error) => {
-        if (error.message !== 'USER_CANCELLED') {
-          console.error('Failed to share', error.message)
-          this.$toast.error('Failed to share: ' + error.message)
-        }
-      })
+    onScroll() {
+      const el = this.$refs.logContainer
+      if (!el) return
+      this.atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
     },
     scrollToBottom() {
-      this.$refs.logContainer.scrollTop = this.$refs.logContainer.scrollHeight
-      this.hasScrolled = this.$refs.logContainer.scrollTop > 0
+      const el = this.$refs.logContainer
+      if (el) el.scrollTop = el.scrollHeight
     },
-    maskLogMessage(message) {
-      return message.replace(/(https?:\/\/)\S+/g, '$1[SERVER_ADDRESS]')
+    showMore() {
+      this.maxBytes = Math.min(this.maxBytes * 2, MAX_BYTES)
+      this.loadLog(false)
     },
-    loadLogs() {
-      this.isLoading = true
-      AbsLogger.getAllLogs()
-        .then((logData) => {
-          const logs = logData.value || []
-          this.logs = logs.map((log) => {
-            log.maskedMessage = this.maskLogMessage(log.message)
-            return log
-          })
-          this.$nextTick(() => {
-            this.scrollToBottom()
-          })
-          this.isLoading = false
-        })
-        .catch((error) => {
-          this.isLoading = false
-          console.error('Failed to load logs', error)
-          this.$toast.error('Failed to load logs: ' + error.message)
-        })
+    onDiagnosticLogChanged() {
+      this.loadLog(true)
+    },
+    async loadLog(scrollToEnd) {
+      try {
+        this.$diag.flush()
+        const res = await AbsLogger.readDiagnosticLog({ maxBytes: this.maxBytes })
+        this.text = res.text || ''
+        this.truncated = !!res.truncated && this.maxBytes < MAX_BYTES
+        this.diagnosticLevel = res.level
+        this.diagnosticLogBytes = res.totalBytes
+        if (scrollToEnd) this.$nextTick(this.scrollToBottom)
+      } catch (error) {
+        console.error('Failed to load logs', error)
+        this.$toast.error('Failed to load logs: ' + (error.message || error))
+      } finally {
+        this.isLoading = false
+      }
     }
   },
   mounted() {
-    AbsLogger.addListener('onLog', (log) => {
-      log.maskedMessage = this.maskLogMessage(log.message)
-      this.logs.push(log)
-      this.logs.sort((a, b) => a.timestamp - b.timestamp)
-
-      this.$nextTick(() => {
-        this.scrollToBottom()
-      })
-    })
-    this.loadLogs()
+    this.loadLog(true)
+    // Keep following new entries while the user is at the bottom of the log
+    this.refreshInterval = setInterval(() => {
+      if (this.atBottom && document.visibilityState === 'visible') this.loadLog(true)
+    }, 3000)
   },
   beforeDestroy() {
-    AbsLogger.removeAllListeners()
+    clearInterval(this.refreshInterval)
   }
 }
 </script>
 
+<style scoped>
+.diag-log,
+.diag-log * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+</style>

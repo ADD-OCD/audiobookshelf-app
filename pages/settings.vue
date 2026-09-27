@@ -179,6 +179,23 @@
           <ui-text-input :value="androidAutoBrowseSeriesSequenceOrderOption" readonly append-icon="expand_more" style="max-width: 200px" />
         </div>
       </div>
+
+      <!-- Diagnostics -->
+      <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderDiagnostics }}</p>
+      <div class="py-3 flex items-center">
+        <p class="pr-4 w-36">{{ $strings.LabelDiagnosticLogging }}</p>
+        <div @click.stop="showDiagnosticLevelOptions">
+          <ui-text-input :value="diagnosticLevelOption" readonly append-icon="expand_more" style="max-width: 200px" />
+        </div>
+      </div>
+      <p class="text-xs text-fg-muted pb-2">{{ $strings.MessageDiagnosticLoggingHelp }}</p>
+      <p v-if="diagnosticLogBytes !== null" class="text-xs text-fg-muted pb-3">{{ $strings.LabelDiagnosticLogSize }}: {{ $bytesPretty(diagnosticLogBytes) }}</p>
+      <div class="flex flex-wrap gap-2 pb-4">
+        <ui-btn small @click="viewDiagnosticLog">{{ $strings.ButtonViewDiagnosticLog }}</ui-btn>
+        <ui-btn small @click="shareDiagnosticLog">{{ $strings.ButtonShareDiagnosticLog }}</ui-btn>
+        <ui-btn small @click="addDiagnosticMarker">{{ $strings.ButtonAddDiagnosticMarker }}</ui-btn>
+        <ui-btn small @click="clearDiagnosticLog">{{ $strings.ButtonClearDiagnosticLog }}</ui-btn>
+      </div>
     </template>
 
     <div v-show="loading" class="w-full h-full absolute top-0 left-0 flex items-center justify-center z-10">
@@ -194,9 +211,10 @@
 <script>
 import { Dialog } from '@capacitor/dialog'
 import jumpLabelMixin from '@/mixins/jumpLabel'
+import diagnosticLogMixin from '@/mixins/diagnosticLog'
 
 export default {
-  mixins: [jumpLabelMixin],
+  mixins: [jumpLabelMixin, diagnosticLogMixin],
   data() {
     return {
       loading: false,
@@ -435,6 +453,7 @@ export default {
       else if (this.moreMenuSetting === 'downloadUsingCellular') return this.downloadUsingCellularItems
       else if (this.moreMenuSetting === 'streamingUsingCellular') return this.streamingUsingCellularItems
       else if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.androidAutoBrowseSeriesSequenceOrderItems
+      else if (this.moreMenuSetting === 'diagnosticLevel') return this.diagnosticLevelItems
       else if (this.moreMenuSetting === 'jumpForward')
         return this.jumpForwardSecondsOptions.map((value) => ({
           text: this.getJumpLabel(value),
@@ -455,6 +474,7 @@ export default {
       if (this.moreMenuSetting === 'downloadUsingCellular') return this.settings.downloadUsingCellular
       if (this.moreMenuSetting === 'streamingUsingCellular') return this.settings.streamingUsingCellular
       if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.settings.androidAutoBrowseSeriesSequenceOrder
+      if (this.moreMenuSetting === 'diagnosticLevel') return this.diagnosticLevel
       if (this.moreMenuSetting === 'shakeSensitivity') return this.settings.shakeSensitivity
       if (this.moreMenuSetting === 'hapticFeedback') return this.settings.hapticFeedback
       return null
@@ -511,6 +531,13 @@ export default {
       this.moreMenuSetting = 'androidAutoBrowseSeriesSequenceOrder'
       this.showMoreMenuDialog = true
     },
+    showDiagnosticLevelOptions() {
+      this.moreMenuSetting = 'diagnosticLevel'
+      this.showMoreMenuDialog = true
+    },
+    viewDiagnosticLog() {
+      this.$router.push('/logs')
+    },
     clickMenuAction(action) {
       this.showMoreMenuDialog = false
       if (this.moreMenuSetting === 'shakeSensitivity') {
@@ -534,6 +561,8 @@ export default {
       } else if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') {
         this.settings.androidAutoBrowseSeriesSequenceOrder = action
         this.saveSettings()
+      } else if (this.moreMenuSetting === 'diagnosticLevel') {
+        this.setDiagnosticLevel(action)
       } else if (this.moreMenuSetting === 'jumpForward') {
         this.settings.jumpForwardTime = action
         this.saveSettings()
@@ -695,6 +724,7 @@ export default {
   },
   mounted() {
     this.init()
+    if (!this.isiOS) this.loadDiagnosticState()
   }
 }
 </script>

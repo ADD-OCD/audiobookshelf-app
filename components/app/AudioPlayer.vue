@@ -906,6 +906,7 @@ export default {
     // When a playback session is started the native android/ios will send the session
     onPlaybackSession(playbackSession) {
       console.log('onPlaybackSession received', JSON.stringify(playbackSession))
+      this.$diag.debug('AudioPlayer', `Playback session received: item ${playbackSession.libraryItemId || playbackSession.localLibraryItem?.id} playMethod=${playbackSession.playMethod} currentTime=${playbackSession.currentTime}`)
       this.playbackSession = playbackSession
 
       this.isEnded = false
@@ -923,11 +924,13 @@ export default {
       })
     },
     onPlaybackClosed() {
+      this.$diag.debug('AudioPlayer', 'Playback closed by native player')
       this.endPlayback()
     },
     onPlaybackFailed(data) {
       console.log('Received onPlaybackFailed evt')
       var errorMessage = data.value || 'Unknown Error'
+      this.$diag.error('AudioPlayer', `Playback failed: ${errorMessage}`)
       this.$toast.error(`Playback Failed: ${errorMessage}`)
       this.endPlayback()
     },
@@ -957,8 +960,10 @@ export default {
       if (this.$platform !== 'android' || this.playbackSession) return
       try {
         const state = await AbsAudioPlayer.getCurrentPlaybackState()
+        if (!state?.playbackSession) this.$diag.debug('AudioPlayer', 'UI started with no native playback session to reattach')
         if (!state?.playbackSession || this.playbackSession) return
         console.log('[AudioPlayer] Reattaching to existing native playback session', state.playbackSession.id)
+        this.$diag.debug('AudioPlayer', `UI reattached to existing native session: playing=${!!state.isPlaying} position=${state.currentTime} rate=${state.playbackRate} queue=${state.queue?.items?.length || 0}`)
         if (state.playbackRate) this.currentPlaybackRate = Number(state.playbackRate)
         this.onPlaybackSession(state.playbackSession)
         this.onMetadata({ duration: Number(state.duration) || 0, currentTime: Number(state.currentTime) || 0, playerState: 'READY' })

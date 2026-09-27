@@ -220,9 +220,11 @@ export default {
       const matches = savedIds.length === native.items.length && savedIds.every((item, index) => item.libraryItemId === native.items[index].libraryItemId && item.episodeId === (native.items[index].episodeId || null))
       if (!matches) {
         console.log('[AudioPlayerContainer] Saved queue does not match native queue, not restoring queue display')
+        this.$diag.debug('AudioPlayerContainer', 'Saved Up Next display did not match the native queue - not restored')
         return
       }
       console.log('[AudioPlayerContainer] Restored queue display from native queue', native.currentIndex)
+      this.$diag.debug('AudioPlayerContainer', `Up Next display restored from native queue (${native.items.length} items, index ${native.currentIndex})`)
       this.$store.commit('setPlaybackQueue', { ...saved, currentIndex: native.currentIndex })
     },
     async onPlaybackEnded() {
