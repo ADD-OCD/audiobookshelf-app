@@ -55,8 +55,8 @@ published (release, prerelease, or test build):
 | versionCode | What it was |
 | --- | --- |
 | 123 | Audiobookshelf+ v0.14.0 (current stable baseline) |
-| 124 | `fix/keyboard-aware-login` device-test build (commit `b66f9d96`) — **failed physical device test** (Galaxy S26 Ultra): keyboard still covered/blocked the server-connection/login form; page did not scroll. Superseded by 125. Not merged into `plus`. |
-| 125 | `fix/keyboard-aware-login` device-test build (commit `1596c0f3`) — corrected fix (WebView now gets a real IME inset so the keyboard genuinely resizes it) pending physical device re-test. Not merged into `plus`. |
+| 124 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `b66f9d96`) — distributed; **FAILED** physical-device testing: the keyboard layout was not scrollable, so lower fields/buttons couldn't be reached. Never merged into `plus`. |
+| 125 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `1596c0f3`) — distributed; keyboard/form behavior corrected, but **REJECTED** because the project/footer links could overlap the Important notice with the keyboard open. Never merged into `plus`. |
 
 Before building anything intended for distribution — including a one-off test/RC build — bump
 `versionCode` to the next integer above the value in this table, build, distribute, then update
@@ -68,7 +68,7 @@ satisfies).
 ## Announcements
 
 Audiobookshelf+ has no in-app "what's new"/announcements screen (checked during the v0.14.0
-release — there isn't one to reuse). The [GitHub Discussions "Announcements" category](https://github.com/ADD-OCD/audiobookshelf-app/discussions/categories/announcements)
+release — there isn't one to reuse). The [GitHub Discussions "Announcements" category](https://github.com/ADD-OCD/audiobookshelfplus-app/discussions/categories/announcements)
 on this repo is the established, preferred place for users to read about completed Audiobookshelf+
 changes, and is treated as part of the release itself, not an optional afterthought.
 
@@ -81,15 +81,29 @@ meaningful user-visible changes included in that release.** Rules for writing it
 - Use plain, user-facing language (what changed for the user), not implementation details,
   internal class/file names, commit SHAs, branch names, or signing/repository-administration
   details.
-- Small fixes/features don't each need their own post — they can accumulate and be summarized
-  together in the next normal release's announcement.
 - Temporary test/RC builds do not get their own Announcements post unless explicitly requested —
   they're for validation, not user-facing history.
+
+## Completing a user-facing feature or fix
+
+**Every completed user-facing Audiobookshelf+ feature or fix receives BOTH:**
+
+1. **README documentation** — an entry in `readme.md` describing it for repository visitors.
+2. **A GitHub Discussions → Announcements post** — a plain-language post for users following
+   Audiobookshelf+ (same writing rules as above).
+
+A feature/fix is only "completed" once it has passed its required testing (for device-dependent
+changes, physical-device approval of a distributed test build) and been merged into `plus`. Until
+then — including while temporary test/RC builds of it are being distributed — it is exempt:
+**don't** add it to the README as a finished improvement and **don't** post its Announcement.
+Both happen together as part of the completion step (merge into `plus` → README → Announcement →
+finalize docs), not before.
 
 ## Summary checklist for any new distributed APK
 
 1. Check the `versionCode` table above; use `last + 1`.
 2. Build the **release** variant (`app.absplus.android`), not debug.
 3. Confirm it's signed with the fingerprint above (`apksigner verify --verbose --print-certs`).
-4. For a normal release (not a test/RC build): write/post the Announcements entry for it first.
+4. For a normal release (not a test/RC build): write/post the Announcements entry for it first,
+   and make sure every completed feature/fix it includes is documented in the README.
 5. Publish it, then update the `versionCode` table in this document.

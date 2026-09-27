@@ -5,7 +5,7 @@
 | App | Package ID (release) | Package ID (debug build) |
 | --- | --- | --- |
 | Official Audiobookshelf (upstream, `advplyr/audiobookshelf-app`) | `com.audiobookshelf.app` | `com.audiobookshelf.app.debug` |
-| Audiobookshelf+ (this fork, `ADD-OCD/audiobookshelf-app`) | `app.absplus.android` | `app.absplus.android.debug` |
+| Audiobookshelf+ (this fork, `ADD-OCD/audiobookshelfplus-app`) | `app.absplus.android` | `app.absplus.android.debug` |
 
 Android treats the package ID (`applicationId`) as an app's permanent identity — two APKs with the same ID are the same app to the OS (an update replaces the other), while different IDs are entirely separate, independently installable apps that never share data, permissions, or storage. Prior to this migration, Audiobookshelf+ builds also shipped as `com.audiobookshelf.app`, identical to upstream, which meant Audiobookshelf+ and the official app could never coexist on one device and any upstream install would be silently overwritten by (or overwrite) a fork build with a higher `versionCode`.
 
