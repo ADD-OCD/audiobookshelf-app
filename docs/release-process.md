@@ -58,11 +58,12 @@ published (release, prerelease, or test build):
 | 124 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `b66f9d96`) — distributed; **FAILED** physical-device testing: the keyboard layout was not scrollable, so lower fields/buttons couldn't be reached. Superseded (its commit is only history within the approved 126 merge). |
 | 125 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `1596c0f3`) — distributed; keyboard/form behavior corrected, but **REJECTED** because the project/footer links could overlap the Important notice with the keyboard open. Superseded by 126. |
 | 126 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `fe30cbac`) — distributed; **PASSED** physical-device testing (Samsung Galaxy S26 Ultra): keyboard-aware Server Address and Login layouts approved, project/footer layout approved, both external project links (Official Audiobookshelf, Audiobookshelf+) verified on the device. Approved and merged into `plus`. |
-| 127 | Playback/widget restoration release-package device-test build from `fix/playback-widget-restoration` (app code as of `ae0ffa16`; built from the commit that set `versionCode 127`, tagged `playback-restore-device-test-v127`) — distributed as a temporary prerelease; pending physical-device testing. Not merged into `plus`. |
+| 127 | Playback/widget restoration release-package device-test build from `fix/playback-widget-restoration` (app code as of `ae0ffa16`; built from the commit that set `versionCode 127`, tagged `playback-restore-device-test-v127`) — distributed as a temporary prerelease; superseded for physical-device testing by the combined 128 build. Not merged into `plus`. |
+| 128 | Combined Playback Restoration + In-App Diagnostics release-package physical-device test build from `feature/in-app-diagnostic-logging` (contains all of `fix/playback-widget-restoration`; app code as of `b9097ada`; built from the commit that set `versionCode 128`, tagged `playback-diagnostics-device-test-v128`) — distributed as a temporary prerelease; pending physical-device testing. Not merged into `plus`. |
 
-**Next distributed versionCode: 128.** The temporary GitHub prereleases/tags for 124–126 were
-deleted after approval; these ledger rows are the permanent record, and those numbers (and 127)
-must never be reused.
+**Next distributed versionCode: 129.** The temporary GitHub prereleases/tags for 124–126 were
+deleted after approval; these ledger rows are the permanent record, and those numbers (and 127,
+128) must never be reused.
 
 Before building anything intended for distribution — including a one-off test/RC build — bump
 `versionCode` to the next integer above the value in this table, build, distribute, then update
