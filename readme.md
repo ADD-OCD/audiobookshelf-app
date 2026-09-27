@@ -88,20 +88,30 @@ be) in the official app.
   situation that could stop all playback until the app was restarted is fixed; failed downloads
   (e.g. a lost folder permission) now show an error instead of failing silently; and Rescan Folder
   now checks your whole library instead of only the first 100 books.
+- **Keyboard-friendly connection and login screens** — when the Android on-screen keyboard opens,
+  the Server Address and Login screens now adapt: the fields and Submit buttons stay reachable,
+  the page scrolls if space runs short, and the large logo condenses until the keyboard closes.
+  The connection screen also links separately to Official Audiobookshelf and to Audiobookshelf+
+  (this unofficial fork), and those links no longer overlap the form.
 
 ### Getting builds
 
-This fork does not publish to the Play Store or TestFlight. Debug APKs are built from the
-`plus` branch and published on the
-[Releases](https://github.com/ADD-OCD/audiobookshelfplus-app/releases) page, or build it yourself
-with the instructions below.
+This fork does not publish to the Play Store or TestFlight. Installable APKs are published on
+this repo's [Releases](https://github.com/ADD-OCD/audiobookshelfplus-app/releases) page — always
+the release package (`app.absplus.android`), signed with the permanent Audiobookshelf+ key, so
+updates install over each other. Debug builds (`app.absplus.android.debug`) are for local
+development only and are not published. You can also build it yourself with the instructions
+below.
 
 ---
+
+This fork: [github.com/ADD-OCD/audiobookshelfplus-app](https://github.com/ADD-OCD/audiobookshelfplus-app)
 
 [Official project repo: github.com/advplyr/audiobookshelf](https://github.com/advplyr/audiobookshelf) or the project site [audiobookshelf.org](https://audiobookshelf.org)
 
 Join the official community on [discord](https://discord.gg/pJsjuNCKRq) — this fork is not
-supported there; open an issue on this repo instead for fork-specific problems.
+supported there; use this repo's [Discussions](https://github.com/ADD-OCD/audiobookshelfplus-app/discussions)
+instead for fork-specific problems.
 
 **Requires an Audiobookshelf server to connect with**
 

@@ -27,8 +27,8 @@ release key.
 
 **Debug builds (`app.absplus.android.debug`) are never uploaded to GitHub Releases** — not as a
 normal release, not as a prerelease, not as a stabilization/RC/device-test build, not as a
-feature-test build. Every APK attached to a GitHub release, regardless of how temporary or
-test-oriented it is, must:
+feature-test build — unless explicitly authorized as an exceptional case. Every APK attached to a
+GitHub release, regardless of how temporary or test-oriented it is, must:
 
 1. Use the release package ID, `app.absplus.android`.
 2. Be signed with the permanent Audiobookshelf+ release key above.
@@ -55,9 +55,14 @@ published (release, prerelease, or test build):
 | versionCode | What it was |
 | --- | --- |
 | 123 | Audiobookshelf+ v0.14.0 (current stable baseline) |
-| 124 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `b66f9d96`) — distributed; **FAILED** physical-device testing: the keyboard layout was not scrollable, so lower fields/buttons couldn't be reached. Never merged into `plus`. |
-| 125 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `1596c0f3`) — distributed; keyboard/form behavior corrected, but **REJECTED** because the project/footer links could overlap the Important notice with the keyboard open. Never merged into `plus`. |
-| 126 | Keyboard/login device-test build from `fix/keyboard-aware-login` (commit `fe30cbac`) — distributed as a new device test; keeps 125's keyboard/form behavior and moves the project links (now separate Official Audiobookshelf / Audiobookshelf+ links) into normal flow below the Important notice. Pending physical-device testing. Not merged into `plus`. |
+| 124 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `b66f9d96`) — distributed; **FAILED** physical-device testing: the keyboard layout was not scrollable, so lower fields/buttons couldn't be reached. Superseded (its commit is only history within the approved 126 merge). |
+| 125 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `1596c0f3`) — distributed; keyboard/form behavior corrected, but **REJECTED** because the project/footer links could overlap the Important notice with the keyboard open. Superseded by 126. |
+| 126 | Keyboard/login release-package device-test build from `fix/keyboard-aware-login` (commit `fe30cbac`) — distributed; **PASSED** physical-device testing (Samsung Galaxy S26 Ultra): keyboard-aware Server Address and Login layouts approved, project/footer layout approved, both external project links (Official Audiobookshelf, Audiobookshelf+) verified on the device. Approved and merged into `plus`. |
+
+**Next distributed versionCode: 127.** (`plus` already carries `versionCode 126` from the
+approved merge, so bump it to 127 before building anything for distribution.) The temporary
+GitHub prereleases/tags for 124–126 were deleted after approval; these ledger rows are the
+permanent record, and those numbers must never be reused.
 
 Before building anything intended for distribution — including a one-off test/RC build — bump
 `versionCode` to the next integer above the value in this table, build, distribute, then update
