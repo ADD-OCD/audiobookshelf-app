@@ -55,6 +55,7 @@ published (release, prerelease, or test build):
 | versionCode | What it was |
 | --- | --- |
 | 123 | Audiobookshelf+ v0.14.0 (current stable baseline) |
+| 124 | `fix/keyboard-aware-login` device-test build (commit `b66f9d96`) — **failed physical device test** (Galaxy S26 Ultra): keyboard still covered/blocked the server-connection/login form; page did not scroll. Superseded by 125. Not merged into `plus`. |
 
 Before building anything intended for distribution — including a one-off test/RC build — bump
 `versionCode` to the next integer above the value in this table, build, distribute, then update

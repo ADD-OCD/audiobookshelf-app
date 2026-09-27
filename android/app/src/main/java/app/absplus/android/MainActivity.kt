@@ -57,24 +57,33 @@ class MainActivity : BridgeActivity() {
     // See: https://developer.android.com/develop/ui/views/layout/edge-to-edge
     val webView: WebView = findViewById(R.id.webview)
     webView.setOnApplyWindowInsetsListener { v, insets ->
-      val (left, top, right, bottom) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      val (left, top, right, sysBottom, imeBottom) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val sysInsets = insets.getInsets(WindowInsets.Type.systemBars())
-        Log.d(tag, "safe sysInsets: $sysInsets")
-        arrayOf(sysInsets.left, sysInsets.top, sysInsets.right, sysInsets.bottom)
+        val imeInsets = insets.getInsets(WindowInsets.Type.ime())
+        Log.d(tag, "safe sysInsets: $sysInsets imeInsets: $imeInsets")
+        arrayOf(sysInsets.left, sysInsets.top, sysInsets.right, sysInsets.bottom, imeInsets.bottom)
       } else {
         arrayOf(
           insets.systemWindowInsetLeft,
           insets.systemWindowInsetTop,
           insets.systemWindowInsetRight,
-          insets.systemWindowInsetBottom
+          insets.systemWindowInsetBottom,
+          0
         )
       }
+      // With edge-to-edge enforced (targetSdk 35+), the keyboard no longer resizes the window
+      // on its own even with windowSoftInputMode="adjustResize" - it only shows up as an IME
+      // inset. Fold it into the WebView's bottom margin so the WebView (and therefore CSS
+      // viewport units/media queries) actually shrinks when the keyboard is open.
+      val bottom = maxOf(sysBottom, imeBottom)
 
       // Inject as CSS variables
       // NOTE: Possibly able to use in the future to support edge-to-edge better.
+      // Kept as the system bar inset only (not the keyboard) so it stays meaningful as a
+      // "safe area" value if it's ever wired up to CSS.
        val js = """
        document.documentElement.style.setProperty('--safe-area-inset-top', '${top}px');
-       document.documentElement.style.setProperty('--safe-area-inset-bottom', '${bottom}px');
+       document.documentElement.style.setProperty('--safe-area-inset-bottom', '${sysBottom}px');
        document.documentElement.style.setProperty('--safe-area-inset-left', '${left}px');
        document.documentElement.style.setProperty('--safe-area-inset-right', '${right}px');
       """.trimIndent()
