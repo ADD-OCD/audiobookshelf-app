@@ -498,7 +498,7 @@ class DownloadItemManager(
         throw IllegalStateException("Could not finalize internal staging file")
       }
       backup.delete()
-      AbsLogger.info(tag, "Move completed for ${part.filename} to ${finalFile.absolutePath}")
+      AbsLogger.info(tag, "Move completed for ${part.filename} (app storage)")
       completePart(item, part)
     } catch (e: Exception) {
       part.isMoving = false
@@ -551,7 +551,7 @@ class DownloadItemManager(
                 throw IllegalStateException("SAF final size mismatch")
         if (!staging.delete()) AbsLogger.error(tag, "Could not remove staging file ${staging.name}")
         part.completedDestinationUri = destination.uri.toString()
-        AbsLogger.info(tag, "Move completed for ${part.filename} to ${destination.uri}")
+        AbsLogger.info(tag, "Move completed for ${part.filename} (selected device folder)")
         completePart(item, part)
       } catch (e: Exception) {
         failFinalization(item, part, "SAF copy failed: ${e.message}")

@@ -286,8 +286,9 @@ class AbsAudioPlayer : Plugin() {
         }
 
         Handler(Looper.getMainLooper()).post {
-          DLog.d(tag, "prepareLibraryItem: Preparing Local Media item ${jacksonMapper.writeValueAsString(it)}")
           val playbackSession = it.getPlaybackSession(episode, playerNotificationService.getDeviceInfo())
+          // Concise on purpose: the serialized item contains file paths, SAF URIs and the server connection id
+          DLog.d(tag, "prepareLibraryItem: downloaded item ${it.id} (server item ${it.libraryItemId ?: "none"}${episode?.let { e -> ", episode " + e.id } ?: ""}) mediaType=${it.mediaType} title=\"${playbackSession.displayTitle}\" tracks=${playbackSession.audioTracks.size} start=${playbackSession.currentTime}s duration=${playbackSession.getTotalDuration()}s rate=$playbackRate playWhenReady=$playWhenReady")
           if (startTimeOverride != null) {
             DLog.d(tag, "prepareLibraryItem: Using start time override $startTimeOverride")
             playbackSession.currentTime = startTimeOverride
@@ -327,7 +328,7 @@ class AbsAudioPlayer : Plugin() {
               }
 
               Handler(Looper.getMainLooper()).post {
-                DLog.d(tag, "Preparing Player playback session ${jacksonMapper.writeValueAsString(it)}")
+                DLog.d(tag, "prepareLibraryItem: streamed session ${it.id} for item ${it.libraryItemId}${it.episodeId?.let { e -> ", episode " + e } ?: ""} mediaType=${it.mediaType} playMethod=${it.playMethod} title=\"${it.displayTitle}\" tracks=${it.audioTracks.size} start=${it.currentTime}s duration=${it.getTotalDuration()}s rate=$playbackRate playWhenReady=$playWhenReady")
                 PlayerListener.lazyIsPlaying = false
                 playerNotificationService.preparePlayer(it, playWhenReady, playbackRate)
               }

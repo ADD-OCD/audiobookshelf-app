@@ -270,7 +270,8 @@ class MediaProgressSyncer(
 
         DLog.d(
                 tag,
-                "Sync local device current serverConnectionConfigId=${DeviceManager.serverConnectionConfig?.id}"
+                // The config id encodes the server address and username, so only whether one is set is logged
+                "Sync local device (server connection set=${DeviceManager.serverConnectionConfig != null}, same server as item=${it.serverConnectionConfigId != null && DeviceManager.serverConnectionConfig?.id == it.serverConnectionConfigId})"
         )
         AbsLogger.info("MediaProgressSyncer", "sync: Saved local progress (title: \"$syncedTitle\") (currentTime: $currentTime) (session id: ${it.id})")
 
