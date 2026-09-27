@@ -37,7 +37,11 @@ import app.absplus.android.data.*
 import app.absplus.android.data.DeviceInfo
 import app.absplus.android.device.DeviceManager
 import app.absplus.android.managers.DbManager
+import app.absplus.android.managers.PlaybackRestoreStore
+import app.absplus.android.managers.PlaybackRestoreStore.LOG_TAG as RESTORE_TAG
 import app.absplus.android.managers.SleepTimerManager
+import android.content.pm.ServiceInfo
+import androidx.media.session.MediaButtonReceiver
 import app.absplus.android.media.MediaManager
 import app.absplus.android.media.MediaProgressSyncer
 import app.absplus.android.media.getUriToAbsIconDrawable
@@ -138,8 +142,23 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   // Playlist queue for native background advancement (bypasses WebView/JS layer)
   data class PlaylistQueueItem(val libraryItemId: String, val episodeId: String?)
+  // Persisted on every change so a widget/headset Play can rebuild the queue after process death
   var playlistQueue: List<PlaylistQueueItem> = emptyList()
+    set(value) {
+      field = value
+      PlaybackRestoreStore.saveQueue(this, field, playlistQueueIndex)
+    }
   var playlistQueueIndex: Int = -1
+    set(value) {
+      field = value
+      PlaybackRestoreStore.saveQueue(this, playlistQueue, field)
+    }
+
+  // Session restoration (widget/headset/system Play when no media is prepared)
+  private var isRestoringPlayback = false
+  private var isServiceDestroyed = false
+  // True while the service is foreground only because of a media-button start, before any media is prepared
+  private var isMediaButtonPlaceholderForeground = false
 
   // The following are used for the shake detection
   private var isShakeSensorRegistered: Boolean = false
@@ -181,9 +200,62 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     isStarted = true
-    Log.d(tag, "onStartCommand $startId")
+    Log.d(tag, "onStartCommand $startId action=${intent?.action}")
+
+    if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
+      // MediaButtonReceiver started us with startForegroundService, so we must be foreground
+      // promptly even if nothing is prepared yet (e.g. widget Play after the service was destroyed)
+      Log.i(RESTORE_TAG, "Media button start command | sessionPrepared=${currentPlaybackSession != null} | foreground=${PlayerNotificationListener.isForegroundService}")
+      if (!PlayerNotificationListener.isForegroundService) startMediaButtonPlaceholderForeground()
+      // null = no key event, so the session callback (which normally releases the placeholder) won't run
+      if (MediaButtonReceiver.handleIntent(mediaSession, intent) == null) onMediaButtonHandled()
+    }
 
     return START_STICKY
+  }
+
+  private fun startMediaButtonPlaceholderForeground() {
+    val title = DeviceManager.deviceData.lastPlaybackSession?.displayTitle ?: getString(R.string.app_name)
+    val notification = NotificationCompat.Builder(this, channelId)
+      .setSmallIcon(R.drawable.icon_monochrome)
+      .setContentTitle(title)
+      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+      .setSilent(true)
+      .build()
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+      } else {
+        startForeground(notificationId, notification)
+      }
+      PlayerNotificationListener.isForegroundService = true
+      isMediaButtonPlaceholderForeground = true
+      Log.i(RESTORE_TAG, "Started placeholder foreground for media button")
+    } catch (e: Exception) {
+      Log.e(RESTORE_TAG, "Could not start placeholder foreground: $e")
+    }
+  }
+
+  // Called once a media button has been handled; drops the placeholder if nothing ended up playing
+  fun onMediaButtonHandled() {
+    if (!isMediaButtonPlaceholderForeground || isRestoringPlayback) return
+    if (currentPlaybackSession == null) {
+      releaseMediaButtonPlaceholderForeground("nothing to play")
+    } else {
+      // A session already existed: put the real player notification back over the placeholder
+      isMediaButtonPlaceholderForeground = false
+      playerNotificationManager.invalidate()
+    }
+  }
+
+  private fun releaseMediaButtonPlaceholderForeground(reason: String) {
+    if (!isMediaButtonPlaceholderForeground) return
+    Log.i(RESTORE_TAG, "Releasing placeholder foreground ($reason)")
+    isMediaButtonPlaceholderForeground = false
+    PlayerNotificationListener.isForegroundService = false
+    stopForeground(Service.STOP_FOREGROUND_REMOVE)
+    isStarted = false
+    stopSelf()
   }
 
   @Deprecated("Deprecated in Java")
@@ -218,8 +290,12 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     }
 
     Log.d(tag, "onDestroy")
+    Log.i(RESTORE_TAG, "Player service destroyed | hadSession=${currentPlaybackSession != null} | resumable=${PlaybackRestoreStore.isResumable(this)} | queue=${playlistQueue.size}")
+    isServiceDestroyed = true
     isStarted = false
     isClosed = true
+    isMediaButtonPlaceholderForeground = false
+    PlayerNotificationListener.isForegroundService = false
     DeviceManager.widgetUpdater?.onPlayerChanged(this)
 
     playerNotificationManager.setPlayer(null)
@@ -236,23 +312,31 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   override fun onTaskRemoved(rootIntent: Intent?) {
     super.onTaskRemoved(rootIntent)
 
-    val isPlaying = try { currentPlayer.isPlaying } catch (e: Exception) { false }
     val playerWantsToPlay = try { currentPlayer.playWhenReady } catch (e: Exception) { false }
+    // isPlaying is false while buffering (e.g. a stream just after Play), which is still intent to play
+    val isBuffering = try { currentPlayer.playbackState == Player.STATE_BUFFERING } catch (e: Exception) { false }
+    val isActuallyPlaying = try { currentPlayer.isPlaying } catch (e: Exception) { false }
+    val isPlaying = isActuallyPlaying || (playerWantsToPlay && isBuffering)
     // Only keep the service alive if the player is actively playing or if it
     // intends to continue (playWhenReady == true with a playlist queue, i.e.
     // between episodes).  When paused by Bluetooth disconnect or user action,
     // playWhenReady is false and the service should be allowed to stop.
     if (isPlaying || (playlistQueue.isNotEmpty() && playerWantsToPlay)) {
       Log.d(tag, "onTaskRemoved: keeping service alive (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+      Log.i(RESTORE_TAG, "Task removed while playing - existing player/session kept alive")
       return
     }
 
+    // Not playing: let the service stop. The session stays resumable (lastPlaybackSession +
+    // PlaybackRestoreStore), so a later widget/headset Play rebuilds it via restoreLastPlaybackSession().
     Log.d(tag, "onTaskRemoved: stopping service (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+    Log.i(RESTORE_TAG, "Task removed while not playing - stopping service, session left resumable=${PlaybackRestoreStore.isResumable(this)}")
     stopSelf()
   }
 
   override fun onCreate() {
     Log.d(tag, "onCreate")
+    Log.i(RESTORE_TAG, "Player service created (new instance - any previous player/session is gone)")
     super.onCreate()
     ctx = this
 
@@ -557,6 +641,10 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       currentPlaybackSession = null
       return
     }
+
+    PlaybackRestoreStore.setResumable(this, true)
+    // PlayerNotificationManager posts its notification under the same id, replacing any placeholder
+    isMediaButtonPlaceholderForeground = false
 
     if (mPlayer == currentPlayer) {
       val mediaSource: MediaSource
@@ -1142,12 +1230,133 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   }
 
   fun play() {
+    if (currentPlaybackSession == null) {
+      // Widget/headset/notification/system Play reached a service with nothing prepared
+      // (service or process was recreated). Rebuild the last session instead of no-op'ing.
+      Log.i(RESTORE_TAG, "Play received with no prepared session - attempting restore")
+      if (!restoreLastPlaybackSession(true)) onMediaButtonHandled()
+      return
+    }
+    Log.i(RESTORE_TAG, "Play received - using existing player/session ${currentPlaybackSession?.mediaItemId}")
     if (currentPlayer.isPlaying) {
       Log.d(tag, "Already playing")
       return
     }
     currentPlayer.volume = 1F
     currentPlayer.play()
+  }
+
+  /**
+   * Rebuilds the last playback session (identity from DeviceData.lastPlaybackSession, position from
+   * local/server progress, rate from saved user settings, queue from PlaybackRestoreStore).
+   * Only runs for an explicit play command; never at app launch.
+   * @return true if a restore was started
+   */
+  fun restoreLastPlaybackSession(playWhenReady: Boolean): Boolean {
+    if (isRestoringPlayback) {
+      Log.i(RESTORE_TAG, "Restore already in progress")
+      return true
+    }
+    val saved = DeviceManager.deviceData.lastPlaybackSession
+    if (saved == null || !PlaybackRestoreStore.isResumable(this)) {
+      Log.i(RESTORE_TAG, "Nothing to restore (hasLastSession=${saved != null}, resumable=${PlaybackRestoreStore.isResumable(this)})")
+      return false
+    }
+
+    isRestoringPlayback = true
+    val playbackRate = mediaManager.getSavedPlaybackRate()
+    Log.i(RESTORE_TAG, "Restoring ${if (saved.isLocal) "downloaded" else "streamed"} item ${saved.mediaItemId} | rate=$playbackRate")
+
+    if (saved.isLocal) {
+      val localItem = DeviceManager.dbManager.getLocalLibraryItem(saved.localLibraryItemId)
+      val episode = saved.localEpisodeId?.let { epId -> (localItem?.media as? Podcast)?.episodes?.find { it.id == epId } }
+      if (localItem == null || (!saved.localEpisodeId.isNullOrEmpty() && episode == null)) {
+        failRestore("downloaded item no longer exists", permanent = true)
+        return false
+      }
+      if (localItem.isInvalid || !localItem.hasTracks(this, episode)) {
+        failRestore("downloaded item has no playable files", permanent = true)
+        return false
+      }
+      // Position comes from the local media progress saved on every sync
+      finishRestore(localItem.getPlaybackSession(episode, getDeviceInfo()), playWhenReady, playbackRate)
+      return true
+    }
+
+    val config = DeviceManager.getServerConnectionConfig(saved.serverConnectionConfigId)
+    val libraryItemId = saved.libraryItemId
+    if (config == null || libraryItemId.isNullOrEmpty()) {
+      failRestore("server connection for streamed item no longer saved", permanent = true)
+      return false
+    }
+    val activeConfigId = DeviceManager.serverConnectionConfig?.id ?: DeviceManager.deviceData.lastServerConnectionConfigId
+    if (activeConfigId != config.id) {
+      failRestore("streamed item belongs to a server that is not the current one", permanent = false)
+      return false
+    }
+    if (!DeviceManager.checkConnectivity(this)) {
+      failRestore("no network for streamed item", permanent = false)
+      return false
+    }
+    val connectivityManager = getSystemService(ConnectivityManager::class.java)
+    val streamingSetting = deviceSettings.streamingUsingCellular
+    if (connectivityManager?.isActiveNetworkMetered == true && streamingSetting != StreamingUsingCellularSetting.ALWAYS) {
+      failRestore("streaming on cellular is not allowed without confirmation ($streamingSetting)", permanent = false)
+      return false
+    }
+    if (DeviceManager.serverConnectionConfig == null) {
+      Log.i(RESTORE_TAG, "Using saved server connection for restore")
+      DeviceManager.serverConnectionConfig = config
+    }
+
+    // A new server session returns the server's current progress for this item
+    apiHandler.playLibraryItem(libraryItemId, saved.episodeId, getPlayItemRequestPayload(false)) { session ->
+      Handler(Looper.getMainLooper()).post {
+        if (session == null) {
+          failRestore("server did not return a playback session", permanent = false)
+        } else {
+          finishRestore(session, playWhenReady, playbackRate)
+        }
+      }
+    }
+    return true
+  }
+
+  private fun finishRestore(session: PlaybackSession, playWhenReady: Boolean, playbackRate: Float) {
+    isRestoringPlayback = false
+    if (isServiceDestroyed) {
+      Log.w(RESTORE_TAG, "Service destroyed before restore finished - dropping")
+      return
+    }
+    if (currentPlaybackSession != null) {
+      Log.i(RESTORE_TAG, "Another session started while restoring - keeping it")
+      return
+    }
+
+    val savedQueue = PlaybackRestoreStore.loadQueue(this)
+    val queuedItem = savedQueue.items.getOrNull(savedQueue.index)
+    val sessionItemId = session.localLibraryItem?.id ?: session.libraryItemId
+    val sessionEpisodeId = if (session.isLocal) session.localEpisodeId else session.episodeId
+    if (queuedItem != null && queuedItem.libraryItemId == sessionItemId && queuedItem.episodeId == sessionEpisodeId) {
+      playlistQueue = savedQueue.items
+      playlistQueueIndex = savedQueue.index
+      Log.i(RESTORE_TAG, "Queue restored (${savedQueue.items.size} items, index ${savedQueue.index})")
+    } else if (savedQueue.items.isNotEmpty()) {
+      Log.i(RESTORE_TAG, "Saved queue does not match restored item - not restoring queue")
+    }
+
+    Log.i(RESTORE_TAG, "Session rebuilt for ${session.mediaItemId} | position=${session.currentTime}s | rate=$playbackRate | playWhenReady=$playWhenReady")
+    preparePlayer(session, playWhenReady, playbackRate)
+  }
+
+  private fun failRestore(reason: String, permanent: Boolean) {
+    isRestoringPlayback = false
+    Log.w(RESTORE_TAG, "Restore failed: $reason (permanent=$permanent)")
+    if (permanent) {
+      PlaybackRestoreStore.setResumable(this, false)
+      DeviceManager.widgetUpdater?.onPlayerClosed()
+    }
+    onMediaButtonHandled()
   }
 
   fun pause() {
@@ -1259,6 +1468,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     currentPlaybackSession = null
     mediaProgressSyncer.reset()
     clientEventEmitter?.onPlaybackClosed()
+
+    // An explicit close (or fatal playback error) must not be revived by a later widget/headset Play
+    PlaybackRestoreStore.setResumable(this, false)
 
     PlayerListener.lastPauseTime = 0
     isClosed = true

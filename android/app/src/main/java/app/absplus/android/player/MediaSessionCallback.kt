@@ -143,7 +143,9 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
   }
 
   override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
-    return handleCallMediaButton(mediaButtonEvent)
+    val handled = handleCallMediaButton(mediaButtonEvent)
+    playerNotificationService.onMediaButtonHandled()
+    return handled
   }
 
   private fun handleCallMediaButton(intent: Intent): Boolean {
@@ -165,21 +167,7 @@ class MediaSessionCallback(var playerNotificationService:PlayerNotificationServi
         when (keyEvent.keyCode) {
           KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
             Log.d(tag, "handleCallMediaButton: Media Play/Pause")
-
-            // TODO: Play/pause event sent from widget when app is closed. Currently the service gets destroyed before anything can happen
-//            if (playerNotificationService.currentPlaybackSession == null && DeviceManager.deviceData.lastPlaybackSession != null) {
-//              Log.i(tag, "No playback session but had one in the db")
-//
-//              val connectionConfig = DeviceManager.deviceData.serverConnectionConfigs.find { it.id == DeviceManager.deviceData.lastPlaybackSession?.serverConnectionConfigId }
-//              connectionConfig?.let {
-//                Log.i(tag, "Setting playback session from db $it")
-//                DeviceManager.serverConnectionConfig = it
-//
-//                playerNotificationService.currentPlaybackSession = DeviceManager.deviceData.lastPlaybackSession
-//                playerNotificationService.startNewPlaybackSession()
-//                return true
-//              }
-//            }
+            // With no prepared session, play() restores the last session (see restoreLastPlaybackSession)
 
             if (playerNotificationService.mPlayer.isPlaying) {
               if (0 == mediaButtonClickCount) playerNotificationService.pause()

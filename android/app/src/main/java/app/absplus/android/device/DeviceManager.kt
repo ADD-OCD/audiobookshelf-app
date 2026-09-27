@@ -9,6 +9,7 @@ import android.util.Log
 import app.absplus.android.MediaPlayerWidget
 import app.absplus.android.data.*
 import app.absplus.android.managers.DbManager
+import app.absplus.android.managers.PlaybackRestoreStore
 import app.absplus.android.player.PlayerNotificationService
 import app.absplus.android.updateAppWidget
 
@@ -194,7 +195,9 @@ object DeviceManager {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MediaPlayerWidget::class.java)
                 val ids = appWidgetManager.getAppWidgetIds(componentName)
-                val playbackSession = pns.getCurrentPlaybackSessionCopy()
+                val playbackSession = pns.getCurrentPlaybackSessionCopy() ?: deviceData.lastPlaybackSession
+                val hasLiveSession = pns.currentPlaybackSession != null && !PlayerNotificationService.isClosed
+                val showControls = hasLiveSession || (deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context))
 
                 for (widgetId in ids) {
                   updateAppWidget(
@@ -203,7 +206,7 @@ object DeviceManager {
                           widgetId,
                           playbackSession,
                           isPlaying,
-                          PlayerNotificationService.isClosed
+                          showControls
                   )
                 }
               }
@@ -212,6 +215,7 @@ object DeviceManager {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MediaPlayerWidget::class.java)
                 val ids = appWidgetManager.getAppWidgetIds(componentName)
+                val showControls = deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context)
                 for (widgetId in ids) {
                   updateAppWidget(
                           context,
@@ -219,7 +223,7 @@ object DeviceManager {
                           widgetId,
                           deviceData.lastPlaybackSession,
                           false,
-                          PlayerNotificationService.isClosed
+                          showControls
                   )
                 }
               }
