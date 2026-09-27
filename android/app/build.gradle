@@ -46,7 +46,7 @@ android {
     applicationId "app.absplus.android"
     minSdkVersion rootProject.ext.minSdkVersion
     targetSdkVersion rootProject.ext.targetSdkVersion
-    versionCode 123
+    versionCode 126
     versionName "0.14.1-beta"
     testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     manifestPlaceholders = [
