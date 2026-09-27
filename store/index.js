@@ -225,8 +225,10 @@ export const mutations = {
   },
   setPlaybackQueue(state, queue) {
     state.playbackQueue = queue
+    this.$localStore.setPlaybackQueue(queue)
   },
   clearPlaybackQueue(state) {
     state.playbackQueue = null
+    this.$localStore.setPlaybackQueue(null)
   }
 }

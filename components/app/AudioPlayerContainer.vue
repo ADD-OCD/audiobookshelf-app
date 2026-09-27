@@ -209,6 +209,22 @@ export default {
           this.$toast.error('Failed to play')
         })
     },
+    // After the UI restarts, reuse the saved Up Next display copy only if it still describes exactly
+    // the queue the native player holds (it may have advanced or been restored in the background).
+    async nativePlaybackReattached(state) {
+      const native = state?.queue
+      if (this.$store.state.playbackQueue || !native?.items?.length) return
+      const saved = await this.$localStore.getPlaybackQueue()
+      if (!saved?.items?.length || this.$store.state.playbackQueue) return
+      const savedIds = nativeQueueItems(saved.items)
+      const matches = savedIds.length === native.items.length && savedIds.every((item, index) => item.libraryItemId === native.items[index].libraryItemId && item.episodeId === (native.items[index].episodeId || null))
+      if (!matches) {
+        console.log('[AudioPlayerContainer] Saved queue does not match native queue, not restoring queue display')
+        return
+      }
+      console.log('[AudioPlayerContainer] Restored queue display from native queue', native.currentIndex)
+      this.$store.commit('setPlaybackQueue', { ...saved, currentIndex: native.currentIndex })
+    },
     async onPlaybackEnded() {
       const queue = this.$store.state.playbackQueue
       if (!queue || this.$platform !== 'android') return
@@ -582,6 +598,8 @@ export default {
     }
   },
   async mounted() {
+    // Registered before any await: the child audio player emits this from its own init right after mount
+    this.$eventBus.$on('native-playback-reattached', this.nativePlaybackReattached)
     this.onLocalMediaProgressUpdateListener = await AbsAudioPlayer.addListener('onLocalMediaProgressUpdate', this.onLocalMediaProgressUpdate)
     this.onSleepTimerEndedListener = await AbsAudioPlayer.addListener('onSleepTimerEnded', this.onSleepTimerEnded)
     this.onSleepTimerSetListener = await AbsAudioPlayer.addListener('onSleepTimerSet', this.onSleepTimerSet)
@@ -621,6 +639,7 @@ export default {
     this.$eventBus.$off('playback-ended', this.onPlaybackEnded)
     this.$eventBus.$off('add-to-queue', this.addSingleItemToQueue)
     this.$eventBus.$off('add-queue-source-to-queue', this.addQueueSourceToQueue)
+    this.$eventBus.$off('native-playback-reattached', this.nativePlaybackReattached)
   }
 }
 </script>

@@ -118,8 +118,46 @@ class AbsAudioPlayer : Plugin() {
       })
 
       MediaEventManager.clientEventEmitter = playerNotificationService.clientEventEmitter
+
+      pendingPlaybackStateCalls.forEach { resolvePlaybackState(it) }
+      pendingPlaybackStateCalls.clear()
     }
     mainActivity.pluginCallback = foregroundServiceReady
+  }
+
+  private val pendingPlaybackStateCalls = mutableListOf<PluginCall>()
+
+  /**
+   * Lets a (re)started JS UI attach to a session the native player already has, e.g. after the
+   * Activity was destroyed while playback continued, or after a widget Play restored a session.
+   * Resolves with no playbackSession when nothing is prepared; never starts playback.
+   */
+  @PluginMethod
+  fun getCurrentPlaybackState(call: PluginCall) {
+    Handler(Looper.getMainLooper()).post {
+      if (::playerNotificationService.isInitialized) resolvePlaybackState(call)
+      else pendingPlaybackStateCalls.add(call)
+    }
+  }
+
+  private fun resolvePlaybackState(call: PluginCall) {
+    val pns = playerNotificationService
+    val ret = JSObject()
+    val session = pns.currentPlaybackSession
+    if (session != null) {
+      ret.put("playbackSession", JSObject(jacksonMapper.writeValueAsString(session)))
+      ret.put("isPlaying", pns.currentPlayer.isPlaying)
+      ret.put("currentTime", pns.getCurrentTimeSeconds())
+      ret.put("duration", session.getTotalDuration())
+      ret.put("playbackRate", pns.currentPlayer.playbackParameters.speed.toDouble())
+      ret.put("mediaPlayer", pns.getMediaPlayer())
+    }
+    val queue = JSObject()
+    queue.put("items", JSArray(jacksonMapper.writeValueAsString(pns.playlistQueue)))
+    queue.put("currentIndex", pns.playlistQueueIndex)
+    ret.put("queue", queue)
+    Log.i("PlaybackRestore", "UI requested native playback state | hasSession=${session != null} | isPlaying=${session != null && pns.currentPlayer.isPlaying} | queue=${pns.playlistQueue.size}")
+    call.resolve(ret)
   }
 
   fun emit(evtName: String, value: Any) {

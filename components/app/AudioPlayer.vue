@@ -947,6 +947,27 @@ export default {
       AbsAudioPlayer.addListener('onProgressSyncFailing', this.showProgressSyncIsFailing)
       AbsAudioPlayer.addListener('onProgressSyncSuccess', this.showProgressSyncSuccess)
       AbsAudioPlayer.addListener('onPlaybackSpeedChanged', this.onPlaybackSpeedChanged)
+
+      await this.reattachNativePlayback()
+    },
+    // A freshly started UI (e.g. after the task was swiped away while audio kept playing, or after a
+    // widget Play restored the session) otherwise never learns about the native session, because
+    // onPlaybackSession only fires when a session is prepared. Never starts playback itself.
+    async reattachNativePlayback() {
+      if (this.$platform !== 'android' || this.playbackSession) return
+      try {
+        const state = await AbsAudioPlayer.getCurrentPlaybackState()
+        if (!state?.playbackSession || this.playbackSession) return
+        console.log('[AudioPlayer] Reattaching to existing native playback session', state.playbackSession.id)
+        if (state.playbackRate) this.currentPlaybackRate = Number(state.playbackRate)
+        this.onPlaybackSession(state.playbackSession)
+        this.onMetadata({ duration: Number(state.duration) || 0, currentTime: Number(state.currentTime) || 0, playerState: 'READY' })
+        this.onPlayingUpdate({ value: !!state.isPlaying })
+        if (state.mediaPlayer) this.$store.commit('setMediaPlayer', state.mediaPlayer)
+        this.$eventBus.$emit('native-playback-reattached', state)
+      } catch (error) {
+        console.error('[AudioPlayer] Failed to read native playback state', error)
+      }
     },
     async screenOrientationChange() {
       if (this.isRefreshingUI) return
