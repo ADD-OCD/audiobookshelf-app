@@ -63,9 +63,31 @@ it stays simple, never collides, and never complicates eventual Google Play publ
 requires each upload's `versionCode` to be strictly greater than the last, which this trivially
 satisfies).
 
+## Announcements
+
+Audiobookshelf+ has no in-app "what's new"/announcements screen (checked during the v0.14.0
+release — there isn't one to reuse). The [GitHub Discussions "Announcements" category](https://github.com/ADD-OCD/audiobookshelf-app/discussions/categories/announcements)
+on this repo is the established, preferred place for users to read about completed Audiobookshelf+
+changes, and is treated as part of the release itself, not an optional afterthought.
+
+**Every normal Audiobookshelf+ release must have a matching Announcements post describing the
+meaningful user-visible changes included in that release.** Rules for writing it:
+
+- Write it before building the final release APK, as part of the release checklist below.
+- Describe only functionality actually included in the release being announced — nothing merely
+  investigated, deferred, or still in progress.
+- Use plain, user-facing language (what changed for the user), not implementation details,
+  internal class/file names, commit SHAs, branch names, or signing/repository-administration
+  details.
+- Small fixes/features don't each need their own post — they can accumulate and be summarized
+  together in the next normal release's announcement.
+- Temporary test/RC builds do not get their own Announcements post unless explicitly requested —
+  they're for validation, not user-facing history.
+
 ## Summary checklist for any new distributed APK
 
 1. Check the `versionCode` table above; use `last + 1`.
 2. Build the **release** variant (`app.absplus.android`), not debug.
 3. Confirm it's signed with the fingerprint above (`apksigner verify --verbose --print-certs`).
-4. Publish it, then update the `versionCode` table in this document.
+4. For a normal release (not a test/RC build): write/post the Announcements entry for it first.
+5. Publish it, then update the `versionCode` table in this document.
