@@ -24,6 +24,12 @@ const systemBars = {
   'system.navigation-bar': [35, 35, 35]
 }
 
+// Existing themes keep today's presentation: no extra recipe, player/item chrome tinted from cover art
+const standardPresentation = {
+  'presentation.finish': 'standard',
+  'presentation.cover-color': 'legacy'
+}
+
 const linear = (angle, ...stops) => ({ kind: 'linear', angle, stops: stops.map(([color, at]) => ({ color, at })) })
 const solid = (color) => ({ kind: 'solid', color })
 
@@ -36,6 +42,7 @@ const dark = {
     'surface.content': [56, 56, 56],
     'surface.raised': [47, 48, 48],
     'surface.hover': [102, 104, 107],
+    'surface.recessed': [35, 35, 35],
     'text.default': [255, 255, 255],
     'text.primary': [230, 237, 243],
     'text.muted': [142, 147, 153],
@@ -49,7 +56,8 @@ const dark = {
     'overlay.player': linear(180, [[0, 0, 0, 0], 0], [[38, 38, 38, 1], 80]),
     'overlay.mini-player': linear(145, [[38, 38, 38, 0.5], 0], [[38, 38, 38, 0.9], 20], [[38, 38, 38], 60]),
     ...states,
-    ...systemBars
+    ...systemBars,
+    ...standardPresentation
   }
 }
 
@@ -62,6 +70,7 @@ const black = {
     'surface.content': [0, 0, 0],
     'surface.raised': [0, 0, 0],
     'surface.hover': [0, 0, 0],
+    'surface.recessed': [0, 0, 0],
     'text.default': [255, 255, 255],
     'text.primary': [230, 237, 243],
     'text.muted': [120, 126, 132],
@@ -75,7 +84,8 @@ const black = {
     'overlay.player': solid([0, 0, 0]),
     'overlay.mini-player': solid([0, 0, 0]),
     ...states,
-    ...systemBars
+    ...systemBars,
+    ...standardPresentation
   }
 }
 
@@ -88,6 +98,7 @@ const light = {
     'surface.content': [255, 255, 255],
     'surface.raised': [246, 248, 250],
     'surface.hover': [208, 210, 212],
+    'surface.recessed': [222, 222, 222],
     'text.default': [0, 0, 0],
     'text.primary': [37, 37, 37],
     'text.muted': [101, 109, 118],
@@ -101,7 +112,8 @@ const light = {
     'overlay.player': linear(180, [[255, 255, 255, 0], 0], [[255, 255, 255, 1], 80]),
     'overlay.mini-player': linear(145, [[255, 255, 255, 0.5], 0], [[255, 255, 255, 0.9], 20], [[255, 255, 255], 60]),
     ...states,
-    ...systemBars
+    ...systemBars,
+    ...standardPresentation
   }
 }
 

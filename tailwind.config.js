@@ -1,6 +1,7 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
 const plugin = require('tailwindcss/plugin')
 const themeEngine = require('./theme/engine')
+const themePresets = require('./theme/presets')
 
 // Built-in themes are validated data (theme/builtins.js); a broken built-in fails the build
 if (themeEngine.BUILTIN_ERRORS.length) {
@@ -67,7 +68,11 @@ module.exports = {
     }
   },
   plugins: [
-    // Emits each built-in theme's token variables (:root = default theme, html[data-theme='<id>'] for others)
-    plugin(({ addBase }) => addBase(themeEngine.builtinThemeRules()))
+    // Emits each built-in theme's token variables (:root = default theme, html[data-theme='<id>'] for others),
+    // then the fixed presentation recipe rules for themes whose finish isn't 'standard'
+    plugin(({ addBase }) => {
+      addBase(themeEngine.builtinThemeRules())
+      addBase(themePresets.builtinPresentationRules())
+    })
   ]
 }

@@ -19,6 +19,7 @@ const TOKENS = [
   { name: 'surface.content', type: 'rgb', cssVar: '--color-bg', purpose: 'Page/content background, cards, inputs' },
   { name: 'surface.raised', type: 'rgb', cssVar: '--color-secondary', purpose: 'Raised strips: bookshelf navigation bar, alternating table rows' },
   { name: 'surface.hover', type: 'rgb', cssVar: '--color-bg-hover', purpose: 'Hovered/selected list rows and drawer items' },
+  { name: 'surface.recessed', type: 'rgb', cssVar: '--color-recessed', purpose: 'Sunken display/readout wells (used by the equipment finish; unused by standard themes)' },
 
   // Text
   { name: 'text.default', type: 'rgb', cssVar: '--color-text-default', purpose: 'Inherited document text color (the root `color`)' },
@@ -54,7 +55,14 @@ const TOKENS = [
   // colors describe the native window background, which is still static in res/values (styles.xml).
   { name: 'system.bar-icons', type: 'enum', values: ['light', 'dark'], purpose: 'Status/navigation bar icon brightness (light icons for dark bars)' },
   { name: 'system.status-bar', type: 'rgb', purpose: 'Status bar background (native; not yet applied at runtime)' },
-  { name: 'system.navigation-bar', type: 'rgb', purpose: 'Navigation bar background (native; not yet applied at runtime)' }
+  { name: 'system.navigation-bar', type: 'rgb', purpose: 'Navigation bar background (native; not yet applied at runtime)' },
+
+  // Presentation policies: validated enums selecting repository-owned behavior, never CSS values.
+  // finish: 'standard' = no extra rules; 'equipment' = the fixed recipe in theme/presets.js
+  { name: 'presentation.finish', type: 'enum', values: ['standard', 'equipment'], purpose: 'Which fixed presentation recipe applies' },
+  // cover-color: 'legacy' = player/item chrome follows the cover's average color (existing behavior);
+  // 'theme' = that chrome uses the theme palette instead (cover art itself is unchanged)
+  { name: 'presentation.cover-color', type: 'enum', values: ['legacy', 'theme'], purpose: 'Whether player/item chrome is tinted from cover art' }
 ]
 
 const TOKEN_NAMES = TOKENS.map((t) => t.name)

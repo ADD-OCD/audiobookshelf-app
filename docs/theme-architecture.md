@@ -26,19 +26,20 @@ Theme identity (`id`, `labelKey`, `colorScheme`), the semantic tokens, how they 
 
 ## Token model
 
-There are 25 tokens in 9 groups. Each token names a _purpose_. Its `cssVar` is the CSS custom property the existing Tailwind classes and component styles already use, so no component had to change.
+There are 28 tokens in 10 groups (25 from Phase 1 plus `surface.recessed` and the two `presentation.*` policies from Phase 2; see [Presentation policies](#presentation-policies-phase-2)). Each token names a _purpose_. Its `cssVar` is the CSS custom property the existing Tailwind classes and component styles already use, so no component had to change.
 
-| Group    | Tokens                                                  | CSS variable                                                                                  |
-| -------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| surface  | `base`, `content`, `raised`, `hover`                    | `--color-primary`, `--color-bg`, `--color-secondary`, `--color-bg-hover`                      |
-| text     | `default`, `primary`, `muted`                           | `--color-text-default` (the root `color`), `--color-fg`, `--color-fg-muted`                   |
-| border   | `default`                                               | `--color-border`                                                                              |
-| control  | `toggle`, `toggle-selected`                             | `--color-bg-toggle`, `--color-bg-toggle-selected`                                             |
-| progress | `track`, `buffered`, `played`                           | `--color-track`, `--color-track-buffered`, `--color-track-cursor`                             |
-| overlay  | `item-header`, `player`, `mini-player`                  | `--gradient-item-page`, `--gradient-audio-player`, `--gradient-minimized-audio-player`        |
-| accent   | `primary`                                               | `--color-accent`                                                                              |
-| state    | `success`, `success-strong`, `warning`, `error`, `info` | `--color-success`, `--color-success-dark`, `--color-warning`, `--color-error`, `--color-info` |
-| system   | `bar-icons`, `status-bar`, `navigation-bar`             | (applied by the service or natively, not CSS)                                                 |
+| Group        | Tokens                                                  | CSS variable                                                                                  |
+| ------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| surface      | `base`, `content`, `raised`, `hover`, `recessed`        | `--color-primary`, `--color-bg`, `--color-secondary`, `--color-bg-hover`, `--color-recessed`  |
+| text         | `default`, `primary`, `muted`                           | `--color-text-default` (the root `color`), `--color-fg`, `--color-fg-muted`                   |
+| border       | `default`                                               | `--color-border`                                                                              |
+| control      | `toggle`, `toggle-selected`                             | `--color-bg-toggle`, `--color-bg-toggle-selected`                                             |
+| progress     | `track`, `buffered`, `played`                           | `--color-track`, `--color-track-buffered`, `--color-track-cursor`                             |
+| overlay      | `item-header`, `player`, `mini-player`                  | `--gradient-item-page`, `--gradient-audio-player`, `--gradient-minimized-audio-player`        |
+| accent       | `primary`                                               | `--color-accent`                                                                              |
+| state        | `success`, `success-strong`, `warning`, `error`, `info` | `--color-success`, `--color-success-dark`, `--color-warning`, `--color-error`, `--color-info` |
+| system       | `bar-icons`, `status-bar`, `navigation-bar`             | (applied by the service or natively, not CSS)                                                 |
+| presentation | `finish`, `cover-color`                                 | (validated policies; never CSS)                                                               |
 
 The legacy variable names (`--color-bg` means _content_ surface, `--color-primary` means _base_ surface) are kept so that upstream components merge cleanly. The semantic names are the vocabulary for theme data and future work.
 
@@ -58,6 +59,23 @@ The Tailwind plugin emits:
 - `html[data-theme='black'] { … }` and `html[data-theme='light'] { … }` for the others.
 
 The CSS is therefore present at first paint and costs nothing at runtime. The persisted value (Preferences key `theme`) and the `data-theme` attribute keep their existing values, so saved selections carry over.
+
+## Presentation policies (Phase 2)
+
+Phase 2 adds one semantic color and two validated policies.
+
+- **`surface.recessed`**: sunken display/readout wells. Dark, Black and Light carry their `surface.base` value for schema completeness. Nothing in the standard themes consumes it, so their appearance is unchanged; the only change to their compiled CSS is the one new variable.
+- **`presentation.finish`** (`standard` | `equipment`) selects a **fixed, repository-owned recipe** in `theme/presets.js`.
+  - `standard` produces no rules at all.
+  - `equipment` is a fixed set of rules, emitted at build time under the theme's own `html[data-theme='<id>']` root.
+  - Selectors and property names live in code. Values reference only token variables, plus two edge colors (`--color-edge-light`, `--color-edge-dark`) derived from validated surfaces with fixed blend factors.
+  - Theme data cannot supply selectors, properties, shadows, gradients, dimensions, URLs, paths or blend factors.
+- **`presentation.cover-color`** (`legacy` | `theme`):
+  - `legacy` keeps player and item chrome tinted from cover art (existing behavior).
+  - `theme` makes that chrome use the theme palette instead. The cover art itself is untouched.
+  - Consumed from Checkpoint C onward.
+
+Policies are ordinary enum tokens: invalid values fall back to `standard` / `legacy`, and unknown `presentation.*` keys are ignored. They have no CSS variable, so the serializer never emits them. Dark, Black and Light are `standard` + `legacy`.
 
 ## Validation and fallback
 
