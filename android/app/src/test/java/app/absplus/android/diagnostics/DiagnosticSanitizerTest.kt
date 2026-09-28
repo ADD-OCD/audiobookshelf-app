@@ -140,6 +140,24 @@ class DiagnosticSanitizerTest {
     assertTrue("not capped: ${out.length}", out.length <= DiagnosticSanitizer.MAX_MESSAGE_CHARS + 40)
   }
 
+  @Test fun encodedValuesUpToTheBoundAreStillCaught() {
+    // A long but realistic encoded path (well under the 2048-char token bound)
+    val longPath = "/storage/emulated/0/" + "Audiobooks/Some Long Author Name/".repeat(20) + "book.m4b"
+    val id = b64url(longPath)
+    assertTrue(id.length in 16..2048)
+    assertNoneOf(s("local file $id"), id)
+    // An over-long run of base64-alphabet characters is left as-is (not decoded), not partially redacted
+    val out = s("v " + "x".repeat(5000))
+    assertFalse(out.contains("[REDACTED_ENCODED]"))
+    assertTrue(out.startsWith("v " + "x".repeat(100)))
+  }
+
+  @Test fun redactsServerUserId() {
+    val out = s("""{"serverUserId":"5a1943f4-3463-472b-914a-dc28f18db566","userId":"u-2","libraryItemId":"62bd8c42-6aec-49da-8912-aadafd32165e"}""")
+    assertNoneOf(out, "5a1943f4-3463-472b-914a-dc28f18db566", "u-2")
+    assertTrue(out.contains("62bd8c42-6aec-49da-8912-aadafd32165e"))
+  }
+
   @Test fun sanitizesExportHeader() {
     val header = "Server connected: true, server http://my-home-nas.example.com:13378 (carol), server version 2.36.1\nResumable session saved: true (downloaded, item 62bd8c42-6aec-49da-8912-aadafd32165e)"
     val out = s(header)

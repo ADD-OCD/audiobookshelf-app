@@ -9,9 +9,16 @@ object DiagnosticSanitizer {
   /** Longest message kept after sanitizing; whole serialized objects don't belong in diagnostics. */
   const val MAX_MESSAGE_CHARS = 4000
 
+  /**
+   * Bump whenever the rules change: stored logs written under older rules are then re-sanitized in
+   * place once (DiagnosticLog), so nothing written by an older app version survives unscrubbed.
+   * 1 = v128 rules; 2 = encoded values, paths, URIs, config ids, custom headers, length cap.
+   */
+  const val RULES_VERSION = 2
+
   private const val SENSITIVE_KEYS =
     "access_token|accesstoken|refresh_token|refreshtoken|x-refresh-token|token|api_key|apikey|password|passwd|pwd|secret|client_secret|" +
-      "authorization|cookie|set-cookie|code_verifier|storepassword|keypassword|username|userid|" +
+      "authorization|cookie|set-cookie|code_verifier|storepassword|keypassword|username|userid|serveruserid|" +
       // Server connection config ids are base64("<server address>@<username>"); addresses/paths/URIs of files and folders
       "serverconnectionconfigid|lastserverconnectionconfigid|serveraddress|address|" +
       "absolutepath|basepath|fullpath|contenturl|coverabsolutepath|covercontenturl|path|relpath|coverpath|imagepath"
@@ -20,7 +27,8 @@ object DiagnosticSanitizer {
   private val jwt = Regex("\\beyJ[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]{5,}\\.[A-Za-z0-9_-]*")
   // key=value, key: value, "key":"value" (JSON, headers, query strings)
   private val keyValue = Regex("(?i)([\"']?\\b(?:$SENSITIVE_KEYS)\\b[\"']?\\s*[:=]\\s*)(?!\\[REDACTED)(\"[^\"]*\"|'[^']*'|[^\\s,&;}\\]\\)]+)")
-  private val customHeaders = Regex("(?i)([\"']?customHeaders[\"']?\\s*[:=]\\s*)\\{[^}]*}")
+  // Note: Android's ICU regex engine rejects an unescaped literal '}' (the JVM accepts it) - keep it escaped
+  private val customHeaders = Regex("(?i)([\"']?customHeaders[\"']?\\s*[:=]\\s*)\\{[^}]*\\}")
   // scheme://[user:pass@]host[:port] - path is kept (item ids are useful), host is categorised
   // (host never starts with '[' unless it's an IPv6 literal, so already-sanitized "[server:...]" is left alone)
   private val url = Regex("(?i)\\b(https?|wss?)://(?:[^\\s/@\\[]+@)?(\\[[0-9a-f:.]+]|[^\\s/:?#\"'<>)\\[\\]]+)(:\\d{1,5})?")
@@ -30,7 +38,9 @@ object DiagnosticSanitizer {
   // Absolute device paths; directory segments may contain spaces when followed by another '/'
   private val devicePath = Regex("(?<![A-Za-z0-9._\\-/:\\]])/(storage|sdcard|mnt|data/user|data/data|data/media)((?:/[^/\\n\"',;|)\\]}]*(?=/))*(?:/[^/\\s\"',;|)\\]}]*)?)")
   // Candidate base64/base64url tokens (ids built by encoding URLs, paths or SAF document ids)
-  private val encodedToken = Regex("(?<![A-Za-z0-9+/_-])[A-Za-z0-9+/_-]{16,}={0,2}(?![A-Za-z0-9+/_=-])")
+  // Bounded to 2048 chars (~1.5 KB decoded - far longer than any encoded id/path/URL the app builds) so
+  // long runs of base64-alphabet text aren't decoded; the lookarounds make an over-long run not match at all
+  private val encodedToken = Regex("(?<![A-Za-z0-9+/_-])[A-Za-z0-9+/_-]{16,2048}={0,2}(?![A-Za-z0-9+/_=-])")
   // Server connection names are "<address> (<username>)"
   private val serverUser = Regex("(\\[server:[a-z-]+](?::\\d{1,5})?/?)\\s*\\(([^)]{1,100})\\)")
   // Bounded lengths keep this linear on long lines (an unbounded local part is quadratic without '@')

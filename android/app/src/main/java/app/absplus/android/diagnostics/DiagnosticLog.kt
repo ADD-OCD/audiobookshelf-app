@@ -38,6 +38,7 @@ object DiagnosticLog {
   private const val PREFS = "absplus_diagnostics"
   private const val KEY_LEVEL = "level"
   private const val KEY_LEGACY_MIGRATED = "legacyMigrated"
+  private const val KEY_RULES_VERSION = "sanitizerRulesVersion"
   private const val QUEUE_CAPACITY = 20000
   private const val MAX_MESSAGE_CHARS = 8000
 
@@ -95,17 +96,26 @@ object DiagnosticLog {
 
   fun write(levelChar: Char, tag: String, message: String, persist: Persist, source: String = "N", timestamp: Long = System.currentTimeMillis()) {
     if (appContext == null || !isPersisted(persist)) return
-    val msg = if (message.length > MAX_MESSAGE_CHARS) message.substring(0, MAX_MESSAGE_CHARS) + "…[truncated]" else message
-    if (!queue.offer(Entry(timestamp, levelChar, source, tag, msg, Process.myPid()))) dropped.incrementAndGet()
+    // Logging must never throw into the caller (player, service, bridge)
+    try {
+      val msg = if (message.length > MAX_MESSAGE_CHARS) message.substring(0, MAX_MESSAGE_CHARS) + "…[truncated]" else message
+      if (!queue.offer(Entry(timestamp, levelChar, source, tag, msg, Process.myPid()))) dropped.incrementAndGet()
+    } catch (t: Throwable) {
+      dropped.incrementAndGet()
+    }
   }
 
   fun marker(text: String, persist: Persist = Persist.DEBUG) {
     write('I', "Diagnostics", "--- $text ---", persist)
   }
 
+  // Diagnostics must never crash the app, and nothing is ever written unsanitized (fails closed)
+  fun safeSanitize(text: String): String =
+    DiagnosticFailClosed.sanitize(text, onFailure = { Log.e("DiagnosticLog", "Sanitizer failed: ${it.javaClass.name}") }) { DiagnosticSanitizer.sanitize(it) }
+
   private fun formatLine(e: Entry): String {
-    val body = DiagnosticSanitizer.sanitize(e.message).replace("\r", "").replace("\n", "\n    ")
-    return "${formatTimestamp(e.timestamp)} ${e.levelChar} ${e.source}/${DiagnosticSanitizer.sanitize(e.tag)} (${e.pid}): $body\n"
+    val body = safeSanitize(e.message).replace("\r", "").replace("\n", "\n    ")
+    return "${formatTimestamp(e.timestamp)} ${e.levelChar} ${e.source}/${safeSanitize(e.tag)} (${e.pid}): $body\n"
   }
 
   private fun logDir(): File? = appContext?.let { File(it.filesDir, DIR).apply { mkdirs() } }
@@ -130,8 +140,24 @@ object DiagnosticLog {
     val dir = logDir() ?: return null
     val file = File(dir, CURRENT)
     currentBytes = file.length()
-    return BufferedWriter(OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8))
+    val w = BufferedWriter(OutputStreamWriter(FileOutputStream(file, true), Charsets.UTF_8))
+    // If a previous process was killed mid-write the file can end in a partial line or a zero-filled
+    // block; start on a fresh line so new entries never merge into it
+    if (currentBytes > 0 && lastByte(file) != '\n'.code) {
+      w.write("\n")
+      currentBytes++
+    }
+    return w
   }
+
+  private fun lastByte(file: File): Int = try {
+    RandomAccessFile(file, "r").use { raf -> raf.seek(raf.length() - 1); raf.read() }
+  } catch (e: Exception) {
+    -1
+  }
+
+  /** Zero bytes only appear when a write was interrupted by process death; drop them from reads/exports. */
+  private fun withoutNulBytes(bytes: ByteArray): ByteArray = if (bytes.contains(0)) bytes.filter { it != 0.toByte() }.toByteArray() else bytes
 
   private fun rotate() {
     val dir = logDir() ?: return
@@ -147,8 +173,12 @@ object DiagnosticLog {
     current.renameTo(rotatedFile(dir, 1))
   }
 
+  // True once every stored byte was written or re-sanitized under the current sanitizer rules
+  @Volatile private var storedLogsCurrent = false
+
   private fun writerLoop() {
     migrateLegacyLogs()
+    rescrubStoredLogsIfRulesChanged()
     val batch = ArrayList<Entry>(512)
     while (true) {
       try {
@@ -157,7 +187,7 @@ object DiagnosticLog {
         synchronized(fileLock) { writeBatchLocked(batch) }
       } catch (e: InterruptedException) {
         return
-      } catch (e: Exception) {
+      } catch (e: Throwable) {
         Log.e("DiagnosticLog", "Failed writing diagnostics: $e")
         writer = null
       } finally {
@@ -217,24 +247,137 @@ object DiagnosticLog {
         raf.seek(len - take)
         val buf = ByteArray(take.toInt())
         raf.readFully(buf)
-        chunks.addFirst(buf)
+        chunks.addFirst(withoutNulBytes(buf))
       }
       remaining -= take
     }
     var text = chunks.joinToString("") { String(it, Charsets.UTF_8) }
     if (total > maxBytes) text = text.substringAfter('\n', text)
-    Pair(text, total)
+    Pair(resanitizeLines(text), total)
   }
 
-  /** Copies the whole log (oldest->newest) after [header] into [dest]. */
-  fun exportTo(dest: File, header: String) {
-    flushNow()
-    synchronized(fileLock) {
-      FileOutputStream(dest).use { out ->
-        out.write(header.toByteArray(Charsets.UTF_8))
-        for (f in logFiles()) f.inputStream().use { it.copyTo(out) }
+  // Stored lines were sanitized when written, possibly by an older app version with weaker rules.
+  // Everything shown or exported is re-sanitized with the current rules (sanitizing is idempotent).
+  private fun resanitizeLines(text: String): String {
+    val sb = StringBuilder(text.length)
+    for (line in text.split('\n')) {
+      if (sb.isNotEmpty()) sb.append('\n')
+      if (line.isNotEmpty()) sb.append(safeSanitize(line))
+    }
+    return sb.toString()
+  }
+
+  /**
+   * When the sanitizer rules change (e.g. after upgrading from an older app version), rewrite the stored
+   * log files once with the current rules so nothing unscrubbed stays at rest. Each file is replaced
+   * atomically (temp + rename); the version is only recorded after all files are done, so a kill part
+   * way through simply redoes it (sanitizing is idempotent).
+   */
+  private fun rescrubStoredLogsIfRulesChanged() {
+    val ctx = appContext ?: return
+    if (prefs(ctx).getInt(KEY_RULES_VERSION, 0) == DiagnosticSanitizer.RULES_VERSION) {
+      storedLogsCurrent = true
+      return
+    }
+    try {
+      val started = System.currentTimeMillis()
+      var files = 0
+      for (f in logFiles()) {
+        synchronized(fileLock) {
+          if (f.name == CURRENT) {
+            writer?.flush()
+            writer?.close()
+            writer = null
+          }
+          if (!f.exists()) return@synchronized
+          val tmp = File(f.parentFile, "${f.name}.rescrub")
+          OutputStreamWriter(FileOutputStream(tmp), Charsets.UTF_8).buffered().use { out ->
+            withoutNulReader(f).useLines { lines -> lines.forEach { line -> if (line.isNotEmpty()) { out.write(safeSanitize(line)); out.write("\n") } } }
+          }
+          if (!tmp.renameTo(f)) {
+            f.delete()
+            tmp.renameTo(f)
+          }
+          files++
+        }
+      }
+      prefs(ctx).edit().putInt(KEY_RULES_VERSION, DiagnosticSanitizer.RULES_VERSION).apply()
+      storedLogsCurrent = true
+      if (files > 0) marker("Stored diagnostic log re-sanitized with current privacy rules ($files files, ${System.currentTimeMillis() - started} ms)", Persist.ALWAYS)
+    } catch (t: Throwable) {
+      Log.e("DiagnosticLog", "Re-sanitizing stored logs failed: ${t.javaClass.name}")
+    }
+  }
+
+  private fun withoutNulReader(f: File) = java.io.InputStreamReader(object : java.io.FilterInputStream(f.inputStream()) {
+    override fun read(): Int {
+      var b = super.read()
+      while (b == 0) b = super.read()
+      return b
+    }
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+      while (true) {
+        val n = super.read(b, off, len)
+        if (n <= 0) return n
+        var w = off
+        for (i in off until off + n) if (b[i] != 0.toByte()) b[w++] = b[i]
+        if (w > off) return w - off
       }
     }
+  }, Charsets.UTF_8).buffered()
+
+  /** Writes [header] then the whole log (oldest->newest) into [dest]; stored lines are re-sanitized if not yet current. */
+  fun exportTo(dest: File, header: String) {
+    flushNow()
+    if (storedLogsCurrent) {
+      // Fast path: every stored byte is already sanitized with the current rules; only strip NUL bytes
+      synchronized(fileLock) {
+        FileOutputStream(dest).use { out ->
+          out.write(header.toByteArray(Charsets.UTF_8))
+          val buf = ByteArray(64 * 1024)
+          for (f in logFiles()) f.inputStream().use { input ->
+            while (true) {
+              val n = input.read(buf)
+              if (n < 0) break
+              out.write(withoutNulBytes(buf.copyOf(n)))
+            }
+          }
+        }
+      }
+      return
+    }
+    val started = System.currentTimeMillis()
+    var lineCount = 0
+    val raw = File(dest.parentFile, "${dest.name}.raw")
+    // Copy under the lock (fast), sanitize outside it so logging isn't held up by a large export
+    synchronized(fileLock) {
+      FileOutputStream(raw).use { out ->
+        val buf = ByteArray(64 * 1024)
+        for (f in logFiles()) f.inputStream().use { input ->
+          while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            out.write(withoutNulBytes(buf.copyOf(n)))
+          }
+        }
+      }
+    }
+    val copied = System.currentTimeMillis()
+    try {
+      OutputStreamWriter(FileOutputStream(dest), Charsets.UTF_8).buffered().use { out ->
+        out.write(header)
+        raw.bufferedReader(Charsets.UTF_8).useLines { lines ->
+          lines.forEach { line ->
+            lineCount++
+            if (line.isNotEmpty()) out.write(safeSanitize(line))
+            out.write("\n")
+          }
+        }
+      }
+    } finally {
+      raw.delete()
+    }
+    write('D', "Diagnostics", "Diagnostic export: $lineCount lines, ${dest.length()} bytes, copy ${copied - started} ms, re-sanitize ${System.currentTimeMillis() - copied} ms", Persist.DEBUG)
   }
 
   /** Deletes only the diagnostic log files. */
@@ -245,6 +388,9 @@ object DiagnosticLog {
       writer = null
       currentBytes = 0L
       logDir()?.listFiles()?.filter { it.name.startsWith(CURRENT) }?.forEach { it.delete() }
+      // Nothing written under older sanitizer rules remains
+      appContext?.let { prefs(it).edit().putInt(KEY_RULES_VERSION, DiagnosticSanitizer.RULES_VERSION).apply() }
+      storedLogsCurrent = true
     }
     marker("Diagnostic logs cleared (level $level)", Persist.ALWAYS)
   }
@@ -265,7 +411,7 @@ object DiagnosticLog {
         }
       }
       book.destroy()
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
       Log.e("DiagnosticLog", "Legacy log migration failed: $e")
     }
     prefs(ctx).edit().putBoolean(KEY_LEGACY_MIGRATED, true).apply()
