@@ -2,6 +2,7 @@ package app.absplus.android.services
 
 import android.content.Context
 import androidx.core.content.ContextCompat
+import app.absplus.android.device.DeviceManager
 import app.absplus.android.device.FolderScanner
 import app.absplus.android.managers.DbManager
 import app.absplus.android.managers.DownloadItemManager
@@ -43,9 +44,20 @@ object DownloadServiceHost {
       DbManager.initialize(appContext)
       manager = DownloadItemManager(FolderScanner(appContext), appContext, ForwardingEmitter)
       restoreJob = scope.launch {
-        IncompleteDownloadCleanup.cleanupExpired(appContext)
-        manager!!.restoreQueue()
-        onRestoreComplete(appContext)
+        try {
+          if (DeviceManager.dbManager.ensureValidDownloadQueue()) {
+            IncompleteDownloadCleanup.cleanupExpired(appContext)
+            manager!!.restoreQueue()
+          } else {
+            AbsLogger.error(TAG, "Skipping invalid download queue because it could not be cleared")
+          }
+          onRestoreComplete(appContext)
+        } catch (restoreError: Exception) {
+          AbsLogger.error(
+                  TAG,
+                  "Could not restore download queue (${restoreError.javaClass.simpleName}: ${restoreError.message})"
+          )
+        }
       }
     }
     return manager!!
