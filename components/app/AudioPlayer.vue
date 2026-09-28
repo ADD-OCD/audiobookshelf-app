@@ -966,6 +966,8 @@ export default {
         this.$diag.debug('AudioPlayer', `UI reattached to existing native session: playing=${!!state.isPlaying} position=${state.currentTime} rate=${state.playbackRate} queue=${state.queue?.items?.length || 0}`)
         if (state.playbackRate) this.currentPlaybackRate = Number(state.playbackRate)
         this.onPlaybackSession(state.playbackSession)
+        // The player template (and its timestamp/track refs) only renders once a session is set
+        await this.$nextTick()
         this.onMetadata({ duration: Number(state.duration) || 0, currentTime: Number(state.currentTime) || 0, playerState: 'READY' })
         this.onPlayingUpdate({ value: !!state.isPlaying })
         if (state.mediaPlayer) this.$store.commit('setMediaPlayer', state.mediaPlayer)
