@@ -4,9 +4,11 @@ import { readFile } from 'node:fs/promises'
 import vm from 'node:vm'
 // Load the Nuxt ES module without changing this project's CommonJS package type.
 const helperSource = await readFile(new URL('../utils/playbackQueue.js', import.meta.url), 'utf8')
-const { downloadedBookItems, fetchSeriesBooks, nativeQueueItems, resolvePlaybackQueue } = await import(`data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`)
+const { downloadedBookItems, fetchSeriesBooks, nativeQueueItems, queueItemDisplay, resolvePlaybackQueue, resolveQueueSourceAppendItems, sessionToQueueItem } = await import(`data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`)
 
 const book = (id) => ({ id, mediaType: 'book', media: { numTracks: 1 } })
+// Queue entry as the Play controls build it: server identity plus the local copy when one is complete.
+const queueEntry = (libraryItemId, localId = null) => ({ libraryItemId, episodeId: null, localLibraryItem: localId ? { id: localId } : null })
 const local = (id, overrides = {}) => ({ id: `local_device_${id}`, libraryItemId: id, serverConnectionConfigId: 'server', mediaType: 'book', media: { tracks: [{}] }, ...overrides })
 function context(localItems = []) {
   return {
@@ -17,18 +19,43 @@ function context(localItems = []) {
   }
 }
 
-test('download filtering preserves source order and uses real local IDs, excluding invalid/foreign/non-audio items', () => {
-  const books = ['c', 'b', 'a', 'missing', 'invalid', 'ebook', 'foreign'].map(book)
+// Since "stream past download gaps" (15ec49ec), every playable book in the source stays in the queue:
+// a complete local copy plays by its real local ID, anything else streams by its server ID.
+test('queue items preserve source order, use real local IDs for downloads and stream the gaps', () => {
+  const books = ['c', 'b', 'a', 'notdownloaded', 'invalid', 'ebookonly', 'foreign', 'badlocal', 'missing'].map(book)
   books[4].isInvalid = true
-  const items = downloadedBookItems(books, [local('a'), local('c'), local('invalid'), local('ebook', { media: { tracks: [] } }), local('foreign', { serverConnectionConfigId: 'other' })], 'server')
+  books[5].media = { numTracks: 0 }
+  books[8].isMissing = true
+  const items = downloadedBookItems(books, [local('a'), local('c'), local('invalid'), local('ebookonly'), local('foreign', { serverConnectionConfigId: 'other' }), local('badlocal', { media: { tracks: [] } })], 'server')
   assert.deepEqual(nativeQueueItems(items), [
     { libraryItemId: 'local_device_c', episodeId: null },
-    { libraryItemId: 'local_device_a', episodeId: null }
+    { libraryItemId: 'b', episodeId: null },
+    { libraryItemId: 'local_device_a', episodeId: null },
+    { libraryItemId: 'notdownloaded', episodeId: null },
+    // Another server's download, or a local record with no tracks, is never used - the book streams
+    { libraryItemId: 'foreign', episodeId: null },
+    { libraryItemId: 'badlocal', episodeId: null }
   ])
+  // Streamed entries carry the server book so Up Next can show a title/cover
+  assert.equal(items[1].libraryItem, books[1])
+  assert.equal(items[0].libraryItem, null)
 })
 
-test('partial downloads are not eligible for auto-advance', () => {
-  assert.deepEqual(downloadedBookItems([{ ...book('a'), media: { numTracks: 3 } }], [local('a')], 'server'), [])
+test('partial downloads stream instead of playing the incomplete local copy', () => {
+  const partial = { ...book('a'), media: { numTracks: 3 } }
+  const items = downloadedBookItems([partial], [local('a')], 'server')
+  assert.equal(items.length, 1)
+  assert.equal(items[0].localLibraryItem, null)
+  assert.deepEqual(nativeQueueItems(items), [{ libraryItemId: 'a', episodeId: null }])
+  const complete = downloadedBookItems([partial], [local('a', { media: { tracks: [{}, {}, {}] } })], 'server')
+  assert.equal(nativeQueueItems(complete)[0].libraryItemId, 'local_device_a')
+})
+
+test('a book downloaded through another library is matched by ino', () => {
+  const items = downloadedBookItems([{ ...book('server-b'), ino: '42' }], [local('other-library-id', { ino: '42' })], 'server')
+  assert.equal(nativeQueueItems(items)[0].libraryItemId, 'local_device_other-library-id')
+  assert.equal(items[0].libraryItemId, 'server-b')
+  assert.equal(nativeQueueItems(downloadedBookItems([book('server-b')], [local('other-library-id', { ino: '42' })], 'server'))[0].libraryItemId, 'server-b')
 })
 
 test('complete series uses server sequence order, all pages, and never shelf collapse', async () => {
@@ -68,17 +95,41 @@ test('incomplete, failed or repeated series pages fail instead of playing a part
   await assert.rejects(fetchSeriesBooks({ get: async () => ({ results: [book('a')], total: 5 }) }, 'l', 's', String), /changed/)
 })
 
-test('Play All starts at first unfinished downloaded book using local progress', async () => {
+test('Play All starts at the first unfinished book, local progress taking precedence over server progress', async () => {
   const ctx = context([local('a'), local('c'), local('d')])
+  // a: finished locally even though the server still thinks it is in progress
   ctx.$store.getters['globals/getLocalMediaProgressById'] = (id) => ({ isFinished: id === 'local_device_a' })
+  // b (streamed, no local copy) is finished according to the server
+  ctx.$store.getters['user/getUserMediaProgress'] = (id) => ({ isFinished: id === 'b' })
   const result = await resolvePlaybackQueue(ctx, { queueSource: { sourceType: 'collection', sourceId: 'c', books: ['a', 'b', 'c', 'd'].map(book) } })
-  assert.equal(result.queue.currentIndex, 1)
+  assert.equal(result.queue.currentIndex, 2)
   assert.equal(result.payload.libraryItemId, 'local_device_c')
+  assert.equal(result.payload.serverLibraryItemId, 'c')
   assert.equal(result.payload.episodeId, null)
   assert.deepEqual(
     result.queue.items.map((item) => item.libraryItemId),
-    ['a', 'c', 'd']
+    ['a', 'b', 'c', 'd']
   )
+})
+
+test('Play All streams an unfinished gap before later downloads', async () => {
+  const ctx = context([local('a'), local('c')])
+  ctx.$store.getters['globals/getLocalMediaProgressById'] = (id) => ({ isFinished: id === 'local_device_a' })
+  const result = await resolvePlaybackQueue(ctx, { queueSource: { sourceType: 'collection', sourceId: 'c', books: ['a', 'b', 'c'].map(book) } })
+  assert.equal(result.queue.currentIndex, 1)
+  assert.equal(result.payload.libraryItemId, 'b')
+  assert.deepEqual(nativeQueueItems(result.queue.items).slice(result.queue.currentIndex), [
+    { libraryItemId: 'b', episodeId: null },
+    { libraryItemId: 'local_device_c', episodeId: null }
+  ])
+})
+
+test('Play All with everything finished, or nothing playable, reports it instead of playing', async () => {
+  const ctx = context([local('a')])
+  ctx.$store.getters['globals/getLocalMediaProgressById'] = () => ({ isFinished: true })
+  ctx.$store.getters['user/getUserMediaProgress'] = () => ({ isFinished: true })
+  await assert.rejects(resolvePlaybackQueue(ctx, { queueSource: { sourceType: 'collection', sourceId: 'c', books: ['a', 'b'].map(book) } }), /finished/)
+  await assert.rejects(resolvePlaybackQueue(context(), { queueSource: { sourceType: 'collection', sourceId: 'c', books: [{ ...book('e'), media: { numTracks: 0 } }] } }), /No downloaded audiobooks/)
 })
 
 test('starting a middle series book constructs the full queue and points at that book', async () => {
@@ -89,16 +140,51 @@ test('starting a middle series book constructs the full queue and points at that
   assert.equal(nativeQueueItems(result.queue.items)[result.queue.currentIndex + 1].libraryItemId, 'local_device_4')
 })
 
-test('collection middle start follows collection order; missing download is never queued', async () => {
+test('collection middle start follows collection order; a missing download streams in its place', async () => {
   const result = await resolvePlaybackQueue(context([local('1'), local('3'), local('4')]), { libraryItemId: 'local_device_3', queueSource: { sourceType: 'collection', sourceId: 'c', books: ['4', '3', '2', '1'].map(book) } })
   assert.equal(result.queue.currentIndex, 1)
-  assert.equal(nativeQueueItems(result.queue.items)[2].libraryItemId, 'local_device_1')
+  assert.deepEqual(nativeQueueItems(result.queue.items).slice(2), [
+    { libraryItemId: '2', episodeId: null },
+    { libraryItemId: 'local_device_1', episodeId: null }
+  ])
 })
 
-test('manual non-downloaded selection has no queue; no source never acquires a queue', async () => {
-  const payload = { libraryItemId: '2', queueSource: { sourceType: 'collection', sourceId: 'c', books: ['1', '2'].map(book) } }
-  assert.equal((await resolvePlaybackQueue(context([local('1')]), payload)).queue, null)
+test('selecting an undownloaded book streams it and continues through the source', async () => {
+  const payload = { libraryItemId: '2', queueSource: { sourceType: 'collection', sourceId: 'c', books: ['1', '2', '3'].map(book) } }
+  const result = await resolvePlaybackQueue(context([local('1'), local('3')]), payload)
+  assert.equal(result.queue.currentIndex, 1)
+  assert.equal(result.payload.libraryItemId, '2')
+  assert.equal(nativeQueueItems(result.queue.items)[2].libraryItemId, 'local_device_3')
+})
+
+test('no source never acquires a queue; an item that is not a playable member of its source plays alone', async () => {
   assert.equal((await resolvePlaybackQueue(context([local('1')]), { libraryItemId: '1' })).queue, null)
+  const outside = { libraryItemId: 'elsewhere', queueSource: { sourceType: 'collection', sourceId: 'c', books: ['1', '2'].map(book) } }
+  const result = await resolvePlaybackQueue(context([local('1')]), outside)
+  assert.equal(result.queue, null)
+  assert.equal(result.payload, outside)
+  const audioless = { libraryItemId: 'e', queueSource: { sourceType: 'collection', sourceId: 'c', books: [book('1'), { ...book('e'), media: { numTracks: 0 } }] } }
+  assert.equal((await resolvePlaybackQueue(context(), audioless)).queue, null)
+})
+
+test('adding a source to a playing queue skips finished and already-queued items (by local identity)', async () => {
+  const ctx = context([local('1'), local('3')])
+  ctx.$store.getters['user/getUserMediaProgress'] = (id) => ({ isFinished: id === '2' })
+  const existing = [queueEntry('1', 'local_device_1')]
+  const added = await resolveQueueSourceAppendItems(ctx, { sourceType: 'collection', sourceId: 'c', books: ['1', '2', '3', '4'].map(book) }, existing)
+  assert.deepEqual(nativeQueueItems(added), [
+    { libraryItemId: 'local_device_3', episodeId: null },
+    { libraryItemId: '4', episodeId: null }
+  ])
+})
+
+test('session-synthesized, playlist, streamed and downloaded queue items all display a title', () => {
+  const session = { libraryItemId: 's', episodeId: null, localLibraryItem: { id: 'local_s' }, localEpisodeId: null, displayTitle: 'Session', displayAuthor: 'Author', coverPath: '/c' }
+  assert.deepEqual(nativeQueueItems([sessionToQueueItem(session)]), [{ libraryItemId: 'local_s', episodeId: null }])
+  assert.equal(queueItemDisplay(sessionToQueueItem(session)).title, 'Session')
+  assert.equal(queueItemDisplay({ libraryItem: { media: { metadata: { title: 'Streamed', authorName: 'A' } } } }).title, 'Streamed')
+  assert.equal(queueItemDisplay({ localLibraryItem: { media: { metadata: { title: 'Downloaded' } } } }).title, 'Downloaded')
+  assert.equal(queueItemDisplay({}).title, 'Unknown')
 })
 
 test('iOS and web do not build Android queues or call the database', async () => {
@@ -129,9 +215,12 @@ async function container(native) {
     .match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/^import .*$/gm, '')
     .replace('export default', 'globalThis.component =')
-  const sandbox = { AbsAudioPlayer: native, AbsLogger: { info: async () => {} }, CellularPermissionHelpers: {}, nativeQueueItems, resolvePlaybackQueue, console }
+  const sandbox = { AbsAudioPlayer: native, AbsLogger: { info: async () => {} }, CellularPermissionHelpers: {}, nativeQueueItems, resolvePlaybackQueue, resolveQueueSourceAppendItems, sessionToQueueItem, console: { ...console, log: () => {} } }
   vm.runInNewContext(script, sandbox)
   const ctx = context([local('1'), local('2')])
+  ctx.$diag = { debug: () => {} }
+  ctx.savedQueue = null
+  ctx.$localStore = { getPlaybackQueue: async () => ctx.savedQueue }
   ctx.$store.state = { playbackQueue: null }
   ctx.$store.commit = (name, payload) => {
     if (name === 'setPlaybackQueue') ctx.$store.state.playbackQueue = payload
@@ -140,6 +229,9 @@ async function container(native) {
   ctx.$toast = {
     error: (message) => {
       ctx.error = message
+    },
+    info: (message) => {
+      ctx.info = message
     }
   }
   ctx.$refs = {}
@@ -233,4 +325,173 @@ test('delayed ENDED reads authoritative native index; stale responses cannot rep
   resolve({ items: [], currentIndex: -1 })
   await ended
   assert.equal(ctx.$store.state.playbackQueue, null)
+})
+
+// Mirrors the approved device scenario: the UI is removed while a 12-item queue keeps playing (or is
+// rebuilt by a media-button restore), then a restarted UI reattaches to the native session.
+// Objects built inside the vm sandbox have another realm's prototypes; compare them as plain data.
+const plain = (value) => JSON.parse(JSON.stringify(value))
+// removeFromQueue/reorderQueue start mutateQueue without returning its promise.
+const settle = () => new Promise((resolve) => setImmediate(resolve))
+const twelve = Array.from({ length: 12 }, (_, i) => queueEntry(`b${i}`, `local_device_b${i}`))
+const nativeTwelve = (currentIndex) => ({ queue: { items: nativeQueueItems(twelve), currentIndex } })
+
+test('reattached UI restores the Up Next display from the native queue and its current index', async () => {
+  const ctx = await container({})
+  ctx.savedQueue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 3 }
+  await ctx.nativePlaybackReattached(nativeTwelve(7))
+  assert.equal(ctx.$store.state.playbackQueue.items.length, 12)
+  assert.equal(ctx.$store.state.playbackQueue.currentIndex, 7)
+  assert.equal(ctx.$store.state.playbackQueue.sourceId, 's')
+})
+
+test('reattach never shows a saved display copy that no longer matches the native queue', async () => {
+  const ctx = await container({})
+  ctx.savedQueue = { sourceType: 'series', sourceId: 's', items: twelve.slice(0, 11), currentIndex: 3 }
+  await ctx.nativePlaybackReattached(nativeTwelve(7))
+  assert.equal(ctx.$store.state.playbackQueue, null)
+  const reordered = [twelve[1], twelve[0], ...twelve.slice(2)]
+  ctx.savedQueue = { sourceType: 'series', sourceId: 's', items: reordered, currentIndex: 0 }
+  await ctx.nativePlaybackReattached(nativeTwelve(7))
+  assert.equal(ctx.$store.state.playbackQueue, null)
+})
+
+test('reattach tolerates missing native or saved queue data and never replaces a newer queue', async () => {
+  const ctx = await container({})
+  ctx.savedQueue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 0 }
+  await ctx.nativePlaybackReattached(null)
+  await ctx.nativePlaybackReattached({ queue: { items: [], currentIndex: -1 } })
+  assert.equal(ctx.$store.state.playbackQueue, null)
+  ctx.savedQueue = null
+  await ctx.nativePlaybackReattached(nativeTwelve(2))
+  assert.equal(ctx.$store.state.playbackQueue, null)
+  ctx.savedQueue = { items: null }
+  await ctx.nativePlaybackReattached(nativeTwelve(2))
+  assert.equal(ctx.$store.state.playbackQueue, null)
+  const newer = { sourceType: 'collection', sourceId: 'new', items: [twelve[0]], currentIndex: 0 }
+  ctx.$store.state.playbackQueue = newer
+  ctx.savedQueue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 0 }
+  await ctx.nativePlaybackReattached(nativeTwelve(2))
+  assert.equal(ctx.$store.state.playbackQueue, newer)
+})
+
+test('queue edits that race a native auto-advance resync instead of overwriting native', async () => {
+  const writes = []
+  const ctx = await container({
+    getPlaylistQueue: async () => ({ items: nativeQueueItems(twelve), currentIndex: 4 }),
+    setPlaylistQueue: async (queue) => writes.push(queue)
+  })
+  // Vue still thinks item 3 is current, but native already advanced to 4
+  ctx.$store.state.playbackQueue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 3 }
+  ctx.removeFromQueue(twelve[10])
+  await settle()
+  assert.equal(writes.length, 0)
+  assert.equal(ctx.error, 'Queue changed, try again')
+  assert.equal(ctx.$store.state.playbackQueue.currentIndex, 4)
+  // Once in sync the edit goes through, keeping native's index
+  ctx.removeFromQueue(twelve[10])
+  await settle()
+  assert.equal(writes.length, 1)
+  assert.equal(writes[0].currentIndex, 4)
+  assert.equal(writes[0].items.length, 11)
+  assert.ok(!writes[0].items.some((item) => item.libraryItemId === 'local_device_b10'))
+  // Already played items (index <= current) are never removed
+  ctx.removeFromQueue(twelve[1])
+  await settle()
+  assert.equal(writes[1].items.length, 11)
+})
+
+test('reordering keeps the played prefix and current item fixed', async () => {
+  const writes = []
+  const ctx = await container({ getPlaylistQueue: async () => ({ items: nativeQueueItems(twelve), currentIndex: 2 }), setPlaylistQueue: async (queue) => writes.push(queue) })
+  ctx.$store.state.playbackQueue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 2 }
+  ctx.reorderQueue(twelve.slice(3).reverse())
+  await settle()
+  assert.deepEqual(
+    writes[0].items.map((item) => item.libraryItemId),
+    [
+      'local_device_b0',
+      'local_device_b1',
+      'local_device_b2',
+      ...twelve
+        .slice(3)
+        .reverse()
+        .map((item) => item.localLibraryItem.id)
+    ]
+  )
+  assert.equal(writes[0].currentIndex, 2)
+})
+
+test('adding to the queue while nothing is queued synthesizes one from the playing session', async () => {
+  const writes = []
+  const ctx = await container({ setPlaylistQueue: async (queue) => writes.push(queue) })
+  ctx.currentPlaybackSession = { libraryItemId: 'p', episodeId: null, localLibraryItem: { id: 'local_p' }, displayTitle: 'Playing' }
+  await ctx.addSingleItemToQueue(queueEntry('n', 'local_device_n'))
+  assert.deepEqual(plain(writes[0]), {
+    items: [
+      { libraryItemId: 'local_p', episodeId: null },
+      { libraryItemId: 'local_device_n', episodeId: null }
+    ],
+    currentIndex: 0
+  })
+  assert.equal(ctx.$store.state.playbackQueue.sourceType, 'adhoc')
+})
+
+// Up Next display copy persistence (plugins/localStore.js) with a mocked Capacitor Preferences.
+async function localStoreWith(prefs) {
+  const source = (await readFile(new URL('../plugins/localStore.js', import.meta.url), 'utf8')).replace(/^import .*$/gm, '').replace('export default', 'globalThis.plugin =')
+  const sandbox = { Preferences: prefs, console: { ...console, error: () => {}, log: () => {} } }
+  vm.runInNewContext(source, sandbox)
+  let store
+  sandbox.plugin({ app: {}, store: {} }, (name, value) => (store = value))
+  return store
+}
+
+test('Up Next display copy round-trips, clears, and survives malformed or missing saved data', async () => {
+  const data = {}
+  const store = await localStoreWith({
+    set: async ({ key, value }) => (data[key] = value),
+    get: async ({ key }) => ({ value: data[key] ?? null }),
+    remove: async ({ key }) => delete data[key]
+  })
+  assert.equal(await store.getPlaybackQueue(), null)
+  const queue = { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 5 }
+  await store.setPlaybackQueue(queue)
+  assert.deepEqual(plain(await store.getPlaybackQueue()), plain(queue))
+  await store.setPlaybackQueue(null)
+  assert.equal('playbackQueue' in data, false)
+  data.playbackQueue = '{not json'
+  assert.equal(await store.getPlaybackQueue(), null)
+  const bridgeDown = async () => {
+    throw new Error('bridge')
+  }
+  const failing = await localStoreWith({ get: bridgeDown, set: bridgeDown, remove: bridgeDown })
+  assert.equal(await failing.getPlaybackQueue(), null)
+  await failing.setPlaybackQueue(queue)
+})
+
+// Vuex queue state (store/index.js): mutations persist the display copy; getters expose current/upcoming.
+async function storeModule() {
+  const source = (await readFile(new URL('../store/index.js', import.meta.url), 'utf8')).replace(/^import .*$/gm, '').replace(/export const (\w+) =/g, 'globalThis.$1 =')
+  const sandbox = {}
+  vm.runInNewContext(source, sandbox)
+  return sandbox
+}
+
+test('Vuex queue mutations persist the display copy and getters expose current/upcoming items', async () => {
+  const { state, mutations, getters } = await storeModule()
+  const s = state()
+  const saved = []
+  const self = { $localStore: { setPlaybackQueue: (queue) => saved.push(queue) } }
+  mutations.setPlaybackQueue.call(self, s, { sourceType: 'series', sourceId: 's', items: twelve, currentIndex: 10 })
+  assert.equal(getters.getPlaybackQueueCurrentItem(s), twelve[10])
+  assert.deepEqual(plain(getters.getPlaybackQueueUpcomingItems(s)), plain([twelve[11]]))
+  mutations.clearPlaybackQueue.call(self, s)
+  assert.equal(s.playbackQueue, null)
+  assert.deepEqual(
+    saved.map((queue) => queue && queue.currentIndex),
+    [10, null]
+  )
+  assert.equal(getters.getPlaybackQueueCurrentItem(s), null)
+  assert.deepEqual(plain(getters.getPlaybackQueueUpcomingItems(s)), [])
 })

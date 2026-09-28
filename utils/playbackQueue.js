@@ -133,7 +133,8 @@ export async function resolvePlaybackQueue(context, payload) {
       const localMatch = nativeItem.libraryItemId === payload.libraryItemId && nativeItem.episodeId === (payload.episodeId || null)
       return serverMatch || localMatch
     })
-    // A manually selected undownloaded book may play normally, but never retains a queue.
+    // Undownloaded books are queue members that stream (see downloadedBookItems), so this only
+    // happens when the selected item isn't a playable member of the source: it plays alone.
     if (currentIndex < 0) return { payload, queue: null }
   } else {
     currentIndex = items.findIndex((item) => {

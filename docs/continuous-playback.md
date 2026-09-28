@@ -26,6 +26,8 @@ Native names and advancement remain unchanged. A queue-state read supports autho
 
 ## Implemented behavior
 
+> The download-only rules in this section (undownloaded books excluded, no queue for a manually selected undownloaded book) were superseded by `15ec49ec`. See [Later change: streaming past download gaps](#later-change-streaming-past-download-gaps).
+
 - The series toolbar has an Android Play entry point. Both list and grid book-card Play controls pass the series source explicitly. Queue retrieval requests every page of server sequence order with no collapsed series. The visible shelf's pagination does not limit playback.
 - Collection Play and its book rows pass the same full collection order. Play All selects the first unfinished downloaded book, preferring local progress over server progress. If none remain, it reports that fact; an individual finished book can still be selected.
 - `utils/playbackQueue.js` builds source-independent queues, filters downloaded books against the active server connection, and translates actual local item/episode IDs for the bridge. Missing, invalid, ebook-only and detectably partial downloads are excluded. No series/collection queue contains server playback IDs.
@@ -124,3 +126,15 @@ Tracked-file diff (new files are listed above and included in the exported patch
  store/index.js                                     | 10 +--
  14 files changed, 147 insertions(+), 90 deletions(-)
 ```
+
+## Later change: streaming past download gaps
+
+`15ec49ec` replaced the download-only queue with one that keeps every playable book of the series/collection, in source order:
+
+- A book with a complete local copy for the current server connection (matched by library item ID, or by `ino` for a copy downloaded through another library) is queued by its real local ID.
+- Every other book with audio (not downloaded, partially downloaded, downloaded from another server, or a local record without tracks) is queued by its server ID and streams. It carries the server book so Up Next can show its title and cover.
+- Books marked missing or invalid on the server, and books without audio, are excluded.
+- Play All starts at the first unfinished book, preferring local progress over server progress. Selecting an undownloaded book streams it and continues through the rest of the source. Only an item that isn't a playable member of the source plays alone, without a queue.
+- Streaming the starting book still goes through the normal cellular-streaming permission check. An opt-in setting can prompt to download the missing books first.
+
+`tests/playbackQueue.test.mjs` was written for the download-only design; its five download-only expectations were updated to this behavior during the upstream v0.14.2-beta synchronization. The same pass added coverage for `ino` matching, Up Next reattachment from the native queue, queue-edit races, and the persisted Up Next display copy. The file now has 28 tests.
