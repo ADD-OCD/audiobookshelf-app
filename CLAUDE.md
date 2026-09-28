@@ -62,6 +62,7 @@ The bridge between JS and native is five custom Capacitor plugins. Each has a JS
 - `plugins/server.js` — `ServerSocket` class (socket.io); injected as `$socket`; handles authentication and real-time events from server.
 - `plugins/db.js` — `DbService`; thin wrapper around `AbsDatabase`; injected as `$db`; also listens for `onTokenRefresh` / `onTokenRefreshFailure` events.
 - `plugins/localStore.js` — `LocalStorage` class backed by Capacitor `Preferences`; injected as `$localStore`; persists user settings, theme, language, last library.
+- `plugins/theme.client.js` + `theme/` — semantic presentation-theme tokens, built-in themes as validated data, and the `$theme` service; see `docs/theme-architecture.md`. Themes are presentation-only.
 - `plugins/init.client.js` — Registers global Vue utilities (`$eventBus`, date/time helpers, `$bytesPretty`, `$elapsedPretty`, etc.); handles back-button behavior for Android and iOS swipe navigation.
 - `plugins/capacitor/AbsAudioPlayer.js` — Web fallback implementation of `AbsAudioPlayer` using the HTML5 `<audio>` element; used during browser-based development.
 
