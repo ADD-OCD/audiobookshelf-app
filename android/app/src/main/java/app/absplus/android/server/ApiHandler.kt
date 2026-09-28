@@ -207,7 +207,7 @@ class ApiHandler(var ctx:Context) {
     val config = DeviceManager.getServerConnectionConfig(serverConnectionConfigId)
     val refreshToken = secureStorage.getRefreshToken(serverConnectionConfigId)
     if (config == null || refreshToken.isNullOrEmpty()) {
-      AbsLogger.error(tag, "No refresh token or server configuration for $serverConnectionConfigId")
+      AbsLogger.error(tag, "No refresh token or server configuration for the saved server connection (config found=${config != null}, refresh token found=${!refreshToken.isNullOrEmpty()})")
       handleRefreshRejected(serverConnectionConfigId)
       onResult(RefreshResult.Rejected)
       return

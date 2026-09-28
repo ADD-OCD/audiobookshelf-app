@@ -41,7 +41,6 @@ class AbsDatabase : Plugin() {
 
     DeviceManager.dbManager.cleanLocalMediaProgress()
     DeviceManager.dbManager.cleanLocalLibraryItems(mainActivity)
-    DeviceManager.dbManager.cleanLogs()
   }
 
   @PluginMethod

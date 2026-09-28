@@ -93,6 +93,24 @@ be) in the official app.
   the page scrolls if space runs short, and the large logo condenses until the keyboard closes.
   The connection screen also links separately to Official Audiobookshelf and to Audiobookshelf+
   (this unofficial fork), and those links no longer overlap the form.
+- **Playback restoration** — swiping Audiobookshelf+ away no longer loses your place. Playback
+  that is already playing simply keeps going. A paused book can be resumed from the Android
+  widget, the media notification or a headset button, even after Android has closed the player
+  in the background: pressing Play rebuilds the session with the same book, position, playback
+  speed and Up Next queue. Downloaded books resume this way without a network connection
+  (streamed books need to reach your server). Reopening the app reconnects the player screen to
+  whatever is already playing. Closing the player with its X ends the session, so it isn't
+  brought back later. (Android's *Force stop* is still a hard stop — open the app normally after
+  using it.)
+- **In-app diagnostics** — Settings → Diagnostics can keep a diagnostic log on the phone to help
+  troubleshoot problems without a computer or ADB. Choose *Normal*, *Debug* or *Verbose*; the log
+  keeps recording while the app is closed or playing in the background, combines the app's
+  playback service and screens into one timeline, and is size-limited, with the oldest entries
+  removed automatically. **Log actions**: *View* it in the app, *Save* it to your phone through
+  Android's normal Save As screen, *Share* it, *Mark* the moment something goes wrong with a note,
+  or *Clear* it. Logs are sanitized before they're stored or exported — passwords, tokens, server
+  addresses and file locations are redacted — but please look over a log before sharing it
+  publicly.
 
 ### Getting builds
 

@@ -179,6 +179,28 @@
           <ui-text-input :value="androidAutoBrowseSeriesSequenceOrderOption" readonly append-icon="expand_more" style="max-width: 200px" />
         </div>
       </div>
+
+      <!-- Diagnostics -->
+      <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderDiagnostics }}</p>
+      <!-- Wraps so the picker moves below the label at large font sizes instead of covering it -->
+      <div class="py-3 flex flex-wrap items-center gap-y-2">
+        <p class="pr-4 w-36 min-w-min">{{ $strings.LabelDiagnosticLogging }}</p>
+        <div @click.stop="showDiagnosticLevelOptions">
+          <ui-text-input :value="diagnosticLevelOption" readonly append-icon="expand_more" style="max-width: 200px" />
+        </div>
+      </div>
+      <p class="text-xs text-fg-muted pb-2">{{ $strings.MessageDiagnosticLoggingHelp }}</p>
+      <p v-if="diagnosticLogBytes !== null" class="text-xs text-fg-muted pb-3">{{ $strings.LabelDiagnosticLogSize }}: {{ $bytesPretty(diagnosticLogBytes) }}</p>
+      <p class="text-sm font-semibold mb-2">{{ $strings.LabelLogActions }}</p>
+      <!-- Wraps to more rows on narrow screens / large font sizes; labels never shrink or truncate -->
+      <div class="flex flex-wrap gap-2 pb-4" role="group" :aria-label="$strings.LabelLogActions">
+        <ui-btn v-for="action in diagnosticLogActions" :key="action.id" small :aria-label="action.ariaLabel" :loading="(action.id === 'share' && isSharingDiagnosticLog) || (action.id === 'save' && isSavingDiagnosticLog)" class="min-h-12" @click="action.handler">
+          <span class="flex items-center whitespace-nowrap">
+            <span class="material-symbols text-lg leading-none mr-1" aria-hidden="true">{{ action.icon }}</span>
+            <span>{{ action.text }}</span>
+          </span>
+        </ui-btn>
+      </div>
     </template>
 
     <div v-show="loading" class="w-full h-full absolute top-0 left-0 flex items-center justify-center z-10">
@@ -194,9 +216,10 @@
 <script>
 import { Dialog } from '@capacitor/dialog'
 import jumpLabelMixin from '@/mixins/jumpLabel'
+import diagnosticLogMixin from '@/mixins/diagnosticLog'
 
 export default {
-  mixins: [jumpLabelMixin],
+  mixins: [jumpLabelMixin, diagnosticLogMixin],
   data() {
     return {
       loading: false,
@@ -435,6 +458,7 @@ export default {
       else if (this.moreMenuSetting === 'downloadUsingCellular') return this.downloadUsingCellularItems
       else if (this.moreMenuSetting === 'streamingUsingCellular') return this.streamingUsingCellularItems
       else if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.androidAutoBrowseSeriesSequenceOrderItems
+      else if (this.moreMenuSetting === 'diagnosticLevel') return this.diagnosticLevelItems
       else if (this.moreMenuSetting === 'jumpForward')
         return this.jumpForwardSecondsOptions.map((value) => ({
           text: this.getJumpLabel(value),
@@ -455,6 +479,7 @@ export default {
       if (this.moreMenuSetting === 'downloadUsingCellular') return this.settings.downloadUsingCellular
       if (this.moreMenuSetting === 'streamingUsingCellular') return this.settings.streamingUsingCellular
       if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') return this.settings.androidAutoBrowseSeriesSequenceOrder
+      if (this.moreMenuSetting === 'diagnosticLevel') return this.diagnosticLevel
       if (this.moreMenuSetting === 'shakeSensitivity') return this.settings.shakeSensitivity
       if (this.moreMenuSetting === 'hapticFeedback') return this.settings.hapticFeedback
       return null
@@ -511,6 +536,10 @@ export default {
       this.moreMenuSetting = 'androidAutoBrowseSeriesSequenceOrder'
       this.showMoreMenuDialog = true
     },
+    showDiagnosticLevelOptions() {
+      this.moreMenuSetting = 'diagnosticLevel'
+      this.showMoreMenuDialog = true
+    },
     clickMenuAction(action) {
       this.showMoreMenuDialog = false
       if (this.moreMenuSetting === 'shakeSensitivity') {
@@ -534,6 +563,8 @@ export default {
       } else if (this.moreMenuSetting === 'androidAutoBrowseSeriesSequenceOrder') {
         this.settings.androidAutoBrowseSeriesSequenceOrder = action
         this.saveSettings()
+      } else if (this.moreMenuSetting === 'diagnosticLevel') {
+        this.setDiagnosticLevel(action)
       } else if (this.moreMenuSetting === 'jumpForward') {
         this.settings.jumpForwardTime = action
         this.saveSettings()
@@ -695,6 +726,7 @@ export default {
   },
   mounted() {
     this.init()
+    if (!this.isiOS) this.loadDiagnosticState()
   }
 }
 </script>

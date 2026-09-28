@@ -906,6 +906,7 @@ export default {
     // When a playback session is started the native android/ios will send the session
     onPlaybackSession(playbackSession) {
       console.log('onPlaybackSession received', JSON.stringify(playbackSession))
+      this.$diag.debug('AudioPlayer', `Playback session received: item ${playbackSession.libraryItemId || playbackSession.localLibraryItem?.id} playMethod=${playbackSession.playMethod} currentTime=${playbackSession.currentTime}`)
       this.playbackSession = playbackSession
 
       this.isEnded = false
@@ -923,11 +924,13 @@ export default {
       })
     },
     onPlaybackClosed() {
+      this.$diag.debug('AudioPlayer', 'Playback closed by native player')
       this.endPlayback()
     },
     onPlaybackFailed(data) {
       console.log('Received onPlaybackFailed evt')
       var errorMessage = data.value || 'Unknown Error'
+      this.$diag.error('AudioPlayer', `Playback failed: ${errorMessage}`)
       this.$toast.error(`Playback Failed: ${errorMessage}`)
       this.endPlayback()
     },
@@ -947,6 +950,31 @@ export default {
       AbsAudioPlayer.addListener('onProgressSyncFailing', this.showProgressSyncIsFailing)
       AbsAudioPlayer.addListener('onProgressSyncSuccess', this.showProgressSyncSuccess)
       AbsAudioPlayer.addListener('onPlaybackSpeedChanged', this.onPlaybackSpeedChanged)
+
+      await this.reattachNativePlayback()
+    },
+    // A freshly started UI (e.g. after the task was swiped away while audio kept playing, or after a
+    // widget Play restored the session) otherwise never learns about the native session, because
+    // onPlaybackSession only fires when a session is prepared. Never starts playback itself.
+    async reattachNativePlayback() {
+      if (this.$platform !== 'android' || this.playbackSession) return
+      try {
+        const state = await AbsAudioPlayer.getCurrentPlaybackState()
+        if (!state?.playbackSession) this.$diag.debug('AudioPlayer', 'UI started with no native playback session to reattach')
+        if (!state?.playbackSession || this.playbackSession) return
+        console.log('[AudioPlayer] Reattaching to existing native playback session', state.playbackSession.id)
+        this.$diag.debug('AudioPlayer', `UI reattached to existing native session: playing=${!!state.isPlaying} position=${state.currentTime} rate=${state.playbackRate} queue=${state.queue?.items?.length || 0}`)
+        if (state.playbackRate) this.currentPlaybackRate = Number(state.playbackRate)
+        this.onPlaybackSession(state.playbackSession)
+        // The player template (and its timestamp/track refs) only renders once a session is set
+        await this.$nextTick()
+        this.onMetadata({ duration: Number(state.duration) || 0, currentTime: Number(state.currentTime) || 0, playerState: 'READY' })
+        this.onPlayingUpdate({ value: !!state.isPlaying })
+        if (state.mediaPlayer) this.$store.commit('setMediaPlayer', state.mediaPlayer)
+        this.$eventBus.$emit('native-playback-reattached', state)
+      } catch (error) {
+        console.error('[AudioPlayer] Failed to read native playback state', error)
+      }
     },
     async screenOrientationChange() {
       if (this.isRefreshingUI) return

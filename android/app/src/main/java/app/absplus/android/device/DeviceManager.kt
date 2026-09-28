@@ -1,5 +1,6 @@
 package app.absplus.android.device
 
+import app.absplus.android.diagnostics.DLog
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -9,6 +10,7 @@ import android.util.Log
 import app.absplus.android.MediaPlayerWidget
 import app.absplus.android.data.*
 import app.absplus.android.managers.DbManager
+import app.absplus.android.managers.PlaybackRestoreStore
 import app.absplus.android.player.PlayerNotificationService
 import app.absplus.android.updateAppWidget
 
@@ -48,7 +50,7 @@ object DeviceManager {
   var widgetUpdater: WidgetEventEmitter? = null
 
   init {
-    Log.d(tag, "Device Manager Singleton invoked")
+    DLog.d(tag, "Device Manager Singleton invoked")
 
     // Initialize new sleep timer settings and shake sensitivity added in v0.9.61
     if (deviceData.deviceSettings?.autoSleepTimerStartTime == null ||
@@ -158,13 +160,13 @@ object DeviceManager {
     val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
     if (capabilities != null) {
       if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-        Log.i("Internet", "NetworkCapabilities.TRANSPORT_CELLULAR")
+        DLog.i("Internet", "NetworkCapabilities.TRANSPORT_CELLULAR")
         return true
       } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-        Log.i("Internet", "NetworkCapabilities.TRANSPORT_WIFI")
+        DLog.i("Internet", "NetworkCapabilities.TRANSPORT_WIFI")
         return true
       } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-        Log.i("Internet", "NetworkCapabilities.TRANSPORT_ETHERNET")
+        DLog.i("Internet", "NetworkCapabilities.TRANSPORT_ETHERNET")
         return true
       }
     }
@@ -185,7 +187,7 @@ object DeviceManager {
    * @param context The context to use for initializing the widget updater.
    */
   fun initializeWidgetUpdater(context: Context) {
-    Log.d(tag, "Initializing widget updater")
+    DLog.d(tag, "Initializing widget updater")
     widgetUpdater =
             (object : WidgetEventEmitter {
               override fun onPlayerChanged(pns: PlayerNotificationService) {
@@ -194,7 +196,9 @@ object DeviceManager {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MediaPlayerWidget::class.java)
                 val ids = appWidgetManager.getAppWidgetIds(componentName)
-                val playbackSession = pns.getCurrentPlaybackSessionCopy()
+                val playbackSession = pns.getCurrentPlaybackSessionCopy() ?: deviceData.lastPlaybackSession
+                val hasLiveSession = pns.currentPlaybackSession != null && !PlayerNotificationService.isClosed
+                val showControls = hasLiveSession || (deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context))
 
                 for (widgetId in ids) {
                   updateAppWidget(
@@ -203,7 +207,7 @@ object DeviceManager {
                           widgetId,
                           playbackSession,
                           isPlaying,
-                          PlayerNotificationService.isClosed
+                          showControls
                   )
                 }
               }
@@ -212,6 +216,7 @@ object DeviceManager {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MediaPlayerWidget::class.java)
                 val ids = appWidgetManager.getAppWidgetIds(componentName)
+                val showControls = deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context)
                 for (widgetId in ids) {
                   updateAppWidget(
                           context,
@@ -219,7 +224,7 @@ object DeviceManager {
                           widgetId,
                           deviceData.lastPlaybackSession,
                           false,
-                          PlayerNotificationService.isClosed
+                          showControls
                   )
                 }
               }

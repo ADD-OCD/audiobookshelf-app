@@ -1,5 +1,6 @@
 package app.absplus.android.player
 
+import app.absplus.android.diagnostics.DLog
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.BroadcastReceiver
@@ -37,7 +38,11 @@ import app.absplus.android.data.*
 import app.absplus.android.data.DeviceInfo
 import app.absplus.android.device.DeviceManager
 import app.absplus.android.managers.DbManager
+import app.absplus.android.managers.PlaybackRestoreStore
+import app.absplus.android.managers.PlaybackRestoreStore.LOG_TAG as RESTORE_TAG
 import app.absplus.android.managers.SleepTimerManager
+import android.content.pm.ServiceInfo
+import androidx.media.session.MediaButtonReceiver
 import app.absplus.android.media.MediaManager
 import app.absplus.android.media.MediaProgressSyncer
 import app.absplus.android.media.getUriToAbsIconDrawable
@@ -138,8 +143,23 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   // Playlist queue for native background advancement (bypasses WebView/JS layer)
   data class PlaylistQueueItem(val libraryItemId: String, val episodeId: String?)
+  // Persisted on every change so a widget/headset Play can rebuild the queue after process death
   var playlistQueue: List<PlaylistQueueItem> = emptyList()
+    set(value) {
+      field = value
+      PlaybackRestoreStore.saveQueue(this, field, playlistQueueIndex)
+    }
   var playlistQueueIndex: Int = -1
+    set(value) {
+      field = value
+      PlaybackRestoreStore.saveQueue(this, playlistQueue, field)
+    }
+
+  // Session restoration (widget/headset/system Play when no media is prepared)
+  private var isRestoringPlayback = false
+  private var isServiceDestroyed = false
+  // True while the service is foreground only because of a media-button start, before any media is prepared
+  private var isMediaButtonPlaceholderForeground = false
 
   // The following are used for the shake detection
   private var isShakeSensorRegistered: Boolean = false
@@ -164,11 +184,11 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
      Service related stuff
   */
   override fun onBind(intent: Intent): IBinder? {
-    Log.d(tag, "onBind")
+    DLog.d(tag, "onBind")
 
     // Android Auto Media Browser Service
     if (SERVICE_INTERFACE == intent.action) {
-      Log.d(tag, "Is Media Browser Service")
+      DLog.d(tag, "Is Media Browser Service")
       return super.onBind(intent)
     }
     return binder
@@ -181,14 +201,67 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     isStarted = true
-    Log.d(tag, "onStartCommand $startId")
+    DLog.d(tag, "onStartCommand $startId action=${intent?.action}")
+
+    if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
+      // MediaButtonReceiver started us with startForegroundService, so we must be foreground
+      // promptly even if nothing is prepared yet (e.g. widget Play after the service was destroyed)
+      DLog.i(RESTORE_TAG, "Media button start command | sessionPrepared=${currentPlaybackSession != null} | foreground=${PlayerNotificationListener.isForegroundService}")
+      if (!PlayerNotificationListener.isForegroundService) startMediaButtonPlaceholderForeground()
+      // null = no key event, so the session callback (which normally releases the placeholder) won't run
+      if (MediaButtonReceiver.handleIntent(mediaSession, intent) == null) onMediaButtonHandled()
+    }
 
     return START_STICKY
   }
 
+  private fun startMediaButtonPlaceholderForeground() {
+    val title = DeviceManager.deviceData.lastPlaybackSession?.displayTitle ?: getString(R.string.app_name)
+    val notification = NotificationCompat.Builder(this, channelId)
+      .setSmallIcon(R.drawable.icon_monochrome)
+      .setContentTitle(title)
+      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+      .setSilent(true)
+      .build()
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+      } else {
+        startForeground(notificationId, notification)
+      }
+      PlayerNotificationListener.isForegroundService = true
+      isMediaButtonPlaceholderForeground = true
+      DLog.i(RESTORE_TAG, "Started placeholder foreground for media button")
+    } catch (e: Exception) {
+      DLog.e(RESTORE_TAG, "Could not start placeholder foreground: $e")
+    }
+  }
+
+  // Called once a media button has been handled; drops the placeholder if nothing ended up playing
+  fun onMediaButtonHandled() {
+    if (!isMediaButtonPlaceholderForeground || isRestoringPlayback) return
+    if (currentPlaybackSession == null) {
+      releaseMediaButtonPlaceholderForeground("nothing to play")
+    } else {
+      // A session already existed: put the real player notification back over the placeholder
+      isMediaButtonPlaceholderForeground = false
+      playerNotificationManager.invalidate()
+    }
+  }
+
+  private fun releaseMediaButtonPlaceholderForeground(reason: String) {
+    if (!isMediaButtonPlaceholderForeground) return
+    DLog.i(RESTORE_TAG, "Releasing placeholder foreground ($reason)")
+    isMediaButtonPlaceholderForeground = false
+    PlayerNotificationListener.isForegroundService = false
+    stopForeground(Service.STOP_FOREGROUND_REMOVE)
+    isStarted = false
+    stopSelf()
+  }
+
   @Deprecated("Deprecated in Java")
   override fun onStart(intent: Intent?, startId: Int) {
-    Log.d(tag, "onStart $startId")
+    DLog.d(tag, "onStart $startId")
   }
 
   @RequiresApi(Build.VERSION_CODES.O)
@@ -208,7 +281,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
               getSystemService(ConnectivityManager::class.java) as ConnectivityManager
       connectivityManager.unregisterNetworkCallback(networkCallback)
     } catch (error: Exception) {
-      Log.e(tag, "Error unregistering network listening callback $error")
+      DLog.e(tag, "Error unregistering network listening callback $error")
     }
 
     // Unregister the defense-in-depth AUDIO_BECOMING_NOISY receiver
@@ -217,9 +290,14 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       audioNoisyReceiver = null
     }
 
-    Log.d(tag, "onDestroy")
+    DLog.d(tag, "onDestroy")
+    DLog.marker("Playback service destroyed")
+    DLog.i(RESTORE_TAG, "Player service destroyed | hadSession=${currentPlaybackSession != null} | resumable=${PlaybackRestoreStore.isResumable(this)} | queue=${playlistQueue.size}")
+    isServiceDestroyed = true
     isStarted = false
     isClosed = true
+    isMediaButtonPlaceholderForeground = false
+    PlayerNotificationListener.isForegroundService = false
     DeviceManager.widgetUpdater?.onPlayerChanged(this)
 
     playerNotificationManager.setPlayer(null)
@@ -236,28 +314,39 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   override fun onTaskRemoved(rootIntent: Intent?) {
     super.onTaskRemoved(rootIntent)
 
-    val isPlaying = try { currentPlayer.isPlaying } catch (e: Exception) { false }
     val playerWantsToPlay = try { currentPlayer.playWhenReady } catch (e: Exception) { false }
+    // isPlaying is false while buffering (e.g. a stream just after Play), which is still intent to play
+    val isBuffering = try { currentPlayer.playbackState == Player.STATE_BUFFERING } catch (e: Exception) { false }
+    val isActuallyPlaying = try { currentPlayer.isPlaying } catch (e: Exception) { false }
+    val isPlaying = isActuallyPlaying || (playerWantsToPlay && isBuffering)
     // Only keep the service alive if the player is actively playing or if it
     // intends to continue (playWhenReady == true with a playlist queue, i.e.
     // between episodes).  When paused by Bluetooth disconnect or user action,
     // playWhenReady is false and the service should be allowed to stop.
     if (isPlaying || (playlistQueue.isNotEmpty() && playerWantsToPlay)) {
-      Log.d(tag, "onTaskRemoved: keeping service alive (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+      DLog.d(tag, "onTaskRemoved: keeping service alive (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+      DLog.marker("UI task removed (playing - service kept)")
+      DLog.i(RESTORE_TAG, "Task removed while playing - existing player/session kept alive")
       return
     }
 
-    Log.d(tag, "onTaskRemoved: stopping service (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+    // Not playing: let the service stop. The session stays resumable (lastPlaybackSession +
+    // PlaybackRestoreStore), so a later widget/headset Play rebuilds it via restoreLastPlaybackSession().
+    DLog.d(tag, "onTaskRemoved: stopping service (playlistQueue=${playlistQueue.size}, isPlaying=$isPlaying, playWhenReady=$playerWantsToPlay)")
+    DLog.marker("UI task removed (not playing - service stopping)")
+    DLog.i(RESTORE_TAG, "Task removed while not playing - stopping service, session left resumable=${PlaybackRestoreStore.isResumable(this)}")
     stopSelf()
   }
 
   override fun onCreate() {
-    Log.d(tag, "onCreate")
     super.onCreate()
     ctx = this
 
-    // Initialize Paper
+    // Initialize Paper (also starts persistent diagnostics in a fresh process)
     DbManager.initialize(ctx)
+    DLog.d(tag, "onCreate")
+    DLog.marker("Playback service created")
+    DLog.i(RESTORE_TAG, "Player service created (new instance - any previous player/session is gone)")
 
     // Initialize widget
     DeviceManager.initializeWidgetUpdater(ctx)
@@ -285,7 +374,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     mediaProgressSyncer = MediaProgressSyncer(this, apiHandler)
 
     // Initialize shake sensor
-    Log.d(tag, "onCreate Register sensor listener ${mAccelerometer?.isWakeUpSensor}")
+    DLog.d(tag, "onCreate Register sensor listener ${mAccelerometer?.isWakeUpSensor}")
     initSensor()
 
     // Initialize media manager
@@ -355,7 +444,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                       windowIndex: Int
               ): MediaDescriptionCompat {
                 if (currentPlaybackSession == null) {
-                  Log.e(tag, "Playback session is not set - returning blank MediaDescriptionCompat")
+                  DLog.e(tag, "Playback session is not set - returning blank MediaDescriptionCompat")
                   return MediaDescriptionCompat.Builder().build()
                 }
 
@@ -386,7 +475,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                           Intent.FLAG_GRANT_READ_URI_PERMISSION
                   )
                 } catch (error: Exception) {
-                  Log.e(tag, "Grant uri permission error $error")
+                  DLog.e(tag, "Grant uri permission error $error")
                 }
 
                 val extra = Bundle()
@@ -454,14 +543,14 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     audioNoisyReceiver = object : BroadcastReceiver() {
       override fun onReceive(context: Context?, intent: Intent?) {
         if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-          Log.d(tag, "ACTION_AUDIO_BECOMING_NOISY received — ensuring player is paused")
+          DLog.d(tag, "ACTION_AUDIO_BECOMING_NOISY received — ensuring player is paused")
           try {
             if (mPlayer.playWhenReady) {
               mPlayer.playWhenReady = false
-              Log.d(tag, "Forced playWhenReady=false on AUDIO_BECOMING_NOISY")
+              DLog.d(tag, "Forced playWhenReady=false on AUDIO_BECOMING_NOISY")
             }
           } catch (e: Exception) {
-            Log.e(tag, "Error handling AUDIO_BECOMING_NOISY: $e")
+            DLog.e(tag, "Error handling AUDIO_BECOMING_NOISY: $e")
           }
         }
       }
@@ -492,7 +581,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       playlistQueueIndex = -1
     }
     if (!isStarted) {
-      Log.i(tag, "preparePlayer: foreground service not started - Starting service --")
+      DLog.i(tag, "preparePlayer: foreground service not started - Starting service --")
       Intent(ctx, PlayerNotificationService::class.java).also { intent ->
         ContextCompat.startForegroundService(ctx, intent)
       }
@@ -500,12 +589,12 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
     // TODO: When an item isFinished the currentTime should be reset to 0
     //        will reset the time if currentTime is within 5s of duration (for android auto)
-    Log.d(
+    DLog.d(
             tag,
             "Prepare Player Session Current Time=${playbackSession.currentTime}, Duration=${playbackSession.duration}"
     )
     if (playbackSession.duration - playbackSession.currentTime < 5) {
-      Log.d(tag, "Prepare Player Session is finished, so restart it")
+      DLog.d(tag, "Prepare Player Session is finished, so restart it")
       playbackSession.currentTime = 0.0
     }
 
@@ -521,7 +610,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     playbackSession.mediaPlayer = getMediaPlayer()
 
     if (playbackSession.mediaPlayer == PLAYER_CAST && playbackSession.isLocal) {
-      Log.w(tag, "Cannot cast local media item - switching player")
+      DLog.w(tag, "Cannot cast local media item - switching player")
       currentPlaybackSession = null
       switchToPlayer(false)
       playbackSession.mediaPlayer = getMediaPlayer()
@@ -553,10 +642,14 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     DeviceManager.widgetUpdater?.onPlayerChanged(this)
 
     if (mediaItems.isEmpty()) {
-      Log.e(tag, "Invalid playback session no media items to play")
+      DLog.e(tag, "Invalid playback session no media items to play")
       currentPlaybackSession = null
       return
     }
+
+    PlaybackRestoreStore.setResumable(this, true)
+    // PlayerNotificationManager posts its notification under the same id, replacing any placeholder
+    isMediaButtonPlaceholderForeground = false
 
     if (mPlayer == currentPlayer) {
       val mediaSource: MediaSource
@@ -608,11 +701,11 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       // Add remaining media items if multi-track
       if (mediaItems.size > 1) {
         currentPlayer.addMediaItems(mediaItems.subList(1, mediaItems.size))
-        Log.d(tag, "currentPlayer total media items ${currentPlayer.mediaItemCount}")
+        DLog.d(tag, "currentPlayer total media items ${currentPlayer.mediaItemCount}")
 
         val currentTrackIndex = playbackSession.getCurrentTrackIndex()
         val currentTrackTime = playbackSession.getCurrentTrackTimeMs()
-        Log.d(
+        DLog.d(
                 tag,
                 "currentPlayer current track index $currentTrackIndex & current track time $currentTrackTime"
         )
@@ -621,7 +714,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         currentPlayer.seekTo(playbackSession.currentTimeMs)
       }
 
-      Log.d(
+      DLog.d(
               tag,
               "Prepare complete for session ${currentPlaybackSession?.displayTitle} | ${currentPlayer.mediaItemCount}"
       )
@@ -633,7 +726,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       val currentTrackIndex = playbackSession.getCurrentTrackIndex()
       val currentTrackTime = playbackSession.getCurrentTrackTimeMs()
       val mediaType = playbackSession.mediaType
-      Log.d(tag, "Loading cast player $currentTrackIndex $currentTrackTime $mediaType")
+      DLog.d(tag, "Loading cast player $currentTrackIndex $currentTrackTime $mediaType")
 
       castPlayer?.load(
               mediaItems,
@@ -685,7 +778,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     currentPlaybackSession?.let { playbackSession ->
       if (playbackSession.isDirectPlay) {
         val playItemRequestPayload = getPlayItemRequestPayload(true)
-        Log.d(tag, "Fallback to transcode $playItemRequestPayload.mediaPlayer")
+        DLog.d(tag, "Fallback to transcode $playItemRequestPayload.mediaPlayer")
 
         val libraryItemId = playbackSession.libraryItemId ?: "" // Must be true since direct play
         val episodeId = playbackSession.episodeId
@@ -707,9 +800,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   }
 
   fun handlePlaybackEnded() {
-    Log.d(tag, "handlePlaybackEnded")
+    DLog.d(tag, "handlePlaybackEnded")
     if (isAndroidAuto && currentPlaybackSession?.isPodcastEpisode == true) {
-      Log.d(tag, "Podcast playback ended on android auto")
+      DLog.d(tag, "Podcast playback ended on android auto")
       val libraryItem = currentPlaybackSession?.libraryItem ?: return
 
       // Need to sync with server to set as finished
@@ -718,11 +811,11 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         mediaManager.loadServerUserMediaProgress {
           val podcast = libraryItem.media as Podcast
           val nextEpisode = podcast.getNextUnfinishedEpisode(libraryItem.id, mediaManager)
-          Log.d(tag, "handlePlaybackEnded nextEpisode=$nextEpisode")
+          DLog.d(tag, "handlePlaybackEnded nextEpisode=$nextEpisode")
           nextEpisode?.let { podcastEpisode ->
             mediaManager.play(libraryItem, podcastEpisode, getPlayItemRequestPayload(false)) {
               if (it == null) {
-                Log.e(tag, "Failed to play library item")
+                DLog.e(tag, "Failed to play library item")
               } else {
                 val playbackRate = mediaManager.getSavedPlaybackRate()
                 Handler(Looper.getMainLooper()).post { preparePlayer(it, true, playbackRate) }
@@ -735,21 +828,21 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   }
 
   fun advancePlaylistQueue() {
-    Log.d(tag, "advancePlaylistQueue: called with queueSize=${playlistQueue.size}, currentIndex=$playlistQueueIndex")
+    DLog.d(tag, "advancePlaylistQueue: called with queueSize=${playlistQueue.size}, currentIndex=$playlistQueueIndex")
     if (playlistQueue.isEmpty()) {
-      Log.d(tag, "advancePlaylistQueue: queue is empty, nothing to do")
+      DLog.d(tag, "advancePlaylistQueue: queue is empty, nothing to do")
       return
     }
     val nextIndex = playlistQueueIndex + 1
     if (nextIndex >= playlistQueue.size) {
-      Log.d(tag, "advancePlaylistQueue: end of queue (nextIndex=$nextIndex >= size=${playlistQueue.size})")
+      DLog.d(tag, "advancePlaylistQueue: end of queue (nextIndex=$nextIndex >= size=${playlistQueue.size})")
       playlistQueue = emptyList()
       playlistQueueIndex = -1
       return
     }
     playlistQueueIndex = nextIndex
     val nextItem = playlistQueue[nextIndex]
-    Log.d(tag, "advancePlaylistQueue: advancing to index $nextIndex, libraryItemId=${nextItem.libraryItemId}, episodeId=${nextItem.episodeId}")
+    DLog.d(tag, "advancePlaylistQueue: advancing to index $nextIndex, libraryItemId=${nextItem.libraryItemId}, episodeId=${nextItem.episodeId}")
     val playbackRate = initialPlaybackRate ?: 1f
 
     // Acquire a temporary WakeLock to keep the CPU alive during playlist advancement
@@ -758,10 +851,10 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     wakeLock.acquire(60_000L) // 60 second timeout
 
     if (nextItem.libraryItemId.startsWith("local")) {
-      Log.d(tag, "advancePlaylistQueue: loading local item ${nextItem.libraryItemId}")
+      DLog.d(tag, "advancePlaylistQueue: loading local item ${nextItem.libraryItemId}")
       val localItem = DeviceManager.dbManager.getLocalLibraryItem(nextItem.libraryItemId)
       if (localItem == null) {
-        Log.e(tag, "advancePlaylistQueue: Local library item not found ${nextItem.libraryItemId}")
+        DLog.e(tag, "advancePlaylistQueue: Local library item not found ${nextItem.libraryItemId}")
         playlistQueue = emptyList()
         playlistQueueIndex = -1
         if (wakeLock.isHeld) wakeLock.release()
@@ -772,21 +865,21 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         val podcastMedia = localItem.media as? Podcast
         episode = podcastMedia?.episodes?.find { ep -> ep.id == nextItem.episodeId }
         if (episode == null) {
-          Log.e(tag, "advancePlaylistQueue: Local podcast episode not found ${nextItem.episodeId}")
+          DLog.e(tag, "advancePlaylistQueue: Local podcast episode not found ${nextItem.episodeId}")
           if (wakeLock.isHeld) wakeLock.release()
           return
         }
       }
       // Downloads can be removed after queue setup. Never fall back to streaming.
       if (localItem.mediaType == "book" && (localItem.isInvalid || !localItem.hasTracks(this, episode))) {
-        Log.e(tag, "advancePlaylistQueue: Downloaded audiobook has no playable files")
+        DLog.e(tag, "advancePlaylistQueue: Downloaded audiobook has no playable files")
         playlistQueue = emptyList()
         playlistQueueIndex = -1
         if (wakeLock.isHeld) wakeLock.release()
         return
       }
       val playbackSession = localItem.getPlaybackSession(episode, getDeviceInfo())
-      Log.d(tag, "advancePlaylistQueue: local session ready")
+      DLog.d(tag, "advancePlaylistQueue: local session ready")
 
       fun startLocalPlayback() {
         PlayerListener.lazyIsPlaying = false
@@ -801,10 +894,10 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       val serverLibraryItemId = localItem.libraryItemId
       val serverConnectionConfig = localItem.serverConnectionConfigId?.let { DeviceManager.getServerConnectionConfig(it) }
       if (playbackSession.currentTime == 0.0 && !serverLibraryItemId.isNullOrEmpty() && serverConnectionConfig != null && DeviceManager.checkConnectivity(ctx)) {
-        Log.d(tag, "advancePlaylistQueue: no local progress, checking server progress for $serverLibraryItemId")
+        DLog.d(tag, "advancePlaylistQueue: no local progress, checking server progress for $serverLibraryItemId")
         apiHandler.getMediaProgress(serverLibraryItemId, episode?.serverEpisodeId, serverConnectionConfig) { mediaProgress ->
           if (mediaProgress != null && !mediaProgress.isFinished && mediaProgress.currentTime > 0.0) {
-            Log.d(tag, "advancePlaylistQueue: found server progress, resuming from ${mediaProgress.currentTime}")
+            DLog.d(tag, "advancePlaylistQueue: found server progress, resuming from ${mediaProgress.currentTime}")
             playbackSession.currentTime = mediaProgress.currentTime
           }
           Handler(Looper.getMainLooper()).post { startLocalPlayback() }
@@ -813,7 +906,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         startLocalPlayback()
       }
     } else {
-      Log.d(tag, "advancePlaylistQueue: requesting server item ${nextItem.libraryItemId}")
+      DLog.d(tag, "advancePlaylistQueue: requesting server item ${nextItem.libraryItemId}")
       // Acquire WiFi lock for server items to keep network alive during API call
       val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
       @Suppress("DEPRECATION")
@@ -822,7 +915,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
       // Stop progress syncer fire-and-forget (don't block on callback)
       mediaProgressSyncer.stop {
-        Log.d(tag, "advancePlaylistQueue: mediaProgressSyncer stopped (fire-and-forget)")
+        DLog.d(tag, "advancePlaylistQueue: mediaProgressSyncer stopped (fire-and-forget)")
       }
 
       // Immediately request next item from server without waiting for sync to complete
@@ -836,26 +929,26 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       if (wakeLock.isHeld) wakeLock.release()
       return
     }
-    Log.d(tag, "advancePlaylistQueueServerItem: libraryItemId=${nextItem.libraryItemId}, episodeId=${nextItem.episodeId}, retry=$retryCount")
+    DLog.d(tag, "advancePlaylistQueueServerItem: libraryItemId=${nextItem.libraryItemId}, episodeId=${nextItem.episodeId}, retry=$retryCount")
     val playItemRequestPayload = getPlayItemRequestPayload(false)
     apiHandler.playLibraryItem(nextItem.libraryItemId, nextItem.episodeId ?: "", playItemRequestPayload) { session ->
       if (session == null && retryCount < 3) {
         val delay = (retryCount + 1) * 2000L
-        Log.w(tag, "advancePlaylistQueue: Server play request failed for ${nextItem.libraryItemId}, retrying in ${delay}ms (attempt ${retryCount + 1}/3)")
+        DLog.w(tag, "advancePlaylistQueue: Server play request failed for ${nextItem.libraryItemId}, retrying in ${delay}ms (attempt ${retryCount + 1}/3)")
         Handler(Looper.getMainLooper()).postDelayed({
           advancePlaylistQueueServerItem(nextItem, playbackRate, wakeLock, wifiLock, retryCount + 1)
         }, delay)
       } else if (session != null) {
-        Log.d(tag, "advancePlaylistQueue: Got server session, calling preparePlayer for ${nextItem.libraryItemId}")
+        DLog.d(tag, "advancePlaylistQueue: Got server session, calling preparePlayer for ${nextItem.libraryItemId}")
         PlayerListener.lazyIsPlaying = false
         Handler(Looper.getMainLooper()).post {
           if (playlistQueue.getOrNull(playlistQueueIndex) === nextItem) preparePlayer(session, true, playbackRate)
-          Log.d(tag, "advancePlaylistQueue: preparePlayer called successfully")
+          DLog.d(tag, "advancePlaylistQueue: preparePlayer called successfully")
         }
         if (wifiLock.isHeld) wifiLock.release()
         if (wakeLock.isHeld) wakeLock.release()
       } else {
-        Log.e(tag, "advancePlaylistQueue: Server play request failed for ${nextItem.libraryItemId} after ${retryCount + 1} attempts, giving up")
+        DLog.e(tag, "advancePlaylistQueue: Server play request failed for ${nextItem.libraryItemId} after ${retryCount + 1} attempts, giving up")
         if (wifiLock.isHeld) wifiLock.release()
         if (wakeLock.isHeld) wakeLock.release()
       }
@@ -864,7 +957,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   fun startNewPlaybackSession() {
     currentPlaybackSession?.let { playbackSession ->
-      Log.i(tag, "Starting new playback session for ${playbackSession.displayTitle}")
+      DLog.i(tag, "Starting new playback session for ${playbackSession.displayTitle}")
 
       val forceTranscode = playbackSession.isHLS // If already HLS then force
       val playItemRequestPayload = getPlayItemRequestPayload(forceTranscode)
@@ -874,9 +967,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       mediaProgressSyncer.stop(false) {
         apiHandler.playLibraryItem(libraryItemId, episodeId, playItemRequestPayload) {
           if (it == null) {
-            Log.e(tag, "Failed to start new playback session")
+            DLog.e(tag, "Failed to start new playback session")
           } else {
-            Log.d(
+            DLog.d(
                     tag,
                     "New playback session response from server with session id ${it.id} for \"${it.displayTitle}\""
             )
@@ -891,24 +984,24 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     val wasPlaying = currentPlayer.isPlaying
     if (useCastPlayer) {
       if (currentPlayer == castPlayer) {
-        Log.d(tag, "switchToPlayer: Already using Cast Player " + castPlayer?.deviceInfo)
+        DLog.d(tag, "switchToPlayer: Already using Cast Player " + castPlayer?.deviceInfo)
         return
       } else {
-        Log.d(tag, "switchToPlayer: Switching to cast player from exo player stop exo player")
+        DLog.d(tag, "switchToPlayer: Switching to cast player from exo player stop exo player")
         mPlayer.stop()
       }
     } else {
       if (currentPlayer == mPlayer) {
-        Log.d(tag, "switchToPlayer: Already using Exo Player " + mPlayer.deviceInfo)
+        DLog.d(tag, "switchToPlayer: Already using Exo Player " + mPlayer.deviceInfo)
         return
       } else if (castPlayer != null) {
-        Log.d(tag, "switchToPlayer: Switching to exo player from cast player stop cast player")
+        DLog.d(tag, "switchToPlayer: Switching to exo player from cast player stop cast player")
         castPlayer?.stop()
       }
     }
 
     if (currentPlaybackSession == null) {
-      Log.e(tag, "switchToPlayer: No Current playback session")
+      DLog.e(tag, "switchToPlayer: No Current playback session")
     } else {
       isSwitchingPlayer = true
     }
@@ -923,13 +1016,13 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
     currentPlayer =
             if (useCastPlayer) {
-              Log.d(tag, "switchToPlayer: Using Cast Player " + castPlayer?.deviceInfo)
+              DLog.d(tag, "switchToPlayer: Using Cast Player " + castPlayer?.deviceInfo)
               mediaSessionConnector.setPlayer(castPlayer)
               playerNotificationManager.setPlayer(castPlayer)
               setMediaSessionToCastVolume()
               castPlayer as CastPlayer
             } else {
-              Log.d(tag, "switchToPlayer: Using ExoPlayer")
+              DLog.d(tag, "switchToPlayer: Using ExoPlayer")
               mediaSessionConnector.setPlayer(mPlayer)
               playerNotificationManager.setPlayer(mPlayer)
               setMediaSessionToLocalVolume()
@@ -939,7 +1032,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     clientEventEmitter?.onMediaPlayerChanged(getMediaPlayer())
 
     currentPlaybackSession?.let {
-      Log.d(tag, "switchToPlayer: Starting new playback session ${it.displayTitle}")
+      DLog.d(tag, "switchToPlayer: Starting new playback session ${it.displayTitle}")
       if (wasPlaying) { // media is paused when switching players
         clientEventEmitter?.onPlayingUpdate(false)
       }
@@ -1048,7 +1141,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         val serverConnectionConfig =
                 DeviceManager.getServerConnectionConfig(playbackSession.serverConnectionConfigId)
         if (serverConnectionConfig == null) {
-          Log.d(
+          DLog.d(
                   tag,
                   "checkCurrentSessionProgress: Local library item server connection config is not saved ${playbackSession.serverConnectionConfigId}"
           )
@@ -1056,7 +1149,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         }
 
         // Local playback session check if server has updated media progress
-        Log.d(
+        DLog.d(
                 tag,
                 "checkCurrentSessionProgress: Checking if local media progress was updated on server"
         )
@@ -1069,7 +1162,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                           mediaProgress.lastUpdate > playbackSession.updatedAt &&
                           mediaProgress.currentTime != playbackSession.currentTime
           ) {
-            Log.d(
+            DLog.d(
                     tag,
                     "checkCurrentSessionProgress: Media progress was updated since last play time updating from ${playbackSession.currentTime} to ${mediaProgress.currentTime}"
             )
@@ -1105,13 +1198,13 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         }
       } else {
         // Streaming from server so check if playback session still exists on server
-        Log.d(
+        DLog.d(
                 tag,
                 "checkCurrentSessionProgress: Checking if playback session ${playbackSession.id} for server stream is still available"
         )
         apiHandler.getPlaybackSession(playbackSession.id) {
           if (it == null) {
-            Log.d(
+            DLog.d(
                     tag,
                     "checkCurrentSessionProgress: Playback session does not exist on server - start new playback session"
             )
@@ -1121,7 +1214,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
               startNewPlaybackSession()
             }
           } else {
-            Log.d(tag, "checkCurrentSessionProgress: Playback session still available on server")
+            DLog.d(tag, "checkCurrentSessionProgress: Playback session still available on server")
             Handler(Looper.getMainLooper()).post {
               if (seekBackTime > 0L) {
                 seekBackward(seekBackTime)
@@ -1142,12 +1235,134 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   }
 
   fun play() {
+    if (currentPlaybackSession == null) {
+      // Widget/headset/notification/system Play reached a service with nothing prepared
+      // (service or process was recreated). Rebuild the last session instead of no-op'ing.
+      DLog.marker("Playback restoration requested")
+      DLog.i(RESTORE_TAG, "Play received with no prepared session - attempting restore")
+      if (!restoreLastPlaybackSession(true)) onMediaButtonHandled()
+      return
+    }
+    DLog.i(RESTORE_TAG, "Play received - using existing player/session ${currentPlaybackSession?.mediaItemId}")
     if (currentPlayer.isPlaying) {
-      Log.d(tag, "Already playing")
+      DLog.d(tag, "Already playing")
       return
     }
     currentPlayer.volume = 1F
     currentPlayer.play()
+  }
+
+  /**
+   * Rebuilds the last playback session (identity from DeviceData.lastPlaybackSession, position from
+   * local/server progress, rate from saved user settings, queue from PlaybackRestoreStore).
+   * Only runs for an explicit play command; never at app launch.
+   * @return true if a restore was started
+   */
+  fun restoreLastPlaybackSession(playWhenReady: Boolean): Boolean {
+    if (isRestoringPlayback) {
+      DLog.i(RESTORE_TAG, "Restore already in progress")
+      return true
+    }
+    val saved = DeviceManager.deviceData.lastPlaybackSession
+    if (saved == null || !PlaybackRestoreStore.isResumable(this)) {
+      DLog.i(RESTORE_TAG, "Nothing to restore (hasLastSession=${saved != null}, resumable=${PlaybackRestoreStore.isResumable(this)})")
+      return false
+    }
+
+    isRestoringPlayback = true
+    val playbackRate = mediaManager.getSavedPlaybackRate()
+    DLog.i(RESTORE_TAG, "Restoring ${if (saved.isLocal) "downloaded" else "streamed"} item ${saved.mediaItemId} | rate=$playbackRate")
+
+    if (saved.isLocal) {
+      val localItem = DeviceManager.dbManager.getLocalLibraryItem(saved.localLibraryItemId)
+      val episode = saved.localEpisodeId?.let { epId -> (localItem?.media as? Podcast)?.episodes?.find { it.id == epId } }
+      if (localItem == null || (!saved.localEpisodeId.isNullOrEmpty() && episode == null)) {
+        failRestore("downloaded item no longer exists", permanent = true)
+        return false
+      }
+      if (localItem.isInvalid || !localItem.hasTracks(this, episode)) {
+        failRestore("downloaded item has no playable files", permanent = true)
+        return false
+      }
+      // Position comes from the local media progress saved on every sync
+      finishRestore(localItem.getPlaybackSession(episode, getDeviceInfo()), playWhenReady, playbackRate)
+      return true
+    }
+
+    val config = DeviceManager.getServerConnectionConfig(saved.serverConnectionConfigId)
+    val libraryItemId = saved.libraryItemId
+    if (config == null || libraryItemId.isNullOrEmpty()) {
+      failRestore("server connection for streamed item no longer saved", permanent = true)
+      return false
+    }
+    val activeConfigId = DeviceManager.serverConnectionConfig?.id ?: DeviceManager.deviceData.lastServerConnectionConfigId
+    if (activeConfigId != config.id) {
+      failRestore("streamed item belongs to a server that is not the current one", permanent = false)
+      return false
+    }
+    if (!DeviceManager.checkConnectivity(this)) {
+      failRestore("no network for streamed item", permanent = false)
+      return false
+    }
+    val connectivityManager = getSystemService(ConnectivityManager::class.java)
+    val streamingSetting = deviceSettings.streamingUsingCellular
+    if (connectivityManager?.isActiveNetworkMetered == true && streamingSetting != StreamingUsingCellularSetting.ALWAYS) {
+      failRestore("streaming on cellular is not allowed without confirmation ($streamingSetting)", permanent = false)
+      return false
+    }
+    if (DeviceManager.serverConnectionConfig == null) {
+      DLog.i(RESTORE_TAG, "Using saved server connection for restore")
+      DeviceManager.serverConnectionConfig = config
+    }
+
+    // A new server session returns the server's current progress for this item
+    apiHandler.playLibraryItem(libraryItemId, saved.episodeId, getPlayItemRequestPayload(false)) { session ->
+      Handler(Looper.getMainLooper()).post {
+        if (session == null) {
+          failRestore("server did not return a playback session", permanent = false)
+        } else {
+          finishRestore(session, playWhenReady, playbackRate)
+        }
+      }
+    }
+    return true
+  }
+
+  private fun finishRestore(session: PlaybackSession, playWhenReady: Boolean, playbackRate: Float) {
+    isRestoringPlayback = false
+    if (isServiceDestroyed) {
+      DLog.w(RESTORE_TAG, "Service destroyed before restore finished - dropping")
+      return
+    }
+    if (currentPlaybackSession != null) {
+      DLog.i(RESTORE_TAG, "Another session started while restoring - keeping it")
+      return
+    }
+
+    val savedQueue = PlaybackRestoreStore.loadQueue(this)
+    val queuedItem = savedQueue.items.getOrNull(savedQueue.index)
+    val sessionItemId = session.localLibraryItem?.id ?: session.libraryItemId
+    val sessionEpisodeId = if (session.isLocal) session.localEpisodeId else session.episodeId
+    if (queuedItem != null && queuedItem.libraryItemId == sessionItemId && queuedItem.episodeId == sessionEpisodeId) {
+      playlistQueue = savedQueue.items
+      playlistQueueIndex = savedQueue.index
+      DLog.i(RESTORE_TAG, "Queue restored (${savedQueue.items.size} items, index ${savedQueue.index})")
+    } else if (savedQueue.items.isNotEmpty()) {
+      DLog.i(RESTORE_TAG, "Saved queue does not match restored item - not restoring queue")
+    }
+
+    DLog.i(RESTORE_TAG, "Session rebuilt for ${session.mediaItemId} | position=${session.currentTime}s | rate=$playbackRate | playWhenReady=$playWhenReady")
+    preparePlayer(session, playWhenReady, playbackRate)
+  }
+
+  private fun failRestore(reason: String, permanent: Boolean) {
+    isRestoringPlayback = false
+    DLog.w(RESTORE_TAG, "Restore failed: $reason (permanent=$permanent)")
+    if (permanent) {
+      PlaybackRestoreStore.setResumable(this, false)
+      DeviceManager.widgetUpdater?.onPlayerClosed()
+    }
+    onMediaButtonHandled()
   }
 
   fun pause() {
@@ -1166,12 +1381,12 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
   fun seekPlayer(time: Long) {
     var timeToSeek = time
-    Log.d(tag, "seekPlayer mediaCount = ${currentPlayer.mediaItemCount} | $timeToSeek")
+    DLog.d(tag, "seekPlayer mediaCount = ${currentPlayer.mediaItemCount} | $timeToSeek")
     if (timeToSeek < 0) {
-      Log.w(tag, "seekPlayer invalid time $timeToSeek - setting to 0")
+      DLog.w(tag, "seekPlayer invalid time $timeToSeek - setting to 0")
       timeToSeek = 0L
     } else if (timeToSeek > getDuration()) {
-      Log.w(tag, "seekPlayer invalid time $timeToSeek - setting to MAX - 2000")
+      DLog.w(tag, "seekPlayer invalid time $timeToSeek - setting to MAX - 2000")
       timeToSeek = getDuration() - 2000L
     }
 
@@ -1179,7 +1394,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       currentPlaybackSession?.currentTime = timeToSeek / 1000.0
       val newWindowIndex = currentPlaybackSession?.getCurrentTrackIndex() ?: 0
       val newTimeOffset = currentPlaybackSession?.getCurrentTrackTimeMs() ?: 0
-      Log.d(tag, "seekPlayer seekTo $newWindowIndex | $newTimeOffset")
+      DLog.d(tag, "seekPlayer seekTo $newWindowIndex | $newTimeOffset")
       currentPlayer.seekTo(newWindowIndex, newTimeOffset)
     } else {
       currentPlayer.seekTo(timeToSeek)
@@ -1221,22 +1436,22 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   fun closePlayback(calledOnError: Boolean? = false) {
     playlistQueue = emptyList()
     playlistQueueIndex = -1
-    Log.d(tag, "closePlayback")
+    DLog.d(tag, "closePlayback")
     val config = DeviceManager.serverConnectionConfig
 
     val isLocal = mediaProgressSyncer.currentIsLocal
     val currentSessionId = mediaProgressSyncer.currentSessionId
     if (mediaProgressSyncer.listeningTimerRunning) {
-      Log.i(tag, "About to close playback so stopping media progress syncer first")
+      DLog.i(tag, "About to close playback so stopping media progress syncer first")
 
       mediaProgressSyncer.stop(
               calledOnError == false
       ) { // If closing on error then do not sync progress (causes exception)
-        Log.d(tag, "Media Progress syncer stopped")
+        DLog.d(tag, "Media Progress syncer stopped")
         // If not local session then close on server
         if (!isLocal && currentSessionId != "") {
           apiHandler.closePlaybackSession(currentSessionId, config) {
-            Log.d(tag, "Closed playback session $currentSessionId")
+            DLog.d(tag, "Closed playback session $currentSessionId")
           }
         }
       }
@@ -1244,7 +1459,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       // If not local session then close on server
       if (!isLocal && currentSessionId != "") {
         apiHandler.closePlaybackSession(currentSessionId, config) {
-          Log.d(tag, "Closed playback session $currentSessionId")
+          DLog.d(tag, "Closed playback session $currentSessionId")
         }
       }
     }
@@ -1253,12 +1468,15 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       currentPlayer.stop()
       currentPlayer.clearMediaItems()
     } catch (e: Exception) {
-      Log.e(tag, "Exception clearing exoplayer $e")
+      DLog.e(tag, "Exception clearing exoplayer $e")
     }
 
     currentPlaybackSession = null
     mediaProgressSyncer.reset()
     clientEventEmitter?.onPlaybackClosed()
+
+    // An explicit close (or fatal playback error) must not be revived by a later widget/headset Play
+    PlaybackRestoreStore.setResumable(this, false)
 
     PlayerListener.lastPauseTime = 0
     isClosed = true
@@ -1363,9 +1581,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   // Only allowing android auto or similar to access media browser service
   //  normal loading of audiobooks is handled in webview (not natively)
   private fun isValid(packageName: String, uid: Int): Boolean {
-    Log.d(tag, "onGetRoot: Checking package $packageName with uid $uid")
+    DLog.d(tag, "onGetRoot: Checking package $packageName with uid $uid")
     if (!VALID_MEDIA_BROWSERS.contains(packageName)) {
-      Log.d(tag, "onGetRoot: package $packageName not valid for the media browser service")
+      DLog.d(tag, "onGetRoot: package $packageName not valid for the media browser service")
       return false
     }
     return true
@@ -1517,7 +1735,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       }
       result.sendResult(localBrowseItems)
     } else if (parentMediaId == AUTO_MEDIA_ROOT) {
-      Log.d(tag, "Trying to initialize browseTree.")
+      DLog.d(tag, "Trying to initialize browseTree.")
       if (!this::browseTree.isInitialized || forceReloadingAndroidAuto) {
         forceReloadingAndroidAuto = false
         AbsLogger.info(tag, "onLoadChildren: Loading Android Auto items")
@@ -1534,7 +1752,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           onBrowseTreeInitialized()
           val children =
                   browseTree[parentMediaId]?.map { item ->
-                    Log.d(tag, "Found top menu item: ${item.description.title}")
+                    DLog.d(tag, "Found top menu item: ${item.description.title}")
                     MediaBrowserCompat.MediaItem(
                             item.description,
                             MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
@@ -1558,7 +1776,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           }
         }
       } else {
-        Log.d(tag, "Starting browseTree refresh")
+        DLog.d(tag, "Starting browseTree refresh")
         browseTree =
                 BrowseTree(
                         this,
@@ -1569,7 +1787,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         onBrowseTreeInitialized()
         val children =
                 browseTree[parentMediaId]?.map { item ->
-                  Log.d(tag, "Found top menu item: ${item.description.title}")
+                  DLog.d(tag, "Found top menu item: ${item.description.title}")
                   MediaBrowserCompat.MediaItem(
                           item.description,
                           MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
@@ -1581,7 +1799,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       }
     } else if (parentMediaId == LIBRARIES_ROOT || parentMediaId == RECENTLY_ROOT)
     {
-      Log.d(tag, "First load done: $firstLoadDone")
+      DLog.d(tag, "First load done: $firstLoadDone")
       if (!firstLoadDone)
       {
         result.sendResult(null)
@@ -1594,7 +1812,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         result.detach()
         waitForBrowseTree {
           val children = browseTree[parentMediaId]?.map { item ->
-            Log.d(tag, "[MENU: $parentMediaId] Showing list item ${item.description.title}")
+            DLog.d(tag, "[MENU: $parentMediaId] Showing list item ${item.description.title}")
             MediaBrowserCompat.MediaItem(
               item.description,
               MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
@@ -1607,7 +1825,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
 
       // Already initialized: just return
       val children = browseTree[parentMediaId]?.map { item ->
-        Log.d(tag, "[MENU: $parentMediaId] Showing list item ${item.description.title}")
+        DLog.d(tag, "[MENU: $parentMediaId] Showing list item ${item.description.title}")
         MediaBrowserCompat.MediaItem(
           item.description,
           MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
@@ -1615,7 +1833,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
       }
       result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
     } else if (mediaManager.getIsLibrary(parentMediaId)) { // Load library items for library
-      Log.d(tag, "Loading items for library $parentMediaId")
+      DLog.d(tag, "Loading items for library $parentMediaId")
       val selectedLibrary = mediaManager.getLibrary(parentMediaId)
       if (selectedLibrary?.mediaType == "podcast") { // Podcasts are browseable
         mediaManager.loadLibraryPodcasts(parentMediaId) { libraryItems ->
@@ -1677,17 +1895,17 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
       }
     } else if (parentMediaId.startsWith(RECENTLY_ROOT)) {
-      Log.d(tag, "Browsing recently $parentMediaId")
+      DLog.d(tag, "Browsing recently $parentMediaId")
       val mediaIdParts = parentMediaId.split("__")
       if (!mediaManager.getIsLibrary(mediaIdParts[2])) {
-        Log.d(tag, "${mediaIdParts[2]} is not library")
+        DLog.d(tag, "${mediaIdParts[2]} is not library")
         result.sendResult(null)
         return
       }
-      Log.d(tag, "Mediaparts: ${mediaIdParts.size} | $mediaIdParts")
+      DLog.d(tag, "Mediaparts: ${mediaIdParts.size} | $mediaIdParts")
       if (mediaIdParts.size == 3) {
         mediaManager.getLibraryRecentShelfs(mediaIdParts[2]) { availableShelfs ->
-          Log.d(tag, "Found ${availableShelfs.size} shelfs")
+          DLog.d(tag, "Found ${availableShelfs.size} shelfs")
           val children: MutableList<MediaBrowserCompat.MediaItem> = mutableListOf()
           for (shelf in availableShelfs) {
             if (shelf.type == "book") {
@@ -1854,7 +2072,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         }
       }
     } else if (parentMediaId.startsWith("__LIBRARY__")) {
-      Log.d(tag, "Browsing library $parentMediaId")
+      DLog.d(tag, "Browsing library $parentMediaId")
       val mediaIdParts = parentMediaId.split("__")
       /*
        MediaIdParts for Library
@@ -1869,15 +2087,15 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
        5: SeriesId: AUTHOR_SERIES
       */
       if (!mediaManager.getIsLibrary(mediaIdParts[2])) {
-        Log.d(tag, "${mediaIdParts[2]} is not library")
+        DLog.d(tag, "${mediaIdParts[2]} is not library")
         result.sendResult(null)
         return
       }
-      Log.d(tag, "$mediaIdParts")
+      DLog.d(tag, "$mediaIdParts")
       if (mediaIdParts[3] == "SERIES_LIST" && mediaIdParts.size == 5) {
-        Log.d(tag, "Loading series from library ${mediaIdParts[2]} with paging ${mediaIdParts[4]}")
+        DLog.d(tag, "Loading series from library ${mediaIdParts[2]} with paging ${mediaIdParts[4]}")
         mediaManager.loadLibrarySeriesWithAudio(mediaIdParts[2], mediaIdParts[4]) { seriesItems ->
-          Log.d(tag, "Received ${seriesItems.size} series")
+          DLog.d(tag, "Received ${seriesItems.size} series")
 
           val seriesLetters =
                   seriesItems
@@ -1916,9 +2134,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           }
         }
       } else if (mediaIdParts[3] == "SERIES_LIST") {
-        Log.d(tag, "Loading series from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading series from library ${mediaIdParts[2]}")
         mediaManager.loadLibrarySeriesWithAudio(mediaIdParts[2]) { seriesItems ->
-          Log.d(tag, "Received ${seriesItems.size} series")
+          DLog.d(tag, "Received ${seriesItems.size} series")
           if (seriesItems.size >
                           DeviceManager.deviceData.deviceSettings!!
                                   .androidAutoBrowseLimitForGrouping && seriesItems.size > 1
@@ -1950,10 +2168,10 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           }
         }
       } else if (mediaIdParts[3] == "SERIES") {
-        Log.d(tag, "Loading items for serie ${mediaIdParts[4]} from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading items for serie ${mediaIdParts[4]} from library ${mediaIdParts[2]}")
         mediaManager.loadLibrarySeriesItemsWithAudio(mediaIdParts[2], mediaIdParts[4]) {
                 libraryItems ->
-          Log.d(tag, "Received ${libraryItems.size} library items")
+          DLog.d(tag, "Received ${libraryItems.size} library items")
           var items = libraryItems
           if (DeviceManager.deviceData.deviceSettings!!.androidAutoBrowseSeriesSequenceOrder ===
                           AndroidAutoBrowseSeriesSequenceOrderSetting.DESC
@@ -1978,9 +2196,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
         }
       } else if (mediaIdParts[3] == "AUTHORS" && mediaIdParts.size == 5) {
-        Log.d(tag, "Loading authors from library ${mediaIdParts[2]} with paging ${mediaIdParts[4]}")
+        DLog.d(tag, "Loading authors from library ${mediaIdParts[2]} with paging ${mediaIdParts[4]}")
         mediaManager.loadAuthorsWithBooks(mediaIdParts[2], mediaIdParts[4]) { authorItems ->
-          Log.d(tag, "Received ${authorItems.size} authors")
+          DLog.d(tag, "Received ${authorItems.size} authors")
 
           val authorLetters =
                   authorItems
@@ -2019,9 +2237,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           }
         }
       } else if (mediaIdParts[3] == "AUTHORS") {
-        Log.d(tag, "Loading authors from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading authors from library ${mediaIdParts[2]}")
         mediaManager.loadAuthorsWithBooks(mediaIdParts[2]) { authorItems ->
-          Log.d(tag, "Received ${authorItems.size} authors")
+          DLog.d(tag, "Received ${authorItems.size} authors")
           if (authorItems.size >
                           DeviceManager.deviceData.deviceSettings!!
                                   .androidAutoBrowseLimitForGrouping && authorItems.size > 1
@@ -2117,9 +2335,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
         }
       } else if (mediaIdParts[3] == "COLLECTIONS") {
-        Log.d(tag, "Loading collections from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading collections from library ${mediaIdParts[2]}")
         mediaManager.loadLibraryCollectionsWithAudio(mediaIdParts[2]) { collectionItems ->
-          Log.d(tag, "Received ${collectionItems.size} collections")
+          DLog.d(tag, "Received ${collectionItems.size} collections")
           val children =
                   collectionItems.map { collectionItem ->
                     val description = collectionItem.getMediaDescription(null, ctx)
@@ -2131,10 +2349,10 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
         }
       } else if (mediaIdParts[3] == "COLLECTION") {
-        Log.d(tag, "Loading collection ${mediaIdParts[4]} books from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading collection ${mediaIdParts[4]} books from library ${mediaIdParts[2]}")
         mediaManager.loadLibraryCollectionBooksWithAudio(mediaIdParts[2], mediaIdParts[4]) {
                 libraryItems ->
-          Log.d(tag, "Received ${libraryItems.size} collections")
+          DLog.d(tag, "Received ${libraryItems.size} collections")
           val children =
                   libraryItems.map { libraryItem ->
                     val progress =
@@ -2153,9 +2371,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
           result.sendResult(children as MutableList<MediaBrowserCompat.MediaItem>?)
         }
       } else if (mediaIdParts[3] == "DISCOVERY") {
-        Log.d(tag, "Loading discovery from library ${mediaIdParts[2]}")
+        DLog.d(tag, "Loading discovery from library ${mediaIdParts[2]}")
         mediaManager.loadLibraryDiscoveryBooksWithAudio(mediaIdParts[2]) { libraryItems ->
-          Log.d(tag, "Received ${libraryItems.size} libraryItems for discovery")
+          DLog.d(tag, "Received ${libraryItems.size} libraryItems for discovery")
           val children =
                   libraryItems.map { libraryItem ->
                     val progress =
@@ -2177,7 +2395,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
         result.sendResult(null)
       }
     } else {
-      Log.d(tag, "Loading podcast episodes for podcast $parentMediaId")
+      DLog.d(tag, "Loading podcast episodes for podcast $parentMediaId")
       mediaManager.loadPodcastEpisodeMediaBrowserItems(parentMediaId, ctx) { result.sendResult(it) }
     }
   }
@@ -2189,7 +2407,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   ) {
     result.detach()
     if (cachedSearch != query) {
-      Log.d(tag, "Search bundle: $extras")
+      DLog.d(tag, "Search bundle: $extras")
       var foundBooks: MutableList<MediaBrowserCompat.MediaItem> = mutableListOf()
       var foundPodcasts: MutableList<MediaBrowserCompat.MediaItem> = mutableListOf()
       var foundSeries: MutableList<MediaBrowserCompat.MediaItem> = mutableListOf()
@@ -2216,7 +2434,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     }
     result.sendResult(cachedSearchResults)
     cachedSearch = query
-    Log.d(tag, "onSearch: Done")
+    DLog.d(tag, "onSearch: Done")
   }
 
   //
@@ -2231,7 +2449,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     mShakeDetector!!.setOnShakeListener(
             object : ShakeDetector.OnShakeListener {
               override fun onShake(count: Int) {
-                Log.d(tag, "PHONE SHAKE! $count")
+                DLog.d(tag, "PHONE SHAKE! $count")
                 sleepTimerManager.handleShake()
               }
             }
@@ -2241,12 +2459,12 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
   // Shake sensor used for sleep timer
   fun registerSensor() {
     if (isShakeSensorRegistered) {
-      Log.i(tag, "Shake sensor already registered")
+      DLog.i(tag, "Shake sensor already registered")
       return
     }
     shakeSensorUnregisterTask?.cancel()
 
-    Log.d(tag, "Registering shake SENSOR ${mAccelerometer?.isWakeUpSensor}")
+    DLog.d(tag, "Registering shake SENSOR ${mAccelerometer?.isWakeUpSensor}")
     val success =
             mSensorManager!!.registerListener(
                     mShakeDetector,
@@ -2264,7 +2482,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     shakeSensorUnregisterTask =
             Timer("ShakeUnregisterTimer", false).schedule(SLEEP_TIMER_WAKE_UP_EXPIRATION) {
               Handler(Looper.getMainLooper()).post {
-                Log.d(tag, "wake time expired: Unregistering shake sensor")
+                DLog.d(tag, "wake time expired: Unregistering shake sensor")
                 mSensorManager!!.unregisterListener(mShakeDetector)
                 isShakeSensorRegistered = false
               }
@@ -2291,7 +2509,7 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
                               networkCapabilities.hasCapability(
                                       NetworkCapabilities.NET_CAPABILITY_INTERNET
                               )
-              Log.i(
+              DLog.i(
                       tag,
                       "Network capabilities changed. hasNetworkConnectivity=$hasNetworkConnectivity | isUnmeteredNetwork=$isUnmeteredNetwork"
               )

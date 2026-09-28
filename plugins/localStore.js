@@ -50,6 +50,26 @@ class LocalStorage {
     }
   }
 
+  // Display copy of the Up Next queue so a restarted UI can show a queue the native player kept or restored
+  async setPlaybackQueue(queue) {
+    try {
+      if (queue) await Preferences.set({ key: 'playbackQueue', value: JSON.stringify(queue) })
+      else await Preferences.remove({ key: 'playbackQueue' })
+    } catch (error) {
+      console.error('[LocalStorage] Failed to set playback queue', error)
+    }
+  }
+
+  async getPlaybackQueue() {
+    try {
+      const obj = (await Preferences.get({ key: 'playbackQueue' })) || {}
+      return obj.value ? JSON.parse(obj.value) : null
+    } catch (error) {
+      console.error('[LocalStorage] Failed to get playback queue', error)
+      return null
+    }
+  }
+
   async getPlayerSettings() {
     try {
       const playerSettingsObj = await Preferences.get({ key: 'playerSettings' }) || {}

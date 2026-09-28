@@ -46,6 +46,32 @@ class AbsLoggerWeb extends WebPlugin {
   async clearLogs() {
     this.logs = []
   }
+
+  // Diagnostic logging is native-only; web stubs keep the UI usable in browser development
+  async logBatch() {}
+  async getDiagnosticLevel() {
+    return { level: 'NORMAL' }
+  }
+  async setDiagnosticLevel({ level }) {
+    return { level }
+  }
+  async addDiagnosticMarker() {}
+  async readDiagnosticLog() {
+    const text = this.logs.map((log) => `${new Date(log.timestamp).toISOString()} ${log.level[0].toUpperCase()} JS/${log.tag}: ${log.message}`).join('\n')
+    return { text, totalBytes: text.length, truncated: false, level: 'NORMAL' }
+  }
+  async getDiagnosticInfo() {
+    return { level: 'NORMAL', totalBytes: 0, maxBytes: 0 }
+  }
+  async shareDiagnosticLog() {
+    throw new Error('Sharing diagnostic logs is only available in the Android app')
+  }
+  async saveDiagnosticLog() {
+    throw new Error('Saving diagnostic logs is only available in the Android app')
+  }
+  async clearDiagnosticLog() {
+    this.logs = []
+  }
 }
 
 const AbsLogger = registerPlugin('AbsLogger', {

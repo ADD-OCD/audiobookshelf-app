@@ -1,5 +1,6 @@
 package app.absplus.android
 
+import app.absplus.android.diagnostics.DLog
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -16,6 +17,7 @@ import androidx.media.session.MediaButtonReceiver
 import app.absplus.android.data.PlaybackSession
 import app.absplus.android.device.DeviceManager
 import app.absplus.android.managers.DbManager
+import app.absplus.android.managers.PlaybackRestoreStore
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.AppWidgetTarget
@@ -27,11 +29,11 @@ import com.bumptech.glide.request.transition.Transition
 class MediaPlayerWidget : AppWidgetProvider() {
   val tag = "MediaPlayerWidget"
   override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
-    Log.d(tag, "onUpdate $appWidgetIds")
+    DLog.d(tag, "onUpdate $appWidgetIds")
   }
 
   override fun onEnabled(context: Context) {
-    Log.i(tag, "onEnabled check context ${context.packageName}")
+    DLog.i(tag, "onEnabled check context ${context.packageName}")
 
     DbManager.initialize(context)
 
@@ -39,9 +41,10 @@ class MediaPlayerWidget : AppWidgetProvider() {
       val appWidgetManager = AppWidgetManager.getInstance(context)
       val componentName = ComponentName(context, MediaPlayerWidget::class.java)
       val ids = appWidgetManager.getAppWidgetIds(componentName)
-      Log.d(tag, "Setting initial widget state with last playback session ${it.displayTitle}")
+      DLog.d(tag, "Setting initial widget state with last playback session ${it.displayTitle}")
+      val showControls = PlaybackRestoreStore.isResumable(context)
       for (widgetId in ids) {
-        updateAppWidget(context, appWidgetManager, widgetId, it, false, true)
+        updateAppWidget(context, appWidgetManager, widgetId, it, false, showControls)
       }
     }
 
@@ -50,10 +53,14 @@ class MediaPlayerWidget : AppWidgetProvider() {
   }
 }
 
-internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, playbackSession: PlaybackSession?, isPlaying:Boolean, isAppClosed:Boolean) {
+/**
+ * @param showControls true when there is a live session or a resumable one (Play restores it);
+ *   false only when nothing can be played, e.g. after the user explicitly closed playback
+ */
+internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, playbackSession: PlaybackSession?, isPlaying:Boolean, showControls:Boolean) {
   val tag = "MediaPlayerWidget"
   val views = RemoteViews(context.packageName, R.layout.media_player_widget)
-  Log.i(tag, "updateAppWidget ${playbackSession?.displayTitle ?: "No Title"} isPlaying=$isPlaying isAppClosed=$isAppClosed")
+  DLog.i(tag, "updateAppWidget ${playbackSession?.displayTitle ?: "No Title"} isPlaying=$isPlaying showControls=$showControls")
   val wholeWidgetClickI = Intent(context, MainActivity::class.java)
   wholeWidgetClickI.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
   val wholeWidgetClickPI = PendingIntent.getActivity(
@@ -73,7 +80,7 @@ internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManage
   views.setOnClickPendingIntent(R.id.widgetRewindButton, rewindPI)
 
   // Show/Hide button container
-  views.setViewVisibility(R.id.widgetButtonContainer, if (isAppClosed) View.GONE else View.VISIBLE)
+  views.setViewVisibility(R.id.widgetButtonContainer, if (showControls) View.VISIBLE else View.GONE)
 
   views.setOnClickPendingIntent(R.id.widgetBackground, wholeWidgetClickPI)
 
@@ -93,7 +100,6 @@ internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManage
   val options = RequestOptions().override(300, 300).placeholder(R.drawable.icon).error(R.drawable.icon)
   Glide.with(context.applicationContext).asBitmap().load(imageUri).apply(options).into(awt)
 
-  Log.i(tag, "Update App Widget | Is Playing=$isPlaying | isAppClosed=$isAppClosed")
 
   val playPauseResource = if (isPlaying) androidx.mediarouter.R.drawable.ic_media_pause_dark else androidx.mediarouter.R.drawable.ic_media_play_dark
   views.setImageViewResource(R.id.widgetPlayPauseButton, playPauseResource)

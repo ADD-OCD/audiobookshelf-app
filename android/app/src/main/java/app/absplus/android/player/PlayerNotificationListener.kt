@@ -1,5 +1,6 @@
 package app.absplus.android.player
 
+import app.absplus.android.diagnostics.DLog
 import android.app.Notification
 import android.content.pm.ServiceInfo
 import android.os.Build
@@ -32,12 +33,12 @@ class PlayerNotificationListener(var playerNotificationService:PlayerNotificatio
     if (effectiveOnGoing) {
       if (!isForegroundService) {
         // Start foreground service for the first time
-        Log.d(tag, "Notification Posted $notificationId - Start Foreground | onGoing=$onGoing hasPlaylistQueue=$hasPlaylistQueue playWhenReady=$playerWantsToPlay")
+        DLog.d(tag, "Notification Posted $notificationId - Start Foreground | onGoing=$onGoing hasPlaylistQueue=$hasPlaylistQueue playWhenReady=$playerWantsToPlay")
         PlayerNotificationService.isClosed = false
       } else if (!onGoing && hasPlaylistQueue && playerWantsToPlay) {
         // Player not actively playing but intends to continue (e.g. between episodes):
         // re-assert foreground to prevent system from downgrading the service
-        Log.d(tag, "Notification Posted $notificationId - Re-assert Foreground for playlist queue | onGoing=$onGoing hasPlaylistQueue=$hasPlaylistQueue playWhenReady=$playerWantsToPlay")
+        DLog.d(tag, "Notification Posted $notificationId - Re-assert Foreground for playlist queue | onGoing=$onGoing hasPlaylistQueue=$hasPlaylistQueue playWhenReady=$playerWantsToPlay")
       } else {
         // Already in foreground and ongoing - just update the notification
         return
@@ -50,7 +51,7 @@ class PlayerNotificationListener(var playerNotificationService:PlayerNotificatio
       }
       isForegroundService = true
     } else {
-      Log.d(tag, "Notification posted $notificationId, not starting foreground - onGoing=$onGoing | hasPlaylistQueue=$hasPlaylistQueue | playWhenReady=$playerWantsToPlay | isForegroundService=$isForegroundService")
+      DLog.d(tag, "Notification posted $notificationId, not starting foreground - onGoing=$onGoing | hasPlaylistQueue=$hasPlaylistQueue | playWhenReady=$playerWantsToPlay | isForegroundService=$isForegroundService")
     }
   }
 
@@ -66,18 +67,18 @@ class PlayerNotificationListener(var playerNotificationService:PlayerNotificatio
       // or if Bluetooth disconnected (playWhenReady == false), allow the stop.
       val playerWantsToPlay = playerNotificationService.currentPlayer.playWhenReady
       if (hasPlaylistQueue && playerWantsToPlay) {
-        Log.d(tag, "onNotificationCancelled dismissed by user but playlist queue active and playWhenReady - keeping service alive")
+        DLog.d(tag, "onNotificationCancelled dismissed by user but playlist queue active and playWhenReady - keeping service alive")
         return
       }
-      Log.d(tag, "onNotificationCancelled dismissed by user | hasPlaylistQueue=$hasPlaylistQueue | playWhenReady=$playerWantsToPlay")
+      DLog.d(tag, "onNotificationCancelled dismissed by user | hasPlaylistQueue=$hasPlaylistQueue | playWhenReady=$playerWantsToPlay")
       playerNotificationService.stopSelf()
     } else {
-      Log.d(tag, "onNotificationCancelled not dismissed by user | hasPlaylistQueue=$hasPlaylistQueue")
+      DLog.d(tag, "onNotificationCancelled not dismissed by user | hasPlaylistQueue=$hasPlaylistQueue")
 
       if (PlayerNotificationService.isSwitchingPlayer) {
         // When switching from cast player to exo player and vice versa the notification is cancelled and posted again
           // so we don't want to cancel the playback during this switch
-        Log.d(tag, "PNS is switching player")
+        DLog.d(tag, "PNS is switching player")
         PlayerNotificationService.isSwitchingPlayer = false
       }
     }
