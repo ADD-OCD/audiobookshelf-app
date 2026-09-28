@@ -182,19 +182,24 @@
 
       <!-- Diagnostics -->
       <p class="uppercase text-xs font-semibold text-fg-muted mb-2 mt-10">{{ $strings.HeaderDiagnostics }}</p>
-      <div class="py-3 flex items-center">
-        <p class="pr-4 w-36">{{ $strings.LabelDiagnosticLogging }}</p>
+      <!-- Wraps so the picker moves below the label at large font sizes instead of covering it -->
+      <div class="py-3 flex flex-wrap items-center gap-y-2">
+        <p class="pr-4 w-36 min-w-min">{{ $strings.LabelDiagnosticLogging }}</p>
         <div @click.stop="showDiagnosticLevelOptions">
           <ui-text-input :value="diagnosticLevelOption" readonly append-icon="expand_more" style="max-width: 200px" />
         </div>
       </div>
       <p class="text-xs text-fg-muted pb-2">{{ $strings.MessageDiagnosticLoggingHelp }}</p>
       <p v-if="diagnosticLogBytes !== null" class="text-xs text-fg-muted pb-3">{{ $strings.LabelDiagnosticLogSize }}: {{ $bytesPretty(diagnosticLogBytes) }}</p>
-      <div class="flex flex-wrap gap-2 pb-4">
-        <ui-btn small @click="viewDiagnosticLog">{{ $strings.ButtonViewDiagnosticLog }}</ui-btn>
-        <ui-btn small @click="shareDiagnosticLog">{{ $strings.ButtonShareDiagnosticLog }}</ui-btn>
-        <ui-btn small @click="addDiagnosticMarker">{{ $strings.ButtonAddDiagnosticMarker }}</ui-btn>
-        <ui-btn small @click="clearDiagnosticLog">{{ $strings.ButtonClearDiagnosticLog }}</ui-btn>
+      <p class="text-sm font-semibold mb-2">{{ $strings.LabelLogActions }}</p>
+      <!-- Wraps to more rows on narrow screens / large font sizes; labels never shrink or truncate -->
+      <div class="flex flex-wrap gap-2 pb-4" role="group" :aria-label="$strings.LabelLogActions">
+        <ui-btn v-for="action in diagnosticLogActions" :key="action.id" small :aria-label="action.ariaLabel" :loading="(action.id === 'share' && isSharingDiagnosticLog) || (action.id === 'save' && isSavingDiagnosticLog)" class="min-h-12" @click="action.handler">
+          <span class="flex items-center whitespace-nowrap">
+            <span class="material-symbols text-lg leading-none mr-1" aria-hidden="true">{{ action.icon }}</span>
+            <span>{{ action.text }}</span>
+          </span>
+        </ui-btn>
       </div>
     </template>
 
@@ -534,9 +539,6 @@ export default {
     showDiagnosticLevelOptions() {
       this.moreMenuSetting = 'diagnosticLevel'
       this.showMoreMenuDialog = true
-    },
-    viewDiagnosticLog() {
-      this.$router.push('/logs')
     },
     clickMenuAction(action) {
       this.showMoreMenuDialog = false

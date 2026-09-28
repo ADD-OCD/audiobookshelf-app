@@ -1,6 +1,13 @@
 package app.absplus.android.plugins
 
+import android.app.Activity
 import android.content.ClipData
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
+import androidx.activity.result.ActivityResult
+import app.absplus.android.diagnostics.DLog
+import com.getcapacitor.annotation.ActivityCallback
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -158,20 +165,96 @@ class AbsLogger : Plugin() {
     }
   }
 
+  private fun defaultExportFilename(): String {
+    val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+    return "absplus-diagnostics-${BuildConfig.VERSION_NAME}-$stamp.txt"
+  }
+
+  /**
+   * The single export generator used by both Share and Save, so their content can't diverge:
+   * sanitized diagnostic header followed by the full (already sanitized) diagnostic timeline.
+   * Must be called off the main thread; [header] must be built on the main thread.
+   */
+  private fun generateSanitizedDiagnosticExport(header: String, filename: String): File {
+    val dir = File(context.cacheDir, "diagnostics-export").apply { mkdirs() }
+    dir.listFiles()?.forEach { it.delete() }
+    val file = File(dir, filename)
+    DiagnosticLog.exportTo(file, header)
+    return file
+  }
+
   @PluginMethod
   fun shareDiagnosticLog(call: PluginCall) {
     // Header reads player state, which must happen on the main thread
     activity.runOnUiThread { exportAndShare(call, buildDiagnosticHeader()) }
   }
 
+  /**
+   * Save the diagnostic export to a location the user picks with Android's standard Save As
+   * (Storage Access Framework ACTION_CREATE_DOCUMENT) - no storage permission needed.
+   */
+  @PluginMethod
+  fun saveDiagnosticLog(call: PluginCall) {
+    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+      addCategory(Intent.CATEGORY_OPENABLE)
+      type = "text/plain"
+      putExtra(Intent.EXTRA_TITLE, defaultExportFilename())
+    }
+    try {
+      startActivityForResult(call, intent, "onSaveDiagnosticLogResult")
+    } catch (e: Exception) {
+      DLog.e("Diagnostics", "Save diagnostic log: could not open the Save As picker: ${e.javaClass.simpleName}: ${e.message}")
+      call.reject("Could not open the Save As screen on this device")
+    }
+  }
+
+  @ActivityCallback
+  private fun onSaveDiagnosticLogResult(call: PluginCall?, result: ActivityResult) {
+    if (call == null) return
+    val uri = result.data?.data
+    if (result.resultCode != Activity.RESULT_OK || uri == null) {
+      // User backed out of the picker: nothing was created, not an error
+      val ret = JSObject()
+      ret.put("cancelled", true)
+      call.resolve(ret)
+      return
+    }
+    val header = buildDiagnosticHeader()
+    val displayName = queryDisplayName(uri) ?: defaultExportFilename()
+    ioExecutor.execute {
+      try {
+        val export = generateSanitizedDiagnosticExport(header, defaultExportFilename())
+        val out = context.contentResolver.openOutputStream(uri, "wt") ?: throw IllegalStateException("provider returned no output stream")
+        out.use { stream -> export.inputStream().use { it.copyTo(stream) } }
+        val bytes = export.length()
+        export.delete()
+        DLog.i("Diagnostics", "Diagnostic log saved to device ($bytes bytes)")
+        val ret = JSObject()
+        ret.put("cancelled", false)
+        ret.put("displayName", displayName)
+        ret.put("bytes", bytes)
+        call.resolve(ret)
+      } catch (e: Exception) {
+        DLog.e("Diagnostics", "Save diagnostic log failed: ${e.javaClass.simpleName}: ${e.message}")
+        // Don't leave an empty/partial document behind
+        try { DocumentsContract.deleteDocument(context.contentResolver, uri) } catch (_: Exception) {}
+        call.reject("The selected location could not be written to")
+      }
+    }
+  }
+
+  private fun queryDisplayName(uri: Uri): String? = try {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+      if (c.moveToFirst()) c.getString(0) else null
+    }
+  } catch (e: Exception) {
+    null
+  }
+
   private fun exportAndShare(call: PluginCall, header: String) {
     ioExecutor.execute {
       try {
-        val dir = File(context.cacheDir, "diagnostics-export").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-        val file = File(dir, "absplus-diagnostics-${BuildConfig.VERSION_NAME}-$stamp.txt")
-        DiagnosticLog.exportTo(file, header)
+        val file = generateSanitizedDiagnosticExport(header, defaultExportFilename())
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND).apply {
           type = "text/plain"
@@ -269,6 +352,6 @@ class AbsLogger : Plugin() {
     sb.appendLine("Timestamps: device local time with UTC offset. Format: time level source/tag (pid): message  (N = native, JS = app UI)")
     sb.appendLine("==========================================")
     sb.appendLine()
-    return DiagnosticSanitizer.sanitize(sb.toString())
+    return DiagnosticLog.safeSanitize(sb.toString())
   }
 }

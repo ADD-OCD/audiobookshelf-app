@@ -66,6 +66,9 @@ class AbsLoggerWeb extends WebPlugin {
   async shareDiagnosticLog() {
     throw new Error('Sharing diagnostic logs is only available in the Android app')
   }
+  async saveDiagnosticLog() {
+    throw new Error('Saving diagnostic logs is only available in the Android app')
+  }
   async clearDiagnosticLog() {
     this.logs = []
   }

@@ -2,10 +2,11 @@
   <div class="w-full h-full py-4 flex flex-col">
     <div class="flex items-center mb-1 space-x-2 px-4">
       <p class="text-lg font-bold">{{ $strings.ButtonLogs }}</p>
-      <ui-icon-btn outlined borderless :icon="isCopied ? 'check' : 'content_copy'" @click="copyToClipboard" />
-      <ui-icon-btn outlined borderless icon="share" :loading="isSharingDiagnosticLog" @click="shareDiagnosticLog" />
+      <ui-icon-btn outlined borderless :icon="isCopied ? 'check' : 'content_copy'" :aria-label="$strings.ButtonCopyLog" @click="copyToClipboard" />
+      <ui-icon-btn outlined borderless icon="download" :aria-label="$strings.ButtonSaveDiagnosticLog" :loading="isSavingDiagnosticLog" @click="saveDiagnosticLog" />
+      <ui-icon-btn outlined borderless icon="share" :aria-label="$strings.ButtonShareDiagnosticLog" :loading="isSharingDiagnosticLog" @click="shareDiagnosticLog" />
       <div class="flex-grow"></div>
-      <ui-icon-btn outlined borderless icon="more_vert" @click="showDialog = true" />
+      <ui-icon-btn outlined borderless icon="more_vert" :aria-label="$strings.LabelMore" @click="showDialog = true" />
     </div>
     <p class="px-4 text-xs text-fg-muted">
       {{ $strings.LabelDiagnosticLogging }}: {{ diagnosticLevelOption }}
