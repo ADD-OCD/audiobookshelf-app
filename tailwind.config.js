@@ -1,4 +1,11 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
+const plugin = require('tailwindcss/plugin')
+const themeEngine = require('./theme/engine')
+
+// Built-in themes are validated data (theme/builtins.js); a broken built-in fails the build
+if (themeEngine.BUILTIN_ERRORS.length) {
+  throw new Error(`Invalid built-in theme data:\n${themeEngine.BUILTIN_ERRORS.join('\n')}`)
+}
 
 module.exports = {
   content: ['components/**/*.vue', 'layouts/**/*.vue', 'pages/**/*.vue', 'mixins/**/*.js', 'plugins/**/*.js'],
@@ -20,12 +27,12 @@ module.exports = {
         'track-cursor': 'rgb(var(--color-track-cursor) / <alpha-value>)',
         track: 'rgb(var(--color-track) / <alpha-value>)',
         'track-buffered': 'rgb(var(--color-track-buffered) / <alpha-value>)',
-        accent: '#1ad691',
-        error: '#FF5252',
-        info: '#2196F3',
-        success: '#4CAF50',
-        successDark: '#3b8a3e',
-        warning: '#FB8C00'
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        error: 'rgb(var(--color-error) / <alpha-value>)',
+        info: 'rgb(var(--color-info) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        successDark: 'rgb(var(--color-success-dark) / <alpha-value>)',
+        warning: 'rgb(var(--color-warning) / <alpha-value>)'
       },
       cursor: {
         none: 'none'
@@ -59,5 +66,8 @@ module.exports = {
       }
     }
   },
-  plugins: []
+  plugins: [
+    // Emits each built-in theme's token variables (:root = default theme, html[data-theme='<id>'] for others)
+    plugin(({ addBase }) => addBase(themeEngine.builtinThemeRules()))
+  ]
 }
