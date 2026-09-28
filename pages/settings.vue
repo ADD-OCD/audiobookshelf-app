@@ -400,20 +400,7 @@ export default {
       return this.getJumpLabel(this.settings.jumpBackwardsTime)
     },
     themeOptionItems() {
-      return [
-        {
-          text: this.$strings.LabelThemeBlack,
-          value: 'black'
-        },
-        {
-          text: this.$strings.LabelThemeDark,
-          value: 'dark'
-        },
-        {
-          text: this.$strings.LabelThemeLight,
-          value: 'light'
-        }
-      ]
+      return this.$theme.themes.map((theme) => ({ text: this.$strings[theme.labelKey], value: theme.id }))
     },
     shakeSensitivityOption() {
       const item = this.shakeSensitivityItems.find((i) => i.value === this.settings.shakeSensitivity)
@@ -573,9 +560,8 @@ export default {
         this.saveSettings()
       }
     },
-    saveTheme(theme) {
-      document.documentElement.dataset.theme = theme
-      this.$localStore.setTheme(theme)
+    async saveTheme(theme) {
+      this.theme = await this.$theme.select(theme)
     },
     autoSleepTimerTimeUpdated(val) {
       if (!val) return // invalid times return falsy
@@ -717,7 +703,8 @@ export default {
     },
     async init() {
       this.loading = true
-      this.theme = (await this.$localStore.getTheme()) || 'dark'
+      await this.$theme.ready
+      this.theme = this.$theme.id
       this.deviceData = await this.$db.getDeviceData()
       this.$store.commit('setDeviceData', this.deviceData)
       this.setDeviceSettings()

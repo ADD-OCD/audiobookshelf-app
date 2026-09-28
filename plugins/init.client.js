@@ -3,20 +3,13 @@ import vClickOutside from 'v-click-outside'
 import { App } from '@capacitor/app'
 import { Dialog } from '@capacitor/dialog'
 import { AbsFileSystem } from '@/plugins/capacitor'
-import { StatusBar, Style } from '@capacitor/status-bar'
+import { StatusBar } from '@capacitor/status-bar'
 import { Clipboard } from '@capacitor/clipboard'
 import { Capacitor } from '@capacitor/core'
 import { formatDistance, format, addDays, isDate, setDefaultOptions } from 'date-fns'
 import * as locale from 'date-fns/locale'
 
 Vue.directive('click-outside', vClickOutside.directive)
-
-if (Capacitor.getPlatform() != 'web') {
-  const setStatusBarStyleDark = async () => {
-    await StatusBar.setStyle({ style: Style.Dark })
-  }
-  setStatusBarStyleDark()
-}
 
 Vue.prototype.$showHideStatusBar = async (show) => {
   if (Capacitor.getPlatform() === 'web') return
@@ -273,13 +266,6 @@ export default ({ store, app }, inject) => {
   inject('eventBus', eventBus)
 
   inject('isValidVersion', isValidVersion)
-
-  // Set theme
-  app.$localStore?.getTheme()?.then((theme) => {
-    if (theme) {
-      document.documentElement.dataset.theme = theme
-    }
-  })
 
   // iOS Only
   //  backButton event does not work with iOS swipe navigation so use this workaround
