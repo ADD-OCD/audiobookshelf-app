@@ -73,6 +73,20 @@ it stays simple, never collides, and never complicates eventual Google Play publ
 requires each upload's `versionCode` to be strictly greater than the last, which this trivially
 satisfies).
 
+## Development baselines
+
+Milestones on `plus` that weren't distributed builds, so they have no `versionCode` row above.
+
+**`615e981f`: upstream v0.14.2-beta synchronization (2026-09-28).**
+
+- Upstream `advplyr/audiobookshelf-app` is synchronized through `7014e04e` (v0.14.2-beta), and `plus` is 0 commits behind it.
+- `versionName` is `0.14.2-beta`, matching the upstream base. `versionCode` stays 129, and 130 is still unused.
+- The five stale queue tests left over from the download-only design were repaired to match the intentional "stream past download gaps" behavior. Coverage was expanded.
+- Automated results: JS tests 28/28, Kotlin unit tests 42/42. Debug build, release Kotlin compile, `lintDebug` (0 errors / 122 warnings), `lintVitalRelease` and Android CI all passed.
+- Emulator regression validation passed on an AOSP API 35 emulator against a local test server. The results are in `docs/device-regression-checklist.md`.
+- **Physical-device validation is still pending.** It will be run on the Samsung Galaxy S22 Ultra test device using `docs/device-regression-checklist.md`.
+- The emulator found a **pre-existing** issue: with no player service running, `KEYCODE_MEDIA_PLAY` and `KEYCODE_HEADSETHOOK` don't restore the last session, while `KEYCODE_MEDIA_PLAY_PAUSE` (the widget) does. It is recorded in `docs/device-regression-checklist.md` (section 3, item 6). It must be verified on physical hardware before any change is made.
+
 ## Announcements
 
 Audiobookshelf+ has no in-app "what's new"/announcements screen (checked during the v0.14.0
