@@ -1340,10 +1340,9 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     }
 
     val savedQueue = PlaybackRestoreStore.loadQueue(this)
-    val queuedItem = savedQueue.items.getOrNull(savedQueue.index)
     val sessionItemId = session.localLibraryItem?.id ?: session.libraryItemId
     val sessionEpisodeId = if (session.isLocal) session.localEpisodeId else session.episodeId
-    if (queuedItem != null && queuedItem.libraryItemId == sessionItemId && queuedItem.episodeId == sessionEpisodeId) {
+    if (PlaybackRestoreStore.queueForRestoredItem(savedQueue, sessionItemId, sessionEpisodeId) != null) {
       playlistQueue = savedQueue.items
       playlistQueueIndex = savedQueue.index
       DLog.i(RESTORE_TAG, "Queue restored (${savedQueue.items.size} items, index ${savedQueue.index})")

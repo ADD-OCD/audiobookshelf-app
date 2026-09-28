@@ -36,6 +36,15 @@ object PlaybackRestoreStore {
     prefs(ctx).edit().putString(KEY_QUEUE, arr.toString()).putInt(KEY_QUEUE_INDEX, index).apply()
   }
 
+  /**
+   * The saved queue, only if its current entry is exactly the item being restored (same item and
+   * episode identity); otherwise the queue is stale and must not be reattached to this session.
+   */
+  fun queueForRestoredItem(saved: SavedQueue, itemId: String?, episodeId: String?): SavedQueue? {
+    val queuedItem = saved.items.getOrNull(saved.index) ?: return null
+    return if (queuedItem.libraryItemId == itemId && queuedItem.episodeId == episodeId) saved else null
+  }
+
   fun loadQueue(ctx: Context): SavedQueue {
     return try {
       val arr = JSONArray(prefs(ctx).getString(KEY_QUEUE, null) ?: "[]")
