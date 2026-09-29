@@ -266,6 +266,11 @@ class AbsDatabaseWeb extends WebPlugin {
     return deviceData
   }
 
+  async refreshWidgets() {
+    // No home-screen widgets on web
+    return null
+  }
+
   async getMediaItemHistory({ mediaId }) {
     console.log('Get media item history', mediaId)
     return {

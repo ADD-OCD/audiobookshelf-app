@@ -106,6 +106,7 @@ async function loadThemePlugin(stored) {
     StatusBar: { setStyle: async (o) => calls.push(o.style) },
     Style: { Dark: 'DARK', Light: 'LIGHT' },
     themeEngine: engine,
+    AbsDatabase: { refreshWidgets: async () => {} },
     document: { documentElement: root },
     console: { ...console, error: () => {} }
   }

@@ -249,19 +249,26 @@ test('system-bar tokens match the native window background and current light-ico
 })
 
 // ThemeService (plugins/theme.client.js) with mocked Vue/Capacitor/document boundaries
-async function loadThemePlugin({ platform = 'android', stored = null, getThemeFails = false } = {}) {
+async function loadThemePlugin({ platform = 'android', stored = null, getThemeFails = false, refreshFails = false } = {}) {
   const source =
     (await read('../plugins/theme.client.js'))
       .replace(/^import .*$/gm, '')
       .replace('export class ThemeService', 'class ThemeService')
       .replace('export default', 'globalThis.plugin =') + '\nglobalThis.ThemeService = ThemeService'
-  const calls = { setStyle: [], setTheme: [] }
+  const calls = { setStyle: [], setTheme: [], refreshWidgets: [] }
   const store = { value: stored }
   const localStore = {
     getTheme: async () => (getThemeFails ? false : store.value),
     setTheme: async (value) => {
       calls.setTheme.push(value)
       store.value = value
+    }
+  }
+  const AbsDatabase = {
+    refreshWidgets: async (...args) => {
+      // records what was saved when the bridge was called, and any arguments (there must be none)
+      calls.refreshWidgets.push({ saved: store.value, args })
+      if (refreshFails) throw new Error('not implemented')
     }
   }
   const root = { dataset: {} }
@@ -271,6 +278,7 @@ async function loadThemePlugin({ platform = 'android', stored = null, getThemeFa
     StatusBar: { setStyle: async (options) => calls.setStyle.push(options.style) },
     Style: { Dark: 'DARK', Light: 'LIGHT' },
     themeEngine: engine,
+    AbsDatabase,
     document: { documentElement: root },
     console: { ...console, error: () => {} }
   }
@@ -307,6 +315,29 @@ test('selecting a theme applies and persists only valid ids', async () => {
   assert.equal(await service.select('<script>alert(1)</script>'), 'dark')
   assert.equal(root.dataset.theme, 'dark')
   assert.equal(store.value, 'dark')
+})
+
+test('selecting a theme asks the native widget to redraw after persisting, with no arguments', async () => {
+  const { service, calls } = await loadThemePlugin({ stored: 'dark' })
+  assert.deepEqual(calls.refreshWidgets, []) // restoring at startup never refreshes
+  await service.select('llama')
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(
+    calls.refreshWidgets.map((c) => c.saved),
+    ['llama']
+  )
+  assert.deepEqual(calls.refreshWidgets[0].args, [])
+})
+
+test('widget refresh failures never break a selection; web never calls the bridge', async () => {
+  const failing = await loadThemePlugin({ stored: 'dark', refreshFails: true })
+  assert.equal(await failing.service.select('light'), 'light')
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(failing.store.value, 'light')
+  const web = await loadThemePlugin({ platform: 'web', stored: 'dark' })
+  await web.service.select('llama')
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(web.calls.refreshWidgets, [])
 })
 
 test('the status-bar icon style follows the theme token; web never touches the native status bar', async () => {

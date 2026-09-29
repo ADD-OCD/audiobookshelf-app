@@ -2,6 +2,7 @@ import Vue from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import themeEngine from '@/theme/engine'
+import { AbsDatabase } from '@/plugins/capacitor/AbsDatabase'
 
 /**
  * The single place the app applies a theme (see docs/theme-architecture.md).
@@ -12,11 +13,12 @@ import themeEngine from '@/theme/engine'
  * A future token provider (e.g. Follow Device/System) would plug in here, not in components.
  */
 export class ThemeService {
-  constructor({ localStore, root, platform, statusBar }) {
+  constructor({ localStore, root, platform, statusBar, widgets }) {
     this.localStore = localStore
     this.root = root
     this.platform = platform
     this.statusBar = statusBar
+    this.widgets = widgets
     this.state = Vue.observable({ id: themeEngine.DEFAULT_THEME_ID })
     this.ready = Promise.resolve()
   }
@@ -53,7 +55,19 @@ export class ThemeService {
   async select(requestedId) {
     const id = this.apply(requestedId)
     await this.localStore.setTheme(id)
+    this.refreshWidgets()
     return id
+  }
+
+  /**
+   * Tells the native home-screen widget the saved theme changed so it redraws. Nothing is passed: the
+   * widget re-reads the saved built-in id itself and maps it through its own allow-list.
+   */
+  refreshWidgets() {
+    if (this.platform === 'web' || !this.widgets) return
+    Promise.resolve()
+      .then(() => this.widgets.refreshWidgets())
+      .catch((error) => console.error('[ThemeService] Failed to refresh widgets', error))
   }
 
   /** Applies the persisted selection (or the default). */
@@ -64,7 +78,7 @@ export class ThemeService {
 }
 
 export default ({ app }, inject) => {
-  const service = new ThemeService({ localStore: app.$localStore, root: document.documentElement, platform: Capacitor.getPlatform(), statusBar: StatusBar })
+  const service = new ThemeService({ localStore: app.$localStore, root: document.documentElement, platform: Capacitor.getPlatform(), statusBar: StatusBar, widgets: AbsDatabase })
   // Default theme immediately (matches the previous unconditional dark status-bar style at startup),
   // then the saved selection once Preferences has answered.
   service.apply(themeEngine.DEFAULT_THEME_ID)

@@ -9,6 +9,7 @@ import app.absplus.android.device.DeviceManager
 import app.absplus.android.media.MediaEventManager
 import app.absplus.android.server.ApiHandler
 import app.absplus.android.managers.SecureStorage
+import app.absplus.android.widget.WidgetRenderer
 import com.fasterxml.jackson.core.json.JsonReadFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -41,6 +42,16 @@ class AbsDatabase : Plugin() {
 
     DeviceManager.dbManager.cleanLocalMediaProgress()
     DeviceManager.dbManager.cleanLocalLibraryItems(mainActivity)
+  }
+
+  /**
+   * The selected theme changed: redraw placed home-screen widgets. Takes no arguments; the widget re-reads
+   * the saved built-in theme id itself (WidgetTheme). Rendering only, no playback state is touched.
+   */
+  @PluginMethod
+  fun refreshWidgets(call:PluginCall) {
+    WidgetRenderer.renderAll(context)
+    call.resolve()
   }
 
   @PluginMethod
