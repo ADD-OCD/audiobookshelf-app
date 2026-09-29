@@ -73,7 +73,11 @@ Phase 2 adds one semantic color and two validated policies.
 - **`presentation.cover-color`** (`legacy` | `theme`):
   - `legacy` keeps player and item chrome tinted from cover art (existing behavior).
   - `theme` makes that chrome use the theme palette instead. The cover art itself is untouched.
-  - Consumed from Checkpoint C onward.
+  - Implemented in `theme/coverPresentation.js`, a pure projection from the validated theme and the unchanged cover sample to the chrome values. It covers the full-player backdrop, the mini-player panel, the fullscreen body background, the play-button surface, the white wash and icon, the dark-foreground decision, and the item-header fill.
+  - Under `legacy` it returns exactly the previous expressions, including Black's light-foreground exception.
+  - Under `theme` it returns fixed references to `surface.base` (backdrop, panel, body, header) and `surface.raised` (play button).
+  - `AudioPlayer.vue` and `pages/item/_id/index.vue` only bind to the projection. A watcher re-syncs the fullscreen body background when the _policy_ changes, so a theme switch while fullscreen can't leave a stale color.
+  - Extraction, cover loading and playback code are untouched.
 
 Policies are ordinary enum tokens: invalid values fall back to `standard` / `legacy`, and unknown `presentation.*` keys are ignored. They have no CSS variable, so the serializer never emits them. Dark, Black and Light are `standard` + `legacy`.
 
@@ -84,7 +88,19 @@ LLAMA is an original Audiobookshelf+ theme inspired by the material language of 
 - It is a built-in like the others (`id: 'llama'`, label `LabelThemeLlama`, `colorScheme: 'dark'`, `equipment` + `theme`). It appears last in Settings through the registry.
 - It styles the existing UI only. Layout, geometry, controls and behavior are unchanged.
 
-Palette (provisional until the Gate 1 review):
+The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. It covers:
+
+- bevelled chassis on the app bar, bookshelf navigation, dialogs/menus and the drawer, with the selected tab shown as a pressed key plus an accent underline;
+- steel buttons over their semantic colors (pressed = inset), and a steel play button;
+- recessed wells for text fields and selects, the Up Next list, and a recessed readout strip behind the fullscreen seek and time rows;
+- inset seek channels. The played portion stays amber even after the player's seek code swaps in its settled-state class;
+- phosphor-green timestamps, speed readout and playback-method label. Titles and other text stay neutral;
+- a thin outer steel frame around player artwork and book cards, drawn outside the image;
+- a visible accent focus outline.
+
+A test compiles the real content with Tailwind and fails if any recipe selector would be pruned. Tailwind drops selectors whose classes only exist at runtime, such as router-added classes.
+
+Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
 | Token                                              | RGB                               | Role                                                                                                              |
 | -------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -165,7 +181,7 @@ Phase 1 status:
 
 - **Player and mini-player background:** the average color of the cover art (`utils/coverAverageColor.js`), with `coverBgIsLight` choosing dark or light icon colors. The theme overlays (`overlay.player`, `overlay.mini-player`) sit on top of it.
 - **Item page header:** the same cover-average color, under `overlay.item-header`.
-- These stay content-derived. A future theme could _opt out_ of them (for example a `player.background: theme` flag), but Phase 1 keeps them as they are.
+- These stay content-derived for Dark, Black and Light. From Phase 2, a theme opts out with `presentation.cover-color: theme` (LLAMA does); see [Presentation policies](#presentation-policies-phase-2).
 
 ## Remaining hardcoded presentation values
 

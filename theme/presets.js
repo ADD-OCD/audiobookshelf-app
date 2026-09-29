@@ -74,6 +74,26 @@ const EQUIPMENT_RULES = [
   ['.cover-wrapper', { 'box-shadow': ARTWORK_FRAME }],
   ['[id^=book-card]', { 'box-shadow': `${ARTWORK_FRAME}, 3px 3px 6px rgb(0 0 0 / 0.5)` }],
 
+  // Player: recessed display behind the fullscreen seek/readout rows (content box only: padding stays chassis)
+  ['.fullscreen #playerTrack', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': '4px' }],
+  ['.fullscreen .total-track', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': '4px' }],
+  // Seek channels read as inset slots; the played portion stays the amber token even after the player's
+  // seek code swaps in its settled-state class (bg-gray-200); the pending-seek highlight is left as is
+  ['#playerTrack div.relative.rounded-full', { 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)' }],
+  ['.total-track div.relative.rounded-full', { 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)' }],
+  ['#playerTrack .bg-track-cursor.bg-gray-200', { 'background-color': 'rgb(var(--color-track-cursor))' }],
+  ['#playerTrack .pointer-events-auto > .bg-track-cursor', { 'box-shadow': '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)' }],
+  // Phosphor-green readouts: timestamps, playback speed and the playback-method label (titles stay neutral)
+  ['#playerTrack p.font-mono', { color: 'rgb(var(--color-accent))' }],
+  ['.total-track p.font-mono', { color: 'rgb(var(--color-accent))' }],
+  ['#playerContent span.font-mono', { color: 'rgb(var(--color-accent))' }],
+  ['#streamContainer p.tracking-widest', { color: 'rgb(var(--color-accent) / 0.85)' }],
+  // Transport: steel play button, raised; pressed = inset (other transport glyphs keep their look)
+  ['#playerControls .play-btn', { 'background-image': STEEL_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` }],
+  ['#playerControls .play-btn:active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
+  // Collapsed mini-player: chassis top edge (same footprint)
+  ['#streamContainer:not(.fullscreen) #playerContent', { 'box-shadow': 'inset 0 1px 0 rgb(var(--color-edge-light) / 0.45), 0 -8px 8px rgb(0 0 0 / 0.33)' }],
+
   // Visible focus for keyboard/switch access
   [':focus-visible', { outline: '2px solid rgb(var(--color-accent))', 'outline-offset': '2px' }]
 ]

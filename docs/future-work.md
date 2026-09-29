@@ -22,3 +22,7 @@ Apply the `system.status-bar`, `system.navigation-bar` and `system.bar-icons` to
 ## Bundled text fonts
 
 Source Sans Pro and Ubuntu Mono never load: their `@font-face` rules use the invalid `format('ttf')`, so the app renders in Roboto and the system monospace font. Fixing the hint would visibly change every screen. Decide deliberately, together with future typography presets that always fall back safely for Arabic, Hebrew and Korean.
+
+## Startup theme flash
+
+A saved non-default theme (Black, Light, LLAMA) is restored asynchronously from Preferences, so the pre-render loading screen briefly shows the default Dark surface. This was measured at about 1.3 s on the emulator during the LLAMA Gate 1 review. It is pre-existing and not LLAMA-specific. A possible fix is a synchronous startup cache of the resolved theme applied before the app bundle runs. It would change startup and theme-restoration lifecycle behavior, so it needs its own phase.
