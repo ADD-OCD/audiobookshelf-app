@@ -123,8 +123,10 @@ jobs:
           apk="$RUNNER_TEMP/out/signed.apk"
           certs="$("$build_tools/apksigner" verify --verbose --print-certs "$apk")"
           echo "$certs" | grep -E '^Verified using|^Number of signers|certificate (DN|SHA-256)'
-          [ "$(echo "$certs" | grep -c 'certificate SHA-256 digest')" = "1" ] || { echo "::error::Expected exactly one signer"; exit 1; }
-          cert="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          [ "$(echo "$certs" | sed -n 's/^Number of signers: //p')" = "1" ] || { echo "::error::Expected exactly one signer"; exit 1; }
+          # Signer lines differ between build-tools versions ("Signer #1 ..." / "V3.0 Signer: ..."); every
+          # certificate digest listed must be the pinned one
+          cert="$(echo "$certs" | sed -n 's/^.*certificate SHA-256 digest: \([0-9a-f]*\)$/\1/p' | sort -u)"
           [ "$cert" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::Signed with an unexpected certificate"; exit 1; }
           package="$("$build_tools/aapt2" dump packagename "$apk")"
           [ "$package" = "$DEBUG_PACKAGE" ] || { echo "::error::Unexpected package $package"; exit 1; }
