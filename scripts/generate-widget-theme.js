@@ -15,20 +15,17 @@ const presets = require('../theme/presets')
 
 const OUTPUT = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values', 'widget_theme_colors.xml')
 
-// Native name suffix -> source token (fixed, repository-owned subset)
+// Native name suffix -> source token (fixed, repository-owned subset: only colors the widget resources use)
 const TOKEN_COLORS = [
   ['base', 'surface.base'],
   ['content', 'surface.content'],
   ['raised', 'surface.raised'],
-  ['hover', 'surface.hover'],
   ['recessed', 'surface.recessed'],
-  ['border', 'border.default'],
   ['text', 'text.primary'],
   ['text_muted', 'text.muted'],
   ['accent', 'accent.primary'],
   ['played', 'progress.played'],
-  ['track', 'progress.track'],
-  ['buffered', 'progress.buffered']
+  ['track', 'progress.track']
 ]
 
 const hex = (rgb) => '#' + rgb.map((c) => c.toString(16).padStart(2, '0').toUpperCase()).join('')

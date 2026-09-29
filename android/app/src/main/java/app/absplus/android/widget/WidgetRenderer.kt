@@ -100,13 +100,14 @@ object WidgetRenderer {
     val key = artworkUri(context, state.session).toString()
     val bitmap = if (key == artworkKey) artworkBitmap else null
     val actions = Actions.create(context)
+    val theme = WidgetTheme.current(context)
     val views =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         // Android 12+: the launcher picks the layout for the current size, including while resizing
-        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, state, bitmap, actions) })
+        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, theme, state, bitmap, actions) })
       } else {
         // API 24-30: pick the layout from the size the launcher reported (redrawn on onAppWidgetOptionsChanged)
-        build(context, sizeFromOptions(context, appWidgetManager.getAppWidgetOptions(appWidgetId)), state, bitmap, actions)
+        build(context, sizeFromOptions(context, appWidgetManager.getAppWidgetOptions(appWidgetId)), theme, state, bitmap, actions)
       }
     appWidgetManager.updateAppWidget(appWidgetId, views)
     if (bitmap == null && key != failedArtworkKey) loadArtwork(context, key)
@@ -121,15 +122,25 @@ object WidgetRenderer {
     return WidgetSize.classify(width.toFloat(), height.toFloat())
   }
 
-  private fun layoutFor(size: WidgetSize): Int =
-    when (size) {
-      WidgetSize.COMPACT -> R.layout.media_player_widget
-      WidgetSize.WIDE -> R.layout.media_player_widget_wide
-      WidgetSize.FULL -> R.layout.media_player_widget_full
+  /** Layout per size; LLAMA has paint-only variants with the same ids, Dark/Black/Light keep the existing layouts. */
+  fun layoutFor(size: WidgetSize, theme: WidgetTheme): Int =
+    when (theme) {
+      WidgetTheme.STANDARD ->
+        when (size) {
+          WidgetSize.COMPACT -> R.layout.media_player_widget
+          WidgetSize.WIDE -> R.layout.media_player_widget_wide
+          WidgetSize.FULL -> R.layout.media_player_widget_full
+        }
+      WidgetTheme.LLAMA ->
+        when (size) {
+          WidgetSize.COMPACT -> R.layout.media_player_widget_llama
+          WidgetSize.WIDE -> R.layout.media_player_widget_wide_llama
+          WidgetSize.FULL -> R.layout.media_player_widget_full_llama
+        }
     }
 
-  private fun build(context: Context, size: WidgetSize, state: State, bitmap: Bitmap?, actions: Actions): RemoteViews {
-    val views = RemoteViews(context.packageName, layoutFor(size))
+  private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions): RemoteViews {
+    val views = RemoteViews(context.packageName, layoutFor(size, theme))
     views.setOnClickPendingIntent(R.id.widgetPlayPauseButton, actions.playPause)
     views.setOnClickPendingIntent(R.id.widgetFastForwardButton, actions.fastForward)
     views.setOnClickPendingIntent(R.id.widgetRewindButton, actions.rewind)

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LLAMA widget control: steel face with a raised bevel; the bevel inverts while pressed. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:state_pressed="true">
+    <layer-list>
+      <item>
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_edge_light_35" />
+        </shape>
+      </item>
+      <item android:bottom="1dp" android:right="1dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_edge_dark" />
+        </shape>
+      </item>
+      <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_content" />
+        </shape>
+      </item>
+    </layer-list>
+  </item>
+  <item>
+    <layer-list>
+      <item>
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_edge_dark" />
+        </shape>
+      </item>
+      <item android:bottom="1dp" android:right="1dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_edge_light_55" />
+        </shape>
+      </item>
+      <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="8dp" />
+          <solid android:color="@color/widget_llama_raised" />
+        </shape>
+      </item>
+    </layer-list>
+  </item>
+</selector>

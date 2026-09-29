@@ -1,4 +1,5 @@
-<!-- Full (~4x2) presentation: larger artwork and metadata, a snapshot progress/time readout, same three actions. -->
+<!-- LLAMA full (~4x2): same structure, ids and actions as media_player_widget_full.xml; equipment paint only. -->
+<!-- UseAppTint: RemoteViews inflate platform ImageViews, where android:tint is the attribute that works (app:tint needs AppCompat). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:tools="http://schemas.android.com/tools"
   android:id="@+id/widgetBackground"
@@ -6,14 +7,14 @@
   android:layout_height="fill_parent"
   android:orientation="vertical"
   android:theme="@style/AppTheme.AppWidgetContainer"
-  style="@style/Widget.Android.AppWidget.Container">
+  style="@style/Widget.Android.AppWidget.Container"
+  android:background="@drawable/widget_llama_chassis"
+  tools:ignore="UseAppTint">
 
   <LinearLayout
     android:id="@+id/widgetContent"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorAccent"
-    android:theme="@style/MediaPlayerWidgetTheme"
     android:orientation="vertical"
     android:padding="8dp">
 
@@ -28,6 +29,8 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:adjustViewBounds="true"
+        android:padding="2dp"
+        android:background="@drawable/widget_llama_artwork_frame"
         android:scaleType="centerCrop"
         android:contentDescription="@null"
         android:src="@drawable/icon" />
@@ -38,7 +41,8 @@
         android:layout_height="match_parent"
         android:layout_weight="1"
         android:layout_marginStart="10dp"
-        android:padding="6dp"
+        android:padding="8dp"
+        android:background="@drawable/widget_llama_readout"
         android:gravity="center_vertical"
         android:orientation="vertical">
 
@@ -48,7 +52,7 @@
           android:layout_height="wrap_content"
           android:ellipsize="end"
           android:maxLines="2"
-          android:textColor="@color/widget_default_text"
+          android:textColor="@color/widget_llama_text"
           android:textSize="16sp"
           android:textStyle="bold"
           tools:text="Title" />
@@ -60,7 +64,7 @@
           android:layout_marginTop="2dp"
           android:ellipsize="end"
           android:maxLines="1"
-          android:textColor="@color/widget_default_text_muted"
+          android:textColor="@color/widget_llama_text_muted"
           android:textSize="13sp"
           tools:text="Artist" />
 
@@ -78,7 +82,7 @@
             android:layout_weight="1"
             android:fontFamily="monospace"
             android:maxLines="1"
-            android:textColor="@color/widget_default_text"
+            android:textColor="@color/widget_llama_text"
             android:textSize="13sp"
             tools:text="0:00" />
 
@@ -90,7 +94,7 @@
             android:fontFamily="monospace"
             android:gravity="end"
             android:maxLines="1"
-            android:textColor="@color/widget_default_text"
+            android:textColor="@color/widget_llama_text_muted"
             android:textSize="13sp"
             tools:text="-0:00" />
         </LinearLayout>
@@ -102,6 +106,7 @@
         android:layout_height="16dp"
         android:layout_marginStart="6dp"
         android:adjustViewBounds="true"
+        android:tint="@color/widget_llama_text_muted"
         android:contentDescription="@null"
         android:src="@drawable/icon_monochrome" />
     </LinearLayout>
@@ -110,11 +115,11 @@
       android:id="@+id/widgetProgress"
       style="?android:attr/progressBarStyleHorizontal"
       android:layout_width="match_parent"
-      android:layout_height="5dp"
+      android:layout_height="6dp"
       android:layout_marginTop="8dp"
       android:max="1000"
       android:progress="0"
-      android:progressDrawable="@drawable/widget_progress_default" />
+      android:progressDrawable="@drawable/widget_llama_progress" />
 
     <LinearLayout
       android:id="@+id/widgetButtonContainer"
@@ -130,7 +135,8 @@
         android:layout_weight="1"
         android:layout_margin="4dp"
         android:padding="10dp"
-        android:background="@drawable/widget_button_bg"
+        android:background="@drawable/widget_llama_button"
+        android:tint="@color/widget_llama_text"
         android:contentDescription="@string/action_jump_backward"
         android:src="@drawable/exo_icon_rewind" />
 
@@ -141,7 +147,8 @@
         android:layout_weight="1"
         android:layout_margin="4dp"
         android:padding="10dp"
-        android:background="@drawable/widget_button_bg"
+        android:background="@drawable/widget_llama_button"
+        android:tint="@color/widget_llama_accent"
         android:contentDescription="@string/widget_play_pause"
         android:src="@drawable/ic_media_play_dark" />
 
@@ -152,7 +159,8 @@
         android:layout_weight="1"
         android:layout_margin="4dp"
         android:padding="10dp"
-        android:background="@drawable/widget_button_bg"
+        android:background="@drawable/widget_llama_button"
+        android:tint="@color/widget_llama_text"
         android:contentDescription="@string/action_jump_forward"
         android:src="@drawable/exo_icon_fastforward" />
     </LinearLayout>
