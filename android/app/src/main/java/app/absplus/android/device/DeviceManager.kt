@@ -199,6 +199,9 @@ object DeviceManager {
                 val playbackSession = pns.getCurrentPlaybackSessionCopy() ?: deviceData.lastPlaybackSession
                 val hasLiveSession = pns.currentPlaybackSession != null && !PlayerNotificationService.isClosed
                 val showControls = hasLiveSession || (deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context))
+                // Progress snapshot for the widget (read only; never throws into the player)
+                val positionMs = if (hasLiveSession) runCatching { pns.getCurrentTime() }.getOrNull() else null
+                val durationMs = if (hasLiveSession) runCatching { pns.getDuration() }.getOrNull()?.takeIf { it > 0 } else null
 
                 for (widgetId in ids) {
                   updateAppWidget(
@@ -207,7 +210,9 @@ object DeviceManager {
                           widgetId,
                           playbackSession,
                           isPlaying,
-                          showControls
+                          showControls,
+                          positionMs,
+                          durationMs
                   )
                 }
               }
