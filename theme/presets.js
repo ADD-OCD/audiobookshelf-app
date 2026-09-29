@@ -36,7 +36,47 @@ function equipmentDerivedDeclarations(tokens) {
  * An empty suffix targets the theme root itself. Values may only reference CSS variables emitted by
  * the token layer or by equipmentDerivedDeclarations.
  */
-const EQUIPMENT_RULES = []
+// Paint-only building blocks (no border widths, padding, transforms or layout properties)
+const RAISED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-light) / 0.55), inset -1px -1px 0 rgb(var(--color-edge-dark))'
+const PRESSED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.35)'
+const RECESSED_WELL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.25), inset 0 2px 6px rgb(0 0 0 / 0.45)'
+const STEEL_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)'
+const CHASSIS_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.1) 0%, rgb(var(--color-edge-light) / 0) 40%, rgb(0 0 0 / 0.2) 100%)'
+const ARTWORK_FRAME = '0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 2px rgb(var(--color-edge-light) / 0.45)'
+
+const EQUIPMENT_RULES = [
+  // Navigation chrome: bevelled chassis strips
+  ['#appbar', { 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 1px 0 rgb(var(--color-edge-dark))` }],
+  ['#bookshelf-navbar', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
+  // Selected navigation tab reads as a pressed key (inset) with an accent underline, not color alone
+  // (BookshelfNavBar binds bg-primary on the active tab; runtime-only router classes would be pruned by Tailwind)
+  ['#bookshelf-navbar a.bg-primary', { 'background-image': 'none', 'box-shadow': `${PRESSED_BEVEL}, inset 0 -2px 0 rgb(var(--color-accent))` }],
+
+  // Buttons: steel sheen over the existing (semantic) button color, raised; pressed = inset
+  ['.btn:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 2px 3px rgb(0 0 0 / 0.45)` }],
+  ['.btn:not(:disabled):active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
+  ['.icon-btn:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
+  ['.icon-btn:not(:disabled):active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
+
+  // Text fields and selects: recessed display wells
+  ['input:not([type=range]):not([type=checkbox]):not([type=radio])', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+  ['textarea', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+
+  // Dialog / menu panels: raised chassis
+  ['.modal .rounded-lg.bg-primary', { 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 6px 16px rgb(0 0 0 / 0.55)` }],
+  // Up Next list: a recessed playlist well inside the chassis
+  ['.modal .queue-panel.rounded-lg.bg-primary', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': 'none', 'box-shadow': `${RECESSED_WELL}, 0 6px 16px rgb(0 0 0 / 0.55)` }],
+
+  // Side drawer: chassis edge facing the page
+  ['.layout-wrapper .w-64.bg-bg', { 'background-image': CHASSIS_SHEEN, 'box-shadow': 'inset 1px 0 0 rgb(var(--color-edge-light) / 0.45), -2px 0 8px rgb(0 0 0 / 0.5)' }],
+
+  // Artwork: thin outer frame (outside the image, so the artwork stays fully visible and unresized)
+  ['.cover-wrapper', { 'box-shadow': ARTWORK_FRAME }],
+  ['[id^=book-card]', { 'box-shadow': `${ARTWORK_FRAME}, 3px 3px 6px rgb(0 0 0 / 0.5)` }],
+
+  // Visible focus for keyboard/switch access
+  [':focus-visible', { outline: '2px solid rgb(var(--color-accent))', 'outline-offset': '2px' }]
+]
 
 const RECIPES = {
   standard: () => ({}),

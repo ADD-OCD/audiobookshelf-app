@@ -6,7 +6,7 @@
       </div>
     </template>
     <div class="w-full h-full overflow-hidden absolute top-0 left-0 flex items-center justify-center" @click="show = false">
-      <div class="w-full rounded-lg bg-primary border border-border overflow-y-auto overflow-x-hidden relative mt-16" style="max-height: 80vh" @click.stop.prevent>
+      <div class="queue-panel w-full rounded-lg bg-primary border border-border overflow-y-auto overflow-x-hidden relative mt-16" style="max-height: 80vh" @click.stop.prevent>
         <div v-if="nowPlayingDisplay" class="px-3 py-3 border-b border-fg/10">
           <p class="text-fg-muted text-xs uppercase tracking-wide mb-2">Now Playing</p>
           <div class="flex items-center">

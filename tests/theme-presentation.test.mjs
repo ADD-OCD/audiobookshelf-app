@@ -129,3 +129,17 @@ test('a theme whose id or finish fails validation contributes no presentation ru
   assert.equal(bad.theme, null)
   assert.deepEqual(presets.presentationRules([engine.validateTheme({ id: 'rig', labelKey: 'LabelRig', colorScheme: 'dark', tokens: { ...dark, 'presentation.finish': 'chrome' } }, dark).theme]), {})
 })
+
+test('every equipment rule survives the real Tailwind build (no selector silently pruned)', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await readFile(new URL('../assets/tailwind.css', import.meta.url), 'utf8')
+  // Real content globs, resolved from the project root like the Nuxt build
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const rules = presets.builtinPresentationRules()
+  assert.ok(Object.keys(rules).length > 1)
+  for (const selector of Object.keys(rules)) assert.ok(css.includes(`${selector} {`), `pruned or missing: ${selector}`)
+})
