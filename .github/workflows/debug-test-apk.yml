@@ -1,0 +1,172 @@
+# DEVELOPMENT TEST APK - not a release.
+#
+# Builds the debug variant (app.absplus.android.debug, installs alongside the production app), re-signs it
+# with the persistent debug/test key so each new test build installs over the previous one, and uploads it
+# as a short-lived Actions artifact. Never uses the production release key. See docs/debug-test-builds.md.
+name: Debug Test APK (development only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Label for the file and artifact names (lowercase letters, digits, hyphens), e.g. llama'
+        required: false
+        default: ''
+  push:
+    branches:
+      - 'feature/**'
+    paths-ignore:
+      - 'ios/**'
+      - '**/*.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debug-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DEBUG_PACKAGE: app.absplus.android.debug
+  # Certificate of the persistent debug/test key (public fingerprint). A build signed with anything else fails.
+  EXPECTED_CERT_SHA256: 0e22f17fc1da110460bef1729a80a1e045c9977968450c00fceedf6d61796c0a
+  RETENTION_DAYS: 21
+
+jobs:
+  debug-test-apk:
+    name: Signed debug test APK
+    # Branches of this repository only (dispatch and push both require write access; no pull_request trigger)
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Names
+        id: names
+        env:
+          INPUT_LABEL: ${{ inputs.label }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Label: the dispatch input, else the first word of the branch name (feature/llama-theme -> llama)
+          label="${INPUT_LABEL}"
+          if [ -z "$label" ]; then slug="${BRANCH##*/}"; label="${slug%%-*}"; fi
+          label="$(printf '%s' "$label" | tr '[:upper:]' '[:lower:]')"
+          if ! printf '%s' "$label" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "::error::Invalid label (use lowercase letters, digits and hyphens)"; exit 1
+          fi
+          version_name="$(sed -n 's/^ *versionName "\(.*\)"$/\1/p' android/app/build.gradle)"
+          version_code="$(sed -n 's/^ *versionCode \([0-9]*\)$/\1/p' android/app/build.gradle)"
+          [ -n "$version_name" ] && [ -n "$version_code" ] || { echo "::error::Could not read versionName/versionCode"; exit 1; }
+          label_upper="$(printf '%s' "$label" | tr '[:lower:]' '[:upper:]')"
+          {
+            echo "label=$label"
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "apk_name=AudiobookshelfPlus-${version_name}-debug-${label}.apk"
+            echo "artifact_name=AudiobookshelfPlus-${label_upper}-S26-Test"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: npm ci --omit=optional
+
+      - name: Build web app
+        run: npm run generate
+
+      - name: Copy web app into the Android project
+        run: npx cap sync android
+
+      - name: Build debug variant
+        run: ./android/gradlew assembleDebug -p android --no-daemon
+
+      - name: Sign with the persistent debug/test key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ABSPLUS_DEBUG_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ABSPLUS_DEBUG_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ABSPLUS_DEBUG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Debug/test signing secrets are missing; refusing to fall back to a throwaway key"; exit 1
+          fi
+          build_tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          keystore="$RUNNER_TEMP/debug-test-signing.p12"
+          trap 'rm -f "$keystore"' EXIT
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          mkdir -p "$RUNNER_TEMP/out"
+          "$build_tools/apksigner" sign --ks "$keystore" --ks-type PKCS12 --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out "$RUNNER_TEMP/out/signed.apk" android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Verify signature, certificate and package
+        id: verify
+        env:
+          APK_NAME: ${{ steps.names.outputs.apk_name }}
+        run: |
+          set -euo pipefail
+          build_tools="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          apk="$RUNNER_TEMP/out/signed.apk"
+          certs="$("$build_tools/apksigner" verify --verbose --print-certs "$apk")"
+          echo "$certs" | grep -E '^Verified using|^Number of signers|certificate (DN|SHA-256)'
+          [ "$(echo "$certs" | grep -c 'certificate SHA-256 digest')" = "1" ] || { echo "::error::Expected exactly one signer"; exit 1; }
+          cert="$(echo "$certs" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          [ "$cert" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::Signed with an unexpected certificate"; exit 1; }
+          package="$("$build_tools/aapt2" dump packagename "$apk")"
+          [ "$package" = "$DEBUG_PACKAGE" ] || { echo "::error::Unexpected package $package"; exit 1; }
+          case "$APK_NAME" in *unsigned*) echo "::error::File name must not say unsigned"; exit 1 ;; esac
+          mkdir -p "$RUNNER_TEMP/artifact"
+          cp "$apk" "$RUNNER_TEMP/artifact/$APK_NAME"
+          echo "apk_sha256=$(sha256sum "$RUNNER_TEMP/artifact/$APK_NAME" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "cert_sha256=$cert" >> "$GITHUB_OUTPUT"
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+
+      - name: Write build info
+        env:
+          APK_NAME: ${{ steps.names.outputs.apk_name }}
+          VERSION_NAME: ${{ steps.names.outputs.version_name }}
+          VERSION_CODE: ${{ steps.names.outputs.version_code }}
+          PACKAGE: ${{ steps.verify.outputs.package }}
+          APK_SHA256: ${{ steps.verify.outputs.apk_sha256 }}
+          CERT_SHA256: ${{ steps.verify.outputs.cert_sha256 }}
+          BRANCH: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          info="DEVELOPMENT TEST BUILD - not a release
+          file: $APK_NAME
+          branch: $BRANCH
+          commit: $GITHUB_SHA
+          versionName: $VERSION_NAME (debug build shows $VERSION_NAME-debug)
+          versionCode: $VERSION_CODE
+          package: $PACKAGE (installs alongside app.absplus.android)
+          apk sha256: $APK_SHA256
+          signing certificate sha256: $CERT_SHA256
+          built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          workflow run: $RUN_URL"
+          printf '%s\n' "$info" | sed 's/^ *//' > "$RUNNER_TEMP/artifact/build-info.txt"
+          cat "$RUNNER_TEMP/artifact/build-info.txt"
+          { echo '### Development test APK (not a release)'; echo '```'; cat "$RUNNER_TEMP/artifact/build-info.txt"; echo '```'
+            echo "Download the artifact below, unzip it, and install the APK. It updates an existing $PACKAGE install."; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.names.outputs.artifact_name }}
+          path: ${{ runner.temp }}/artifact/
+          retention-days: ${{ env.RETENTION_DAYS }}
+          if-no-files-found: error
+          compression-level: 0
