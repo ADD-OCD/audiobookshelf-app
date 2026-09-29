@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Standard widget look used for Dark/Black/Light (the existing widget style: MediaPlayerWidgetTheme). -->
+  <color name="widget_default_text">#FFFFFF</color>
+  <color name="widget_default_text_muted">#B9BEC5</color>
+  <color name="widget_default_track">#6B7280</color>
+  <color name="widget_default_played">#E5E7EB</color>
+</resources>

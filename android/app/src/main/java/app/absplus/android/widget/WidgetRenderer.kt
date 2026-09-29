@@ -124,7 +124,7 @@ object WidgetRenderer {
   private fun layoutFor(size: WidgetSize): Int =
     when (size) {
       WidgetSize.COMPACT -> R.layout.media_player_widget
-      WidgetSize.WIDE -> R.layout.media_player_widget
+      WidgetSize.WIDE -> R.layout.media_player_widget_wide
       WidgetSize.FULL -> R.layout.media_player_widget
     }
 
