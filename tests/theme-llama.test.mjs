@@ -145,3 +145,37 @@ test('switching LLAMA to Dark, Black and Light and back persists each selection'
   }
   assert.deepEqual(store.writes, ['llama', 'dark', 'llama', 'black', 'llama', 'light', 'llama'])
 })
+
+test('non-EPUB reader shell: Dark/Black/Light keep their shell, LLAMA uses the dark-compatible shell', async () => {
+  for (const id of ['dark', 'black', 'light']) assert.equal(engine.readerShellId(engine.getTheme(id)), id)
+  assert.equal(engine.readerShellId(llama()), 'dark')
+  assert.equal(engine.readerShellId(null), 'dark')
+  const light = engine.getTheme('light')
+  const { theme } = engine.validateTheme({ ...light, id: 'paper' }, light.tokens)
+  assert.equal(engine.readerShellId(theme), 'light')
+  const reader = await read('../components/readers/Reader.vue')
+  assert.match(reader, /if \(this\.isEpub\) return this\.ereaderSettings\.theme/) // EPUB preference untouched
+  assert.match(reader, /data-\[theme=dark\]:bg-\[#232323\]/) // the existing dark shell it maps onto
+})
+
+test('LLAMA progress repaint targets only unfinished playback bars, never warning semantics or finished state', () => {
+  const selectors = Object.keys(presets.presentationRules([llama()]))
+  const progress = selectors.filter((s) => s.includes('bg-yellow-400'))
+  assert.deepEqual(progress, ["html[data-theme='llama'] .absolute.bottom-0.left-0.z-10.bg-yellow-400"])
+  for (const s of selectors) {
+    assert.doesNotMatch(s, /warning|bg-success|text-success|bg-error/, s)
+    if (s.includes('bg-yellow-400')) assert.ok(s.includes('.absolute.bottom-0.left-0.z-10'), s) // never bare yellow
+  }
+  const rules = presets.presentationRules([llama()])
+  assert.equal(rules[progress[0]]['background-color'], 'rgb(var(--color-track-cursor))')
+})
+
+test('LLAMA toggle styling keeps the on-state color and only recolors the off slot and thumb', () => {
+  const rules = presets.presentationRules([llama()])
+  const toggle = Object.entries(rules).filter(([s]) => s.includes('border-gray-400'))
+  assert.ok(toggle.length >= 3)
+  for (const [selector, declarations] of toggle) {
+    assert.doesNotMatch(selector, /bg-success/, selector)
+    for (const property of Object.keys(declarations)) assert.doesNotMatch(property, /width|height|transform|padding|margin|left|top/, property)
+  }
+})

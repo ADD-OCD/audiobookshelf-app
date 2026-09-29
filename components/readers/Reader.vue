@@ -128,6 +128,7 @@
 <script>
 import { Capacitor } from '@capacitor/core'
 import { VolumeButtons } from '@capacitor-community/volume-buttons'
+import themeEngine from '@/theme/engine'
 import { KeepAwake } from '@capacitor-community/keep-awake'
 
 export default {
@@ -204,7 +205,8 @@ export default {
     },
     ereaderTheme() {
       if (this.isEpub) return this.ereaderSettings.theme
-      return document.documentElement.dataset.theme || 'dark'
+      // Non-EPUB shell: black/dark/light as before; other app themes (e.g. LLAMA) use the matching shell
+      return themeEngine.readerShellId(this.$theme.theme)
     },
     spreadItems() {
       return [

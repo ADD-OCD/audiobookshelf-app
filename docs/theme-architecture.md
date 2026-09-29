@@ -96,7 +96,12 @@ The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only unde
 - inset seek channels. The played portion stays amber even after the player's seek code swaps in its settled-state class;
 - phosphor-green timestamps, speed readout and playback-method label. Titles and other text stay neutral;
 - a thin outer steel frame around player artwork and book cards, drawn outside the image;
-- a visible accent focus outline.
+- a visible accent focus outline;
+- Checkpoint F polish, each needed by LLAMA:
+  - the bookshelf view's wood material becomes graphite/blue-gray equipment (steel ledge, recessed placards with neutral text); alternative-view placards match;
+  - toggle switches get a recessed off slot and a steel thumb. On keeps the success color, state also reads from thumb position, and the disabled thumb reads dimmer than the enabled one;
+  - unfinished playback progress bars (cards, list rows, playlist rows, item cover) use the amber played-progress token. Finished bars (success) and other yellow uses keep their colors;
+  - a contrast safety margin for small uppercase muted headers and inactive navigation icons, using primary text at reduced alpha (6.6:1 and 4.8:1 measured, up from 4.6:1 and 3.05:1).
 
 A test compiles the real content with Tailwind and fails if any recipe selector would be pruned. Tailwind drops selectors whose classes only exist at runtime, such as router-added classes.
 
@@ -122,7 +127,7 @@ Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2
 Known limits at this stage:
 
 - **Startup:** like Black and Light, a saved LLAMA selection is restored asynchronously, so the pre-render loading screen briefly shows the default Dark surface.
-- **Non-EPUB reader shell:** it only knows `black`, `dark` and `light`. A presentation-only mapping for LLAMA is still to come.
+- **Non-EPUB reader shell:** it only knows `black`, `dark` and `light`. `engine.readerShellId()` keeps those three and maps any other theme to the shell matching its color scheme, so LLAMA uses the dark shell. The independent EPUB reader theme and `EpubReader.vue` are unchanged.
 
 ## Validation and fallback
 
@@ -189,16 +194,16 @@ These are still hardcoded, by decision, and documented rather than forced into t
 
 - **Tailwind palette classes** (about 170 uses; e.g. `text-white`, `bg-black`, `bg-yellow-400`):
   - white/black text and badges over artwork, which should stay legible whatever the theme;
-  - the yellow listening-progress bar on book cards;
+  - the yellow listening-progress bar on book cards (repainted amber for LLAMA only);
   - `bg-black-400` (not a real class; it has no effect).
 - **`assets/app.css`:**
   - `.box-shadow-*` (`#111111xx`);
-  - the bookshelf wood and alternative shelf styles (`.bookshelfRow`, `.bookshelfDivider`, `.shinyBlack`, `.altBookshelfLabel`);
+  - the bookshelf wood and alternative shelf styles (`.bookshelfRow`, `.bookshelfDivider`, `.shinyBlack`, `.altBookshelfLabel`; repainted by the equipment finish);
   - `.default-style a` link color `#5985ff`.
 - **Components:**
   - `Modal.vue` top gradient (`from-black`) and white close icon;
   - `LazyBookCard.vue` badge colors (`#78350f`, `#cd9d49dd`);
-  - `ToggleSwitch`/`MultiSelect` gray palette classes;
+  - `ToggleSwitch` (repainted by the equipment finish) and `MultiSelect` gray palette classes;
   - `vue-toastification` default CSS.
 - **Theme-id conditionals:**
   - `AudioPlayer.vue` (`theme !== 'black'`), which reads the attribute non-reactively;

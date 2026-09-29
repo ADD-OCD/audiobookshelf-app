@@ -182,6 +182,17 @@ function resolveThemeId(value) {
   return theme ? theme.id : DEFAULT_THEME_ID
 }
 
+/**
+ * The non-EPUB reader shell only knows 'black', 'dark' and 'light' (components/readers/Reader.vue).
+ * Those themes keep their own shell; any other theme uses the shell matching its color scheme.
+ */
+const READER_SHELLS = ['black', 'dark', 'light']
+function readerShellId(theme) {
+  if (!theme) return DEFAULT_THEME_ID
+  if (READER_SHELLS.includes(theme.id)) return theme.id
+  return theme.colorScheme === 'light' ? 'light' : 'dark'
+}
+
 function getTheme(id) {
   return THEMES.find((t) => t.id === resolveThemeId(id))
 }
@@ -197,5 +208,6 @@ module.exports = {
   builtinThemeRules,
   toCssText,
   resolveThemeId,
+  readerShellId,
   getTheme
 }
