@@ -77,6 +77,37 @@ Phase 2 adds one semantic color and two validated policies.
 
 Policies are ordinary enum tokens: invalid values fall back to `standard` / `legacy`, and unknown `presentation.*` keys are ignored. They have no CSS variable, so the serializer never emits them. Dark, Black and Light are `standard` + `legacy`.
 
+## LLAMA (built-in, Phase 2)
+
+LLAMA is an original Audiobookshelf+ theme inspired by the material language of late-1990s blue-gray audio equipment: a steel chassis, recessed black displays, phosphor-green readouts and amber progress. It uses no third-party skin assets, fonts or pixel values.
+
+- It is a built-in like the others (`id: 'llama'`, label `LabelThemeLlama`, `colorScheme: 'dark'`, `equipment` + `theme`). It appears last in Settings through the registry.
+- It styles the existing UI only. Layout, geometry, controls and behavior are unchanged.
+
+Palette (provisional until the Gate 1 review):
+
+| Token                                              | RGB                               | Role                                                                                                              |
+| -------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `surface.recessed`                                 | 10 13 18                          | black-blue display wells                                                                                          |
+| `surface.base`                                     | 27 34 46                          | navy/slate chassis: app bar, dialogs, menus                                                                       |
+| `surface.content`                                  | 45 55 71                          | medium blue-gray page surface                                                                                     |
+| `surface.raised`                                   | 70 82 101                         | lighter steel strips                                                                                              |
+| `surface.hover`                                    | 88 102 124                        | steel highlight                                                                                                   |
+| `text.default` / `text.primary`                    | 235 238 242 / 226 232 240         | neutral near-white                                                                                                |
+| `text.muted`                                       | 150 162 178                       | subdued cool gray                                                                                                 |
+| `border.default`                                   | 96 111 134                        | steel edge                                                                                                        |
+| `control.toggle` / `-selected`                     | 45 55 71 / 88 102 124             | toggle segments                                                                                                   |
+| `progress.track` / `buffered` / `played`           | 40 46 56 / 86 98 116 / 245 190 40 | recessed channel, lighter buffered, yellow-amber played                                                           |
+| `accent.primary`                                   | 96 232 104                        | phosphor-green readout/accent                                                                                     |
+| `state.*`                                          | shared                            | success, warning, error and info keep their semantic values, so warning orange stays distinct from amber progress |
+| derived `--color-edge-light` / `--color-edge-dark` | 153 160 170 / 11 14 18            | bevel edges, fixed blends of `surface.raised` / `surface.base`                                                    |
+| `system.*`                                         | 35 35 35, light icons             | the actual native window background; runtime system-bar theming is out of scope                                   |
+
+Known limits at this stage:
+
+- **Startup:** like Black and Light, a saved LLAMA selection is restored asynchronously, so the pre-render loading screen briefly shows the default Dark surface.
+- **Non-EPUB reader shell:** it only knows `black`, `dark` and `light`. A presentation-only mapping for LLAMA is still to come.
+
 ## Validation and fallback
 
 - `validateTokens(input, fallback)` reads only schema tokens, and only as own properties.

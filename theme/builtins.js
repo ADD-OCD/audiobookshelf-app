@@ -117,9 +117,42 @@ const light = {
   }
 }
 
+// LLAMA: an original blue-gray audio-equipment theme (late-1990s material language). Palette values are
+// original to Audiobookshelf+. Semantic states keep the shared values so warning/error/success/info keep
+// their meaning, and warning orange stays distinct from the yellow-amber played progress.
+const llama = {
+  id: 'llama',
+  labelKey: 'LabelThemeLlama',
+  colorScheme: 'dark',
+  tokens: {
+    'surface.base': [27, 34, 46], // dark navy/slate chassis: app bar, dialogs, menus
+    'surface.content': [45, 55, 71], // medium blue-gray page surface
+    'surface.raised': [70, 82, 101], // lighter steel strips
+    'surface.hover': [88, 102, 124], // steel highlight for hovered/selected rows
+    'surface.recessed': [10, 13, 18], // black-blue display wells
+    'text.default': [235, 238, 242],
+    'text.primary': [226, 232, 240], // neutral near-white
+    'text.muted': [150, 162, 178], // subdued cool gray
+    'border.default': [96, 111, 134], // steel edge
+    'control.toggle': [45, 55, 71],
+    'control.toggle-selected': [88, 102, 124],
+    'progress.track': [40, 46, 56], // recessed channel
+    'progress.buffered': [86, 98, 116], // visibly lighter than the track
+    'progress.played': [245, 190, 40], // yellow-amber
+    'overlay.item-header': linear(169, [[10, 13, 18, 0.4], 0], [[45, 55, 71, 1], 80]),
+    'overlay.player': linear(180, [[27, 34, 46, 0], 0], [[27, 34, 46, 1], 80]),
+    'overlay.mini-player': linear(145, [[27, 34, 46, 0.5], 0], [[27, 34, 46, 0.9], 20], [[27, 34, 46], 60]),
+    ...states,
+    'accent.primary': [96, 232, 104], // phosphor green readout/accent
+    ...systemBars,
+    'presentation.finish': 'equipment',
+    'presentation.cover-color': 'theme'
+  }
+}
+
 const DEFAULT_THEME_ID = 'dark'
 
-// Order shown in Settings (unchanged from before: Black, Dark, Light)
-const BUILTIN_THEMES = [black, dark, light]
+// Order shown in Settings (Black, Dark, Light as before, then LLAMA)
+const BUILTIN_THEMES = [black, dark, light, llama]
 
 module.exports = { BUILTIN_THEMES, DEFAULT_THEME_ID }

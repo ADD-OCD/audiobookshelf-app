@@ -44,7 +44,7 @@ test('every built-in theme satisfies the schema with no fallbacks', () => {
   assert.deepEqual(engine.BUILTIN_ERRORS, [])
   assert.deepEqual(
     engine.THEMES.map((t) => t.id),
-    ['black', 'dark', 'light']
+    ['black', 'dark', 'light', 'llama']
   )
   for (const theme of engine.THEMES) {
     for (const name of TOKEN_NAMES) assert.notEqual(theme.tokens[name], undefined, `${theme.id} ${name}`)
@@ -318,14 +318,15 @@ test('the status-bar icon style follows the theme token; web never touches the n
   assert.equal(web.service.id, 'black')
 })
 
-test('the Settings options list comes from the registry in the original order and labels', async () => {
+test('the Settings options list comes from the registry in the original order and labels, with LLAMA last', async () => {
   const { service } = await loadThemePlugin()
   assert.deepEqual(
     service.themes.map((t) => [t.id, t.labelKey]),
     [
       ['black', 'LabelThemeBlack'],
       ['dark', 'LabelThemeDark'],
-      ['light', 'LabelThemeLight']
+      ['light', 'LabelThemeLight'],
+      ['llama', 'LabelThemeLlama']
     ]
   )
   const strings = JSON.parse(await read('../strings/en-us.json'))
