@@ -125,7 +125,7 @@ object WidgetRenderer {
     when (size) {
       WidgetSize.COMPACT -> R.layout.media_player_widget
       WidgetSize.WIDE -> R.layout.media_player_widget_wide
-      WidgetSize.FULL -> R.layout.media_player_widget
+      WidgetSize.FULL -> R.layout.media_player_widget_full
     }
 
   private fun build(context: Context, size: WidgetSize, state: State, bitmap: Bitmap?, actions: Actions): RemoteViews {
@@ -142,6 +142,17 @@ object WidgetRenderer {
     if (bitmap != null) views.setImageViewBitmap(R.id.widgetAlbumArt, bitmap) else views.setImageViewResource(R.id.widgetAlbumArt, R.drawable.icon)
     val playPauseResource = if (state.isPlaying) androidx.mediarouter.R.drawable.ic_media_pause_dark else androidx.mediarouter.R.drawable.ic_media_play_dark
     views.setImageViewResource(R.id.widgetPlayPauseButton, playPauseResource)
+
+    if (size == WidgetSize.FULL) {
+      // Snapshot only: fixed at this update, never advanced by a timer or scheduled work
+      val snapshot = WidgetText.snapshot(state.positionMs, state.durationMs)
+      views.setViewVisibility(R.id.widgetTimeRow, if (snapshot != null) View.VISIBLE else View.INVISIBLE)
+      views.setProgressBar(R.id.widgetProgress, WidgetText.PROGRESS_MAX, snapshot?.progress ?: 0, false)
+      if (snapshot != null) {
+        views.setTextViewText(R.id.widgetElapsedText, snapshot.elapsed)
+        views.setTextViewText(R.id.widgetRemainingText, snapshot.remaining)
+      }
+    }
     return views
   }
 
