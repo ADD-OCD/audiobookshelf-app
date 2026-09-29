@@ -2,27 +2,27 @@
   <!-- Main container - only shows when playback session exists, applies fullscreen/platform classes -->
   <div v-if="playbackSession" id="streamContainer" class="fixed top-0 left-0 layout-wrapper right-0 z-50 pointer-events-none" :class="{ fullscreen: showFullscreen, 'ios-player': $platform === 'ios', 'web-player': $platform === 'web' }">
     <!-- Fullscreen overlays: colored background and menu overlays -->
-    <div v-if="showFullscreen" class="w-full h-full z-10 absolute top-0 left-0 pointer-events-auto" :style="{ backgroundColor: coverRgb }">
+    <div v-if="showFullscreen" class="w-full h-full z-10 absolute top-0 left-0 pointer-events-auto" :style="{ backgroundColor: coverChrome.backdrop }">
       <!-- Background gradient for player -->
       <div class="w-full h-full absolute top-0 left-0 pointer-events-none" style="background: var(--gradient-audio-player)" />
 
       <!-- Collapse button - minimizes player -->
       <div class="top-4 left-4 absolute cursor-pointer">
-        <span class="material-symbols text-5xl" :class="{ 'text-black text-opacity-75': coverBgIsLight && theme !== 'black' }" @click="collapseFullscreen">keyboard_arrow_down</span>
+        <span class="material-symbols text-5xl" :class="{ 'text-black text-opacity-75': coverChrome.darkForeground }" @click="collapseFullscreen">keyboard_arrow_down</span>
       </div>
 
       <!-- Cast button - Chromecast toggle -->
       <div v-show="showCastBtn" class="top-6 right-16 absolute cursor-pointer">
-        <span class="material-symbols text-3xl" :class="coverBgIsLight && theme !== 'black' ? 'text-black' : ''" @click="castClick">{{ isCasting ? 'cast_connected' : 'cast' }}</span>
+        <span class="material-symbols text-3xl" :class="coverChrome.darkForeground ? 'text-black' : ''" @click="castClick">{{ isCasting ? 'cast_connected' : 'cast' }}</span>
       </div>
 
       <!-- Player options menu button -->
       <div class="top-6 right-4 absolute cursor-pointer">
-        <span class="material-symbols text-3xl" :class="{ 'text-black text-opacity-75': coverBgIsLight && theme !== 'black' }" @click="showMoreMenuDialog = true">more_vert</span>
+        <span class="material-symbols text-3xl" :class="{ 'text-black text-opacity-75': coverChrome.darkForeground }" @click="showMoreMenuDialog = true">more_vert</span>
       </div>
 
       <!-- Playback method indicator (Direct/Local/Transcode) -->
-      <p class="top-4 absolute left-0 right-0 mx-auto text-center uppercase tracking-widest text-opacity-75 z-50" :class="{ 'text-black text-opacity-75': coverBgIsLight && theme !== 'black' }" style="font-size: 10px">{{ isDirectPlayMethod ? $strings.LabelPlaybackDirect : isLocalPlayMethod ? $strings.LabelPlaybackLocal : $strings.LabelPlaybackTranscode }}</p>
+      <p class="top-4 absolute left-0 right-0 mx-auto text-center uppercase tracking-widest text-opacity-75 z-50" :class="{ 'text-black text-opacity-75': coverChrome.darkForeground }" style="font-size: 10px">{{ isDirectPlayMethod ? $strings.LabelPlaybackDirect : isLocalPlayMethod ? $strings.LabelPlaybackLocal : $strings.LabelPlaybackTranscode }}</p>
     </div>
 
     <!-- Overall book progress bar -->
@@ -61,7 +61,7 @@
       <p class="author-text text-fg text-opacity-75 truncate">{{ authorName }}</p>
     </div>
 
-    <div id="playerContent" class="playerContainer w-full z-20 absolute bottom-0 left-0 right-0 p-2 pointer-events-auto transition-all" :style="{ backgroundColor: showFullscreen ? '' : coverRgb }" @click="clickContainer">
+    <div id="playerContent" class="playerContainer w-full z-20 absolute bottom-0 left-0 right-0 p-2 pointer-events-auto transition-all" :style="{ backgroundColor: showFullscreen ? '' : coverChrome.backdrop }" @click="clickContainer">
       <!-- Top controls bar - fullscreen only: bookmarks, speed, sleep timer, chapters -->
       <div v-if="showFullscreen" class="absolute bottom-4 left-0 right-0 w-full pb-4 pt-2 mx-auto px-6" style="max-width: 414px">
         <div class="flex items-center justify-between pointer-events-auto">
@@ -95,10 +95,10 @@
             <span class="material-symbols text-3xl leading-none">replay</span>
             <span v-if="showFullscreen" class="jump-label text-[10px] font-semibold leading-tight">{{ jumpBackwardsLabel }}</span>
           </div>
-          <div class="play-btn cursor-pointer shadow-sm flex items-center justify-center rounded-full text-primary mx-4 relative overflow-hidden" :style="{ backgroundColor: coverRgb }" :class="{ 'animate-spin': seekLoading }" @mousedown.prevent @mouseup.prevent @click.stop="playPauseClick">
-            <div v-if="!coverBgIsLight" class="absolute top-0 left-0 w-full h-full bg-white bg-opacity-20 pointer-events-none" />
+          <div class="play-btn cursor-pointer shadow-sm flex items-center justify-center rounded-full text-primary mx-4 relative overflow-hidden" :style="{ backgroundColor: coverChrome.control }" :class="{ 'animate-spin': seekLoading }" @mousedown.prevent @mouseup.prevent @click.stop="playPauseClick">
+            <div v-if="!coverChrome.isLight" class="absolute top-0 left-0 w-full h-full bg-white bg-opacity-20 pointer-events-none" />
 
-            <span v-if="!showLoadingState" class="material-symbols fill" :class="{ 'text-white': coverRgb && !coverBgIsLight }">{{ seekLoading ? 'autorenew' : !isPlaying ? 'play_arrow' : 'pause' }}</span>
+            <span v-if="!showLoadingState" class="material-symbols fill" :class="{ 'text-white': coverChrome.control && !coverChrome.isLight }">{{ seekLoading ? 'autorenew' : !isPlaying ? 'play_arrow' : 'pause' }}</span>
             <widgets-spinner-icon v-else class="h-8 w-8" />
           </div>
           <div v-show="!playerSettings.lockUi" class="jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpForward">
@@ -139,6 +139,7 @@ import { Capacitor } from '@capacitor/core'
 import { AbsAudioPlayer } from '@/plugins/capacitor'
 import { Dialog } from '@capacitor/dialog'
 import { getAverageColorFromCoverUrl } from '@/utils/coverAverageColor'
+import coverPresentation from '@/theme/coverPresentation'
 import WrappingMarquee from '@/assets/WrappingMarquee.js'
 import jumpLabelMixin from '@/mixins/jumpLabel'
 
@@ -199,7 +200,12 @@ export default {
     showFullscreen(val) {
       this.updateScreenSize()
       this.$store.commit('setPlayerFullscreen', !!val)
-      document.querySelector('body').style.backgroundColor = this.showFullscreen ? this.coverRgb : ''
+      document.querySelector('body').style.backgroundColor = this.showFullscreen ? this.coverChrome.backdrop : ''
+    },
+    // Only a cover-color *policy* change (theme switch) re-syncs the fullscreen body background here, so a
+    // stale backdrop from the previous policy can't remain; legacy cover updates behave exactly as before.
+    'coverChrome.usesTheme'() {
+      if (this.showFullscreen) document.querySelector('body').style.backgroundColor = this.coverChrome.backdrop
     },
     bookCoverAspectRatio() {
       this.updateScreenSize()
@@ -209,8 +215,10 @@ export default {
     }
   },
   computed: {
-    theme() {
-      return document.documentElement.dataset.theme || 'dark'
+    // Chrome colors for the theme's presentation.cover-color policy (theme/coverPresentation.js):
+    // legacy = tinted from the sampled cover (previous behavior), theme = the theme's own surfaces
+    coverChrome() {
+      return coverPresentation.coverColorPresentation(this.$theme.theme, { rgb: this.coverRgb, isLight: this.coverBgIsLight })
     },
     menuItems() {
       const items = []

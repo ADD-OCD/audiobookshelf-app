@@ -20,8 +20,8 @@
 
     <div class="relative">
       <!-- background gradient -->
-      <div id="item-page-bg-gradient" class="absolute top-0 left-0 w-full pointer-events-none z-0" :style="{ opacity: coverRgb ? 1 : 0 }">
-        <div class="w-full h-full" :style="{ backgroundColor: coverRgb }" />
+      <div id="item-page-bg-gradient" class="absolute top-0 left-0 w-full pointer-events-none z-0" :style="{ opacity: headerCoverChrome.backdrop ? 1 : 0 }">
+        <div class="w-full h-full" :style="{ backgroundColor: headerCoverChrome.backdrop }" />
         <div class="w-full h-full absolute top-0 left-0" style="background: var(--gradient-item-page)" />
       </div>
 
@@ -173,6 +173,7 @@
 import { Dialog } from '@capacitor/dialog'
 import { AbsFileSystem, AbsDownloader } from '@/plugins/capacitor'
 import { getAverageColorFromCoverUrl } from '@/utils/coverAverageColor'
+import coverPresentation from '@/theme/coverPresentation'
 import cellularPermissionHelpers from '@/mixins/cellularPermissionHelpers'
 
 export default {
@@ -226,6 +227,11 @@ export default {
   },
   mixins: [cellularPermissionHelpers],
   computed: {
+    // Header color for the theme's presentation.cover-color policy (theme/coverPresentation.js):
+    // legacy = the sampled cover color (previous behavior), theme = the theme's own surface
+    headerCoverChrome() {
+      return coverPresentation.coverColorPresentation(this.$theme.theme, { rgb: this.coverRgb, isLight: this.coverBgIsLight })
+    },
     isIos() {
       return this.$platform === 'ios'
     },
