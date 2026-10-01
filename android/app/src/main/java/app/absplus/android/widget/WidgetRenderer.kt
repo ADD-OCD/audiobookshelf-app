@@ -121,7 +121,7 @@ object WidgetRenderer {
   }
 
   /**
-   * FULL presentation (side-by-side or expanded) and cover bounds for this widget from its reported size (redrawn
+   * FULL presentation (side-by-side, expanded or large) and cover bounds for this widget from its reported size (redrawn
    * on onAppWidgetOptionsChanged), or null before the launcher has reported one: then FULL is side-by-side with
    * the layouts' widget_full_artwork_max.
    */
@@ -146,26 +146,36 @@ object WidgetRenderer {
 
   /**
    * Layout per size; LLAMA has paint-only variants with the same ids, Dark/Black/Light keep the existing layouts.
-   * [expanded] selects FULL's stacked presentation (same ids); it doesn't affect COMPACT or WIDE.
+   * [full] selects FULL's presentation (same ids in every one); it doesn't affect COMPACT or WIDE.
    */
-  fun layoutFor(size: WidgetSize, theme: WidgetTheme, expanded: Boolean = false): Int =
+  fun layoutFor(size: WidgetSize, theme: WidgetTheme, full: FullArtwork.Presentation = FullArtwork.Presentation.NORMAL): Int =
     when (theme) {
       WidgetTheme.STANDARD ->
         when (size) {
           WidgetSize.COMPACT -> R.layout.media_player_widget
           WidgetSize.WIDE -> R.layout.media_player_widget_wide
-          WidgetSize.FULL -> if (expanded) R.layout.media_player_widget_full_expanded else R.layout.media_player_widget_full
+          WidgetSize.FULL ->
+            when (full) {
+              FullArtwork.Presentation.NORMAL -> R.layout.media_player_widget_full
+              FullArtwork.Presentation.EXPANDED -> R.layout.media_player_widget_full_expanded
+              FullArtwork.Presentation.LARGE -> R.layout.media_player_widget_full_expanded_large
+            }
         }
       WidgetTheme.LLAMA ->
         when (size) {
           WidgetSize.COMPACT -> R.layout.media_player_widget_llama
           WidgetSize.WIDE -> R.layout.media_player_widget_wide_llama
-          WidgetSize.FULL -> if (expanded) R.layout.media_player_widget_full_expanded_llama else R.layout.media_player_widget_full_llama
+          WidgetSize.FULL ->
+            when (full) {
+              FullArtwork.Presentation.NORMAL -> R.layout.media_player_widget_full_llama
+              FullArtwork.Presentation.EXPANDED -> R.layout.media_player_widget_full_expanded_llama
+              FullArtwork.Presentation.LARGE -> R.layout.media_player_widget_full_expanded_large_llama
+            }
         }
     }
 
   private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions, full: FullArtwork.Plan?): RemoteViews {
-    val views = RemoteViews(context.packageName, layoutFor(size, theme, expanded = full?.presentation == FullArtwork.Presentation.EXPANDED))
+    val views = RemoteViews(context.packageName, layoutFor(size, theme, full?.presentation ?: FullArtwork.Presentation.NORMAL))
     views.setOnClickPendingIntent(R.id.widgetPlayPauseButton, actions.playPause)
     views.setOnClickPendingIntent(R.id.widgetFastForwardButton, actions.fastForward)
     views.setOnClickPendingIntent(R.id.widgetRewindButton, actions.rewind)

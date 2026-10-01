@@ -8,6 +8,7 @@ import android.view.View.MeasureSpec
 import android.widget.ImageView
 import androidx.test.core.app.ApplicationProvider
 import app.absplus.android.widget.FullArtwork.Presentation.EXPANDED
+import app.absplus.android.widget.FullArtwork.Presentation.LARGE
 import app.absplus.android.widget.FullArtwork.Presentation.NORMAL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,7 +40,8 @@ class ExpandedFullTest {
   @Test
   fun wideAndTallFullExpandsToAVeryLargeCover() {
     assertEquals(NORMAL, plan(496, 510).presentation) // side-by-side already gives ~292dp
-    assertEquals(EXPANDED, plan(496, 861).presentation)
+    assertEquals(EXPANDED, plan(496, 686).presentation)
+    assertEquals(LARGE, plan(496, 861).presentation) // stacked, and tall enough for the larger readout/controls
     assertTrue(plan(496, 861).bounds.squareDp >= 450f)
   }
 
@@ -58,7 +60,7 @@ class ExpandedFullTest {
     for (w in 250..900 step 5) {
       for (h in 150..2400 step 5) {
         val p = plan(w, h)
-        if (p.presentation == EXPANDED) {
+        if (p.presentation != NORMAL) {
           val side = FullArtwork.bounds(w.toFloat(), h.toFloat())!!.squareDp
           val stacked = FullArtwork.expandedSquareDp(w.toFloat(), h.toFloat())
           assertTrue("${w}x$h gain", stacked >= side * FullArtwork.EXPANDED_GAIN && stacked >= side + FullArtwork.EXPANDED_MIN_GAIN_DP)
@@ -72,7 +74,7 @@ class ExpandedFullTest {
     for (w in 250..900 step 5) {
       var expanded = false
       for (h in 150..3000 step 5) {
-        val now = plan(w, h).presentation == EXPANDED
+        val now = plan(w, h).presentation != NORMAL
         assertTrue("${w}x$h flips back", !expanded || now)
         expanded = now
       }
@@ -133,5 +135,65 @@ class ExpandedFullTest {
       }
       assertTrue("portrait stays portrait and fills the height", ph > pw && ph + 2 * frame * density >= bounds.maxHeightDp * density - 2)
     }
+  }
+
+  @Test
+  fun ordinaryAndShorterStackedSizesKeepTheirSizing() {
+    for (w in 250..900 step 5) for (h in 150..260 step 2) assertEquals("${w}x$h", NORMAL, plan(w, h).presentation)
+    assertEquals(NORMAL, plan(360, 344).presentation)
+    assertEquals(EXPANDED, plan(360, 464).presentation)
+    assertEquals(EXPANDED, plan(360, 584).presentation) // the cover nearly fills the space: no room for LARGE
+    assertEquals(EXPANDED, plan(291, 458).presentation)
+    assertEquals(EXPANDED, plan(496, 686).presentation)
+  }
+
+  @Test
+  fun veryTallFullGetsTheLargeReadoutAndControls() {
+    assertEquals(LARGE, plan(360, 620).presentation) // e.g. the tallest S26 resize (~360x620dp)
+    assertEquals(LARGE, plan(496, 861).presentation)
+    assertEquals(LARGE, plan(291, 700).presentation)
+  }
+
+  @Test
+  fun largeBoundaryIsWherePlentyOfHeightIsLeftAboveAFullWidthCover() {
+    // LARGE when height >= width + 226.6dp: its readout/controls (2-line title) plus 8dp fit above a full-width cover
+    assertEquals(EXPANDED, plan(360, 586).presentation)
+    assertEquals(LARGE, plan(360, 587).presentation)
+    assertEquals(EXPANDED, plan(496, 722).presentation)
+    assertEquals(LARGE, plan(496, 723).presentation)
+    for (w in 250..900 step 5) {
+      var large = false
+      for (h in 150..3000 step 5) {
+        val p = plan(w, h)
+        if (p.presentation == LARGE) {
+          // LARGE never costs the cover anything: still the full content width with a two-line title
+          assertTrue("${w}x$h", FullArtwork.largeSpareDp(w.toFloat(), h.toFloat()) >= FullArtwork.LARGE_MARGIN_DP)
+          assertEquals("${w}x$h", w - 2 * FullArtwork.CONTENT_PADDING_DP, p.bounds.maxWidthDp, 0.01f)
+          assertTrue("${w}x$h", p.bounds.maxHeightDp >= p.bounds.maxWidthDp)
+        }
+        assertTrue("${w}x$h leaves LARGE", !large || p.presentation == LARGE)
+        large = p.presentation == LARGE
+      }
+    }
+  }
+
+  @Test
+  fun largeBoundsLeaveRoomForTheLargerReadoutProgressAndControls() {
+    for (w in 250..900 step 10) {
+      for (h in 400..3000 step 10) {
+        val p = plan(w, h)
+        if (p.presentation != LARGE) continue
+        val readout2 = FullArtwork.readoutHeightDp(titleLines = 2, large = true)
+        assertTrue("${w}x$h", (w - 2 * FullArtwork.CONTENT_PADDING_DP) + FullArtwork.EXPANDED_READOUT_GAP_DP + readout2 + FullArtwork.LARGE_VERTICAL_CHROME_DP <= h)
+        val readout1 = FullArtwork.readoutHeightDp(titleLines = 1, paddingDp = FullArtwork.READOUT_PADDING_MIN_DP, large = true)
+        assertTrue("${w}x$h backstop", p.bounds.maxHeightDp + FullArtwork.EXPANDED_READOUT_GAP_DP + readout1 + FullArtwork.LARGE_VERTICAL_CHROME_DP <= h + 0.01f)
+      }
+    }
+  }
+
+  @Test
+  fun largerFontsNeedMoreHeightForLarge() {
+    assertEquals(LARGE, plan(360, 590).presentation)
+    assertEquals(EXPANDED, FullArtwork.plan(360f, 590f, 1.3f)!!.presentation)
   }
 }

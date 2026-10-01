@@ -41,9 +41,11 @@ const VARIANTS = [
   ['media_player_widget.xml', 'media_player_widget_llama.xml'],
   ['media_player_widget_wide.xml', 'media_player_widget_wide_llama.xml'],
   ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml'],
-  ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']
+  ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml'],
+  ['media_player_widget_full_expanded_large.xml', 'media_player_widget_full_expanded_large_llama.xml']
 ]
-const FULL_LAYOUTS = ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml', 'media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']
+const STACKED_LAYOUTS = ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml', 'media_player_widget_full_expanded_large.xml', 'media_player_widget_full_expanded_large_llama.xml']
+const FULL_LAYOUTS = ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml', ...STACKED_LAYOUTS]
 const viewIds = (xml) => [...xml.matchAll(/android:id="@\+id\/([A-Za-z]+)"/g)].map((m) => m[1]).sort()
 
 test('each LLAMA layout has exactly the view ids (and so the actions) of its standard layout', async () => {
@@ -82,7 +84,7 @@ test('FULL artwork is bounded (both dimensions wrap, aspect kept, no crop, fallb
       assert.ok(art.includes(expected), `${file}: ${expected}`)
     }
   }
-  for (const file of ['media_player_widget_full_llama.xml', 'media_player_widget_full_expanded_llama.xml']) {
+  for (const file of ['media_player_widget_full_llama.xml', 'media_player_widget_full_expanded_llama.xml', 'media_player_widget_full_expanded_large_llama.xml']) {
     const llamaArt = attrs(await read(LAYOUTS + file), 'widgetAlbumArt')
     for (const frame of ['android:padding="2dp"', 'android:background="@drawable/widget_llama_artwork_frame"', 'android:cropToPadding="true"']) assert.ok(llamaArt.includes(frame), `${file}: LLAMA frame stays on the artwork view: ${frame}`)
   }
@@ -117,35 +119,38 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
   const std = await read(LAYOUTS + 'media_player_widget_full.xml')
   const llama = await read(LAYOUTS + 'media_player_widget_full_llama.xml')
   const expanded = [await read(LAYOUTS + 'media_player_widget_full_expanded.xml'), await read(LAYOUTS + 'media_player_widget_full_expanded_llama.xml')]
+  const large = [await read(LAYOUTS + 'media_player_widget_full_expanded_large.xml'), await read(LAYOUTS + 'media_player_widget_full_expanded_large_llama.xml')]
   for (const xml of [std, llama]) assert.equal(dp(xml, 'widgetReadout', 'layout_marginStart'), k('READOUT_MARGIN_DP'))
-  for (const xml of expanded) {
+  for (const xml of [...expanded, ...large]) {
     // the readout row (the readout's parent) sits EXPANDED_READOUT_GAP_DP below the cover area
     const readoutAt = xml.indexOf('android:id="@+id/widgetReadout"')
     const row = xml.slice(xml.lastIndexOf('<LinearLayout', xml.lastIndexOf('<LinearLayout', readoutAt) - 1), xml.lastIndexOf('<LinearLayout', readoutAt))
     assert.equal(Number(row.match(/android:layout_marginTop="(\d+)dp"/)[1]), k('EXPANDED_READOUT_GAP_DP'))
   }
-  for (const xml of [std, llama, ...expanded]) {
+  for (const [xml, isLarge] of [std, llama, ...expanded].map((x) => [x, false]).concat(large.map((x) => [x, true]))) {
     assert.equal(dp(xml, 'widgetContent', 'padding'), k('CONTENT_PADDING_DP'))
     assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width') + dp(xml, 'tinyCornerIcon', 'layout_marginStart'), k('CORNER_ICON_DP'))
-    assert.equal(dp(xml, 'widgetMediaTitle', 'textSize'), k('TITLE_TEXT_SP'))
+    assert.equal(dp(xml, 'widgetMediaTitle', 'textSize'), k(isLarge ? 'LARGE_TITLE_TEXT_SP' : 'TITLE_TEXT_SP'))
     assert.ok(attrs(xml, 'widgetMediaTitle').includes('android:maxLines="2"'), 'title wraps to at most two lines')
+    assert.ok(attrs(xml, 'widgetArtistText').includes('android:maxLines="1"') && attrs(xml, 'widgetArtistText').includes('android:ellipsize="end"'), 'author: one line, ellipsized')
+    assert.equal(dp(xml, 'widgetArtistText', 'textSize'), k(isLarge ? 'LARGE_TIME_TEXT_SP' : 'TIME_TEXT_SP'))
     assert.equal(dp(xml, 'widgetArtistText', 'layout_marginTop') + dp(xml, 'widgetTimeRow', 'layout_marginTop'), k('READOUT_LINE_GAPS_DP'))
-    assert.equal(dp(xml, 'widgetButtonContainer', 'layout_marginTop') + dp(xml, 'widgetButtonContainer', 'layout_height'), k('CONTROLS_DP'))
+    assert.equal(dp(xml, 'widgetButtonContainer', 'layout_marginTop') + dp(xml, 'widgetButtonContainer', 'layout_height'), k(isLarge ? 'LARGE_CONTROLS_DP' : 'CONTROLS_DP'))
     for (const id of ['widgetElapsedText', 'widgetRemainingText']) {
-      assert.equal(dp(xml, id, 'textSize'), k('TIME_TEXT_SP'))
+      assert.equal(dp(xml, id, 'textSize'), k(isLarge ? 'LARGE_TIME_TEXT_SP' : 'TIME_TEXT_SP'))
       assert.ok(attrs(xml, id).includes('android:fontFamily="monospace"'), `${id} is monospace`)
     }
   }
   // Width reserve uses the larger readout padding; height backstop the smaller progress bar (the layout limits height anyway)
-  const all = [std, llama, ...expanded]
+  const all = [std, llama, ...expanded, ...large]
   assert.equal(Math.max(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_DP'))
   assert.equal(Math.min(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_MIN_DP'))
   const progress = (xml) => dp(xml, 'widgetProgress', 'layout_marginTop') + dp(xml, 'widgetProgress', 'layout_height')
   assert.equal(Math.min(...all.map(progress)), k('PROGRESS_DP'))
 })
 
-test('EXPANDED FULL stacks cover, readout, progress and controls without overlap', async () => {
-  for (const file of ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']) {
+test('EXPANDED and LARGE FULL stack cover, readout, progress and controls without overlap', async () => {
+  for (const file of STACKED_LAYOUTS) {
     const xml = await read(LAYOUTS + file)
     const at = (id) => xml.indexOf(`android:id="@+id/${id}"`)
     // One vertical column inside widgetContent, in this order: cover area, readout row, progress, controls
@@ -160,8 +165,43 @@ test('EXPANDED FULL stacks cover, readout, progress and controls without overlap
     assert.equal(xml.slice(at('widgetAlbumArt'), at('widgetReadout')).match(/<\/LinearLayout>/g).length, 1, `${file}: the readout is outside the cover area`)
   }
   const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
-  assert.match(renderer, /WidgetSize\.FULL -> if \(expanded\) R\.layout\.media_player_widget_full_expanded else R\.layout\.media_player_widget_full\n/)
-  assert.match(renderer, /WidgetSize\.FULL -> if \(expanded\) R\.layout\.media_player_widget_full_expanded_llama else R\.layout\.media_player_widget_full_llama\n/)
+  for (const suffix of ['', '_llama']) {
+    for (const [presentation, layout] of [
+      ['NORMAL', 'full'],
+      ['EXPANDED', 'full_expanded'],
+      ['LARGE', 'full_expanded_large']
+    ]) {
+      assert.match(renderer, new RegExp(`FullArtwork\\.Presentation\\.${presentation} -> R\\.layout\\.media_player_widget_${layout}${suffix}\\n`), `${presentation}${suffix}`)
+    }
+  }
+})
+
+test('LARGE differs from EXPANDED only in readout text, control height and glyph inset', async () => {
+  const sizes = {
+    widgetMediaTitle: ['textSize', '16sp', '20sp'],
+    widgetArtistText: ['textSize', '13sp', '16sp'],
+    widgetElapsedText: ['textSize', '13sp', '16sp'],
+    widgetRemainingText: ['textSize', '13sp', '16sp'],
+    widgetButtonContainer: ['layout_height', '52dp', '72dp'],
+    widgetRewindButton: ['padding', '10dp', '14dp'],
+    widgetPlayPauseButton: ['padding', '10dp', '14dp'],
+    widgetFastForwardButton: ['padding', '10dp', '14dp']
+  }
+  for (const suffix of ['', '_llama']) {
+    const expandedXml = await read(LAYOUTS + `media_player_widget_full_expanded${suffix}.xml`)
+    let largeXml = await read(LAYOUTS + `media_player_widget_full_expanded_large${suffix}.xml`)
+    for (const [id, [attr, from, to]] of Object.entries(sizes)) {
+      assert.ok(attrs(expandedXml, id).includes(`android:${attr}="${from}"`), `expanded${suffix} ${id} ${from}`)
+      assert.ok(attrs(largeXml, id).includes(`android:${attr}="${to}"`), `large${suffix} ${id} ${to}`)
+      const at = largeXml.indexOf(`android:id="@+id/${id}"`),
+        start = largeXml.lastIndexOf('<', at),
+        end = largeXml.indexOf('>', at)
+      largeXml = largeXml.slice(0, start) + largeXml.slice(start, end).replace(`android:${attr}="${to}"`, `android:${attr}="${from}"`) + largeXml.slice(end)
+    }
+    // With those sizes reverted, LARGE is EXPANDED apart from its header comment: same structure, ids, paint and actions
+    const body = (xml) => xml.replace(/\r\n/g, '\n').replace(/^<!--.*?-->\n/, '')
+    assert.equal(body(largeXml), body(expandedXml), `large${suffix} structure`)
+  }
 })
 
 test('COMPACT and WIDE artwork keep their existing sizing (row height, crop) and get no responsive bounds', async () => {

@@ -26,12 +26,14 @@ class WidgetLayoutTest {
   }
 
   @Test
-  fun expandedOnlyChangesFullAndKeepsTheTheme() {
-    assertEquals(R.layout.media_player_widget_full_expanded, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.STANDARD, expanded = true))
-    assertEquals(R.layout.media_player_widget_full_expanded_llama, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.LLAMA, expanded = true))
+  fun fullPresentationsOnlyChangeFullAndKeepTheTheme() {
+    assertEquals(R.layout.media_player_widget_full_expanded, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.STANDARD, FullArtwork.Presentation.EXPANDED))
+    assertEquals(R.layout.media_player_widget_full_expanded_llama, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.LLAMA, FullArtwork.Presentation.EXPANDED))
+    assertEquals(R.layout.media_player_widget_full_expanded_large, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.STANDARD, FullArtwork.Presentation.LARGE))
+    assertEquals(R.layout.media_player_widget_full_expanded_large_llama, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.LLAMA, FullArtwork.Presentation.LARGE))
     for (theme in WidgetTheme.values()) {
       for (size in listOf(WidgetSize.COMPACT, WidgetSize.WIDE)) {
-        assertEquals("$size $theme", WidgetRenderer.layoutFor(size, theme), WidgetRenderer.layoutFor(size, theme, expanded = true))
+        for (full in FullArtwork.Presentation.values()) assertEquals("$size $theme $full", WidgetRenderer.layoutFor(size, theme), WidgetRenderer.layoutFor(size, theme, full))
       }
     }
   }
