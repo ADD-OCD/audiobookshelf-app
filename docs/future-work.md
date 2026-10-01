@@ -34,3 +34,21 @@ The FULL widget's progress and time are a snapshot from the last widget update (
 ## Widget session mismatch after restart
 
 After a process restart the widget shows `deviceData.lastPlaybackSession`, while widget Play resumes the session chosen by the restoration store. On the emulator these were different books. This is pre-existing (the baseline build shows the same session) and lives in playback/restoration, so it was not changed in Phase 2B.
+
+## Widget responsive-layout text containment
+
+Found in Phase 2C Gate F; it affects every widget theme. LLAMA was mitigated with spacing and text-size changes in its own layouts. The standard layouts are unchanged.
+
+- **FULL NORMAL:** the readout panel takes the cover row's height. At narrow widths (≤~300dp) `FullArtwork` limits the cover by the width, so the readout gets ~86dp at every height, while a two-line title, author and time row need ~101dp. The time row (and the author) are squeezed.
+- **COMPACT / WIDE:** two text lines share half of a short row and clip below ~72–92dp tall, depending on theme and layout.
+- **Font scale:** larger scales widen both.
+
+Measured boundaries are in `docs/widget-architecture.md` (Gate F section). `WidgetContainmentTest` asserts only the sizes that fit today.
+
+A complete correction needs its own gate. Areas to investigate (no solution chosen):
+
+- `FullArtwork` planning: reserve the readout's minimum height at narrow sizes instead of following the cover.
+- A readout minimum-height reservation in the NORMAL layouts.
+- The NORMAL/EXPANDED choice at narrow or short sizes.
+- Accessibility font-scale behavior in every presentation.
+- Whether the standard layouts get the same mitigation.

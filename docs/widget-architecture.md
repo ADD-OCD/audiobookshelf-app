@@ -83,6 +83,64 @@ A `Chronometer` was considered and rejected: it counts wall-clock time at 1×, s
 
 Observed, not changed (pre-existing, outside the widget): after a restart the widget shows `deviceData.lastPlaybackSession`, while widget Play resumes the session chosen by the restoration store; on the test device these were different books. The baseline build shows the same session.
 
+## LLAMA widget polish and text containment (Phase 2C Gate F)
+
+LLAMA layouts and drawables only. Standard layouts and drawables, `WidgetSize`, `FullArtwork`, the renderer, the provider and its info XML are unchanged. Hashes pin them in `tests/widget-theme.test.mjs`, and Robolectric renders 434 standard-theme cases identically before and after.
+
+**Shared clipping limitation (found, not fixed).** Text can clip in every theme, because of how space is allocated:
+
+- **FULL NORMAL:** the readout's height follows the cover row. At narrow widths (≤~300dp) the cover is limited by the width to ~86dp, so the readout is ~86dp at every height, while a two-line title, author and time row need ~101dp.
+- **COMPACT / WIDE:** two text lines share half of a short row.
+- **Font scale:** larger scales widen both problems.
+
+The originally reported cases (LLAMA ~291×174dp FULL NORMAL with a two-line title, time row ~2dp; LLAMA COMPACT title) are instances of this. A complete fix needs responsive-layout changes (see `docs/future-work.md`). Gate F mitigates LLAMA only.
+
+**LLAMA mitigation (exact values):**
+
+- **COMPACT:** title 13sp, author 12sp, `includeFontPadding=false`.
+- **WIDE:** `includeFontPadding=false` on title and author (sizes unchanged).
+- **FULL NORMAL:**
+
+  - readout `paddingVertical` 8→4dp (horizontal stays 8dp, the width reserve);
+  - author `layout_marginTop` 2→0dp;
+  - time row `layout_marginTop` 8→4dp;
+  - `includeFontPadding=false` on title, author and both times.
+
+  `FullArtwork`'s readout constants are a reserve; the LLAMA NORMAL readout now uses less than they model, so cover and icon planning stay conservative.
+
+- **EXPANDED / LARGE:** spacing unchanged (they never clipped).
+
+Measured clipping boundaries with a long two-line title (Robolectric, real font metrics, 420dpi):
+
+| LLAMA                   | Before (font 1.0)                        | After (font 1.0)            | Before (font 1.3)     | After (font 1.3)                                       |
+| ----------------------- | ---------------------------------------- | --------------------------- | --------------------- | ------------------------------------------------------ |
+| FULL NORMAL 291×174     | time row 1.9dp                           | contained                   | clipped               | clipped                                                |
+| FULL NORMAL ≥291dp wide | clipped ≤186dp tall, every height at 291 | clipped only 150–168dp tall | clipped at most sizes | ≥360 wide contained from 192dp; narrower still clipped |
+| FULL NORMAL ~250dp wide | clipped every height                     | clipped every height        | clipped               | clipped                                                |
+| COMPACT                 | clipped ≤92dp tall                       | clipped ≤72dp tall          | clipped ≤112dp        | clipped ≤88dp                                          |
+| WIDE                    | clipped ≤88dp tall                       | clipped ≤80dp tall          | clipped ≤108dp        | clipped ≤96dp                                          |
+
+On the emulator's Pixel launcher, all of these fit: one row (360×104dp, WIDE), two rows (360×224dp, FULL NORMAL, also at font 1.3) and EXPANDED (to 584dp).
+
+**Paint:**
+
+- **Time readouts:** the accent green in every FULL presentation (they were text/muted). With the play glyph neutral there is one accent zone, the readout display, and the bold white title still leads. On the near-black well: 12.3:1.
+- **Play glyph:** the neutral text color like the jump glyphs (was the accent). It has 6.4:1 on the steel face, against 5.0:1 for the accent. Play/pause reads from the glyph's shape, and the accent stays reserved for readouts.
+- **Radii:** steel keys 8→4dp and the readout well 6→4dp (the app's key/well radius). The chassis keeps the launcher's widget radius, the artwork frame stays square, and the progress bar stays 3dp.
+- **Unchanged:** artwork, frame, chassis, progress and icon placement.
+
+**Tests:**
+
+- `WidgetContainmentTest` (Robolectric, native graphics) lays out the real RemoteViews and asserts:
+
+  - the LLAMA sizes that now fit (291×174; FULL NORMAL 291–400dp wide from 174dp tall, and from 192dp at font 1.3 for ≥360dp; COMPACT from 76dp, or 92dp at 1.3; WIDE from 88dp, or 104dp at 1.3; EXPANDED and LARGE);
+  - unchanged cover/control/play geometry in both themes;
+  - an icon that takes no layout space and never overlaps content.
+
+  Known-limit sizes are documented, not asserted. A mutation run against the pre-Gate-F layouts fails the containment tests and passes the geometry ones.
+
+- It needs `testOptions.unitTests.includeAndroidResources = true` to inflate app layouts. That is a unit-test-only option: debug and release APKs built with and without it are identical entry for entry.
+
 ## Galaxy S26 Ultra findings (One UI, first real-device pass)
 
 The CI-signed debug build installed alongside production. Player, item page, mini-player, Up Next and normal widget sizes were accepted. Two corrections followed (Phase 2C): the FULL widget's artwork at very tall resizes (above; first a fixed cap, then responsive bounds after the S26 retest preferred the large cover), and a LLAMA-only recessed treatment for the Chapters list. Extreme resizes are only approximated on the emulator; the S26 retest is the real check.
