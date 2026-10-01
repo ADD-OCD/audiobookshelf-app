@@ -197,6 +197,44 @@ They all follow one hierarchy: the existing raised chassis dialog panel, then a 
 
 Cascade: a state rule outranks the row-seam rule it shares an element with, by equal specificity and later order; a test computes this. Without it, the selected speed lost its key to the seam rule.
 
+### Browsing and detail surfaces (Phase 2C Gate D)
+
+Paint only:
+
+- home shelves;
+- the bookshelf toolbar;
+- the library selector and the library list;
+- card types;
+- item, collection and playlist detail pages;
+- detail tables;
+- group-item tables.
+
+Geometry, navigation, data loading, filters, sorting and actions are unchanged. Content stays dominant: artwork is mounted, information sits in recessed displays, tappable section headers are raised strips, and only real controls become keys. `PRIMARY_STEEL` stays reserved for the play button. The completed player, the Gate C overlays and Chapters carry none of these hooks, and a test checks that.
+
+- **Artwork:** every card type marks its artwork box with the generic `card-artwork` hook. That's the series, collection and playlist cards' inner cover box, the author card's portrait box (its rounded portrait shape is kept), and the cover box of collection and playlist table rows. It's never a card root or row; a test checks each template. Detail artwork (`detail-artwork`) gets the same mounted frame on the squared frame radius:
+  - the item page's cover box, which also holds the progress bar;
+  - the collection and playlist cover components, at their detail-page usage only.
+- **Shelves:** each home section (`shelf-section`) ends in an engraved seam. It's drawn beneath the shelf's content, so in the standard shelf view the shelf's own divider covers it; it only shows in the alternative view.
+- **Toolbar** (`browse-toolbar`): a chassis strip seamed off from the content below.
+  - The active-filter dot (`filter-indicator`) was success green. It's now the accent: an active state, not a completion.
+- **Library selector** (`library-selector`, in the app bar): a key that inverts while pressed.
+- **Library list** (`library-option-panel`): recessed well with seamed rows. The current library (`option-selected`) is a `SELECTED_KEY` on a lit row, and its marker (`option-marker`) is the accent instead of warning orange.
+- **Item detail:**
+  - The progress box (`detail-progress`) is a recessed display; its text is unchanged.
+  - The tappable Chapters/Tracks/Ebook-file headers (`section-bar`) are raised strips.
+  - Their count badges (`section-count`) are small recessed accent readouts.
+  - The tables (`tracksTable`) become a recessed display with a dark zebra.
+  - Action buttons keep the existing steel `.btn` treatment.
+- **Collection and playlist detail:**
+  - The items table (`group-items`) is a recessed well under a raised header strip, with the count and total duration (`section-readout`) as accent readouts.
+  - Collection rows (`group-row`) are seamed display entries.
+  - Row play buttons (`row-play-btn`) are keys.
+  - Playlist rows keep their own entry panels.
+- **Semantics:**
+  - Unfinished progress bars stay amber and finished ones stay success green, through the existing rule; Gate D adds no progress selectors.
+  - No Gate D rule uses success or warning colors.
+  - Cascade checks: the selected library outranks its row seam; the LLAMA table zebra outranks both the LLAMA base rows and `assets/app.css`; the artwork frame outranks the author card's `box-shadow-book` utility.
+
 Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
 | Token                                              | RGB                               | Role                                                                                                              |
