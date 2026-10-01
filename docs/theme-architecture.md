@@ -73,7 +73,7 @@ Phase 2 adds one semantic color and two validated policies.
 - **`presentation.cover-color`** (`legacy` | `theme`):
   - `legacy` keeps player and item chrome tinted from cover art (existing behavior).
   - `theme` makes that chrome use the theme palette instead. The cover art itself is untouched.
-  - Implemented in `theme/coverPresentation.js`, a pure projection from the validated theme and the unchanged cover sample to the chrome values. It covers the full-player backdrop, the mini-player panel, the fullscreen body background, the play-button surface, the white wash and icon, the dark-foreground decision, and the item-header fill.
+  - Implemented in `theme/coverPresentation.js`, a pure projection from the validated theme and the unchanged cover sample to the chrome values. It covers the full-player backdrop, the mini-player panel, the fullscreen body background, the play-button surface, the white wash (`controlWash`, Gate B) and icon, the dark-foreground decision, and the item-header fill.
   - Under `legacy` it returns exactly the previous expressions, including Black's light-foreground exception.
   - Under `theme` it returns fixed references to `surface.base` (backdrop, panel, body, header) and `surface.raised` (play button).
   - `AudioPlayer.vue` and `pages/item/_id/index.vue` only bind to the projection. A watcher re-syncs the fullscreen body background when the _policy_ changes, so a theme switch while fullscreen can't leave a stale color.
@@ -120,12 +120,46 @@ A test compiles the real content with Tailwind and fails if any recipe selector 
   Each level equals a value existing rules already used, so adopting them changed nothing on screen. A few older shadows (the play button, the Chapters header, the drawer edge, the mini-player and shelf ledge, which mirror their components' own shadows) keep their values until the gate that restyles those surfaces.
 
 - **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
-- **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Defined for later use (queue, chapter, table and dialog rows, toolbar and player-zone boundaries); not applied yet.
+- **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Gate B applies it to the player (transport vs secondary row); queue, chapter, table and dialog rows are later gates. `ENGRAVED_SEPARATOR_TOP` is the same seam on a top edge, and `RECESSED_FACE` is a recessed-display bevel as a background layer (both Gate B).
 - **Control states** (complete declaration sets):
-  - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Not applied yet; Gate B decides where it fits.
+  - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Gate B applies it to the player keys.
   - `SELECTED_KEY`: pressed in (inset bevel plus inner shade) with an accent ring inside the edge. Selection reads as a physical state, not only a color. Not applied yet; Gates C and E consume it.
 
 Semantic hooks: artwork framing targets the generic `card-artwork` class instead of the `book-card-*` id prefix. `LazyBookCard` (whose root is the cover) and the cover box of `LazyListBookCard` carry it. The old id-prefix selector also matched the list card's whole row, so list view used to frame every row. A test checks both templates.
+
+### Full player and mini-player (Phase 2C Gate B)
+
+Paint only. Every player box, control position, size, order and touch target is unchanged. The emulator check found 22 geometry roles with 0 Dark-vs-LLAMA differences, all identical to Gate A, and a 120px mini-player. Dark/Black/Light get no new rules.
+
+- **Artwork:** the player artwork uses the squared `RADIUS.frame` (2px) instead of the fullscreen 16px card radius (mini was 3px). Fullscreen artwork adds `ELEVATION.panel`, so it sits mounted on the chassis. Size, position, crop and aspect ratio are unchanged.
+- **Transport deck:** the existing 200px fullscreen bottom panel (`#playerContent`) becomes a raised chassis panel:
+
+  - the `surface.content` fill, `CHASSIS_SHEEN` and `RAISED_BEVEL`;
+  - a dark seam above it, against the artwork zone.
+
+  It holds the seek display, transport row and secondary row exactly where they were.
+
+- **Seams:**
+  - `ENGRAVED_SEPARATOR` on `#playerControls` divides the transport row from the secondary row;
+  - a new mirror primitive, `ENGRAVED_SEPARATOR_TOP`, on the mini-player's seek region divides it from the title/controls zone.
+- **Keys:** the new `player-key` hook marks controls that read as physical keys:
+
+  - transport: chapter start/end and both jumps (the jumps are also the mini-player's);
+  - secondary row: queue, bookmark, sleep and chapters.
+
+  They get `KEY_CAP` on their own box, and `KEY_CAP_PRESSED` while pressed. A key that is currently unavailable (loading, no next chapter, no chapters) also carries `key-disabled`, next to its existing dimmed glyph. It then has no cap, so it reads flat by shape as well as color. Readouts (speed, sleep countdown) don't fit a cap inside their boxes and stay bare. The invisible podcast bookmark placeholder isn't a key. The play button stays round.
+
+- **Play button:** `coverPresentation` now also returns `controlWash`, which decides whether the button keeps its translucent white wash:
+
+  - `legacy`: `!isLight`, exactly the previous `v-if`;
+  - `theme`: `false`.
+
+  The wash sat above the steel sheen and inset bevel and flattened both. The template binds only to the projection; there are no theme-id checks in the player.
+
+- **Readouts:**
+  - The sleep countdown (`sleep-readout` hook) uses the phosphor accent like the other live readouts. This is a presentation mapping; `state.success` still means finished/complete everywhere.
+  - The fullscreen seek and total-track wells gain `RECESSED_FACE`, a background-layer bevel that follows `background-clip: content-box` (an inset shadow would span the padding). It adds a dark upper lip with an inner shade and a faint light lower lip.
+- **Pending seek:** the seek code's pending state (`bg-yellow-300`, until playback confirms the position) was a near-identical yellow next to the amber played bar. LLAMA draws it as the same amber broken into segments, so it reads as unsettled by pattern, not only by hue. Seek behavior and the class toggling are unchanged.
 
 Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
