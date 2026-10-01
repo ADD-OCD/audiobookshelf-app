@@ -84,6 +84,7 @@ android {
     }
   }
   testOptions {
+    unitTests.includeAndroidResources = true
     unitTests.all {
       // Paper's Kryo serializers reflect into JDK internals, which JDK 17+ only allows when opened
       jvmArgs '--add-opens=java.base/java.util=ALL-UNNAMED', '--add-opens=java.base/java.lang=ALL-UNNAMED'
