@@ -7,7 +7,7 @@
     </template>
 
     <div class="w-full h-full overflow-hidden absolute top-0 left-0 flex items-center justify-center" @click="show = false">
-      <div ref="container" class="w-full overflow-x-hidden overflow-y-auto bg-secondary rounded-lg border border-fg/20" style="max-height: 75%" @click.stop>
+      <div ref="container" class="chapters-panel w-full overflow-x-hidden overflow-y-auto bg-secondary rounded-lg border border-fg/20" style="max-height: 75%" @click.stop>
         <div class="sticky top-0 z-10 bg-secondary grid grid-cols-[1fr_auto_auto] gap-2 px-3 py-2 border-b border-fg/10 transition-shadow" :class="{ 'shadow-md': isScrolled }">
           <div>
             <p class="text-fg-muted text-sm">{{ $strings.LabelChapters }}</p>

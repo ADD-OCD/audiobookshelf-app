@@ -171,6 +171,31 @@ test('LLAMA progress repaint targets only unfinished playback bars, never warnin
   assert.equal(rules[progress[0]]['background-color'], 'rgb(var(--color-track-cursor))')
 })
 
+test('Chapters: LLAMA-only paint (recessed list, chassis header, lit current row); amber marker untouched', async () => {
+  const rules = presets.presentationRules([llama()])
+  const chapters = Object.entries(rules).filter(([s]) => s.includes('.chapters-panel'))
+  assert.ok(chapters.length >= 4)
+  for (const [selector, declarations] of chapters) {
+    assert.ok(selector.startsWith("html[data-theme='llama'] .modal .chapters-panel"), selector)
+    assert.doesNotMatch(selector, /bg-yellow-400/, 'the current-chapter marker keeps its amber')
+    for (const property of Object.keys(declarations)) assert.match(property, /^(background-color|background-image|box-shadow|color)$/, `${selector}: ${property} (paint only)`)
+  }
+  const t = llama().tokens
+  assert.equal(rules["html[data-theme='llama'] .modal .chapters-panel.bg-secondary"]['background-color'], 'rgb(var(--color-recessed))')
+  // Current row is clearly lit against the well; text stays readable on both
+  assert.equal(rules["html[data-theme='llama'] .modal .chapters-panel li.bg-primary"]['background-color'], 'rgb(var(--color-bg))')
+  assert.ok(luminance(t['surface.content']) > luminance(t['surface.recessed']) * 2)
+  for (const surface of ['surface.recessed', 'surface.content']) assert.ok(contrast(t['text.muted'], t[surface]) >= 4.5, `muted times on ${surface}`)
+  // Header labels on the raised strip get the same contrast margin as other small muted headers
+  const blend = t['text.primary'].map((c, i) => Math.round(c * 0.85 + t['surface.raised'][i] * 0.15))
+  assert.ok(contrast(blend, t['surface.raised']) >= 4.5, 'header labels')
+  // Standard themes: no rules at all, and the hook class is the only template change
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+  const modal = await read('../components/modals/ChaptersModal.vue')
+  assert.match(modal, /class="chapters-panel w-full overflow-x-hidden overflow-y-auto bg-secondary rounded-lg border border-fg\/20"/)
+  assert.match(modal, /class="w-0\.5 h-full absolute top-0 left-0 bg-yellow-400"/)
+})
+
 test('LLAMA toggle styling keeps the on-state color and only recolors the off slot and thumb', () => {
   const rules = presets.presentationRules([llama()])
   const toggle = Object.entries(rules).filter(([s]) => s.includes('border-gray-400'))
