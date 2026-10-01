@@ -1,7 +1,7 @@
 <template>
   <div ref="card" :id="`book-card-${index}`" :style="{ minWidth: width + 'px', maxWidth: width + 'px', height: height + 'px' }" class="rounded-sm z-10 cursor-pointer py-1" @click="clickCard">
     <div class="h-full flex relative">
-      <div class="list-card-cover relative">
+      <div class="card-artwork list-card-cover relative">
         <!-- When cover image does not fill -->
         <div v-show="showCoverBg" class="absolute top-0 left-0 w-full h-full overflow-hidden rounded-sm bg-primary">
           <div class="absolute cover-bg" ref="coverBg" />

@@ -36,13 +36,49 @@ function equipmentDerivedDeclarations(tokens) {
  * An empty suffix targets the theme root itself. Values may only reference CSS variables emitted by
  * the token layer or by equipmentDerivedDeclarations.
  */
-// Paint-only building blocks (no border widths, padding, transforms or layout properties)
+// --- Shared equipment primitives ---
+// Paint-only building blocks (no border widths, padding, transforms or layout properties). One light source:
+// light upper/left edges, dark lower/right edges, drop shadows falling down. Later gates compose rules from
+// these instead of adding one-off values. All are fixed repository values; theme data cannot supply any.
+
+// Radius scale: squared, restrained geometry. Circular playback controls keep their own full rounding.
+const RADIUS = Object.freeze({
+  frame: '2px', // artwork frames and fine detail
+  key: '4px', // wells, panels and equipment keys
+  round: '9999px' // circular controls only (e.g. the play button)
+})
+
+// Edge treatments
 const RAISED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-light) / 0.55), inset -1px -1px 0 rgb(var(--color-edge-dark))'
 const PRESSED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.35)'
 const RECESSED_WELL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.25), inset 0 2px 6px rgb(0 0 0 / 0.45)'
 const STEEL_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)'
 const CHASSIS_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.1) 0%, rgb(var(--color-edge-light) / 0) 40%, rgb(0 0 0 / 0.2) 100%)'
 const ARTWORK_FRAME = '0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 2px rgb(var(--color-edge-light) / 0.45)'
+// A seam cut into the bottom of an element: dark inset line with a faint light return line below it.
+// Drawn inside the element's own box (inset), so row dimensions never change.
+const ENGRAVED_SEPARATOR = 'inset 0 -1px 0 rgb(var(--color-edge-light) / 0.12), inset 0 -2px 0 rgb(var(--color-edge-dark))'
+
+// Elevation: the only drop shadows the recipe uses (each value matches what existing rules already used)
+const ELEVATION = Object.freeze({
+  raised: '0 2px 3px rgb(0 0 0 / 0.45)', // subtle raised surface: buttons
+  panel: '3px 3px 6px rgb(0 0 0 / 0.5)', // equipment panel / framed object: cards, artwork
+  overlay: '0 6px 16px rgb(0 0 0 / 0.55)' // prominent frame floating above the chassis: dialogs, menus
+})
+
+// Control states as complete declaration sets, for rules to reuse as-is
+// Subtle key cap for an existing bare-glyph control: a bevelled steel face on the control's own box (no fill
+// change, no size change); pressed inverts the bevel
+const KEY_CAP = Object.freeze({ 'border-radius': RADIUS.key, 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL })
+const KEY_CAP_PRESSED = Object.freeze({ 'background-image': 'none', 'box-shadow': PRESSED_BEVEL })
+// Selected equipment key: pressed in (inset bevel and inner shade, so it reads as a different physical state,
+// not just a color) with an accent ring inside the edge
+const SELECTED_KEY = Object.freeze({
+  'background-image': 'none',
+  'box-shadow': `inset 0 0 0 1px rgb(var(--color-accent) / 0.9), ${PRESSED_BEVEL}, inset 0 2px 5px rgb(0 0 0 / 0.45)`
+})
+
+const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
 
 const EQUIPMENT_RULES = [
   // Navigation chrome: bevelled chassis strips
@@ -53,37 +89,43 @@ const EQUIPMENT_RULES = [
   ['#bookshelf-navbar a.bg-primary', { 'background-image': 'none', 'box-shadow': `${PRESSED_BEVEL}, inset 0 -2px 0 rgb(var(--color-accent))` }],
 
   // Buttons: steel sheen over the existing (semantic) button color, raised; pressed = inset
-  ['.btn:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 2px 3px rgb(0 0 0 / 0.45)` }],
-  ['.btn:not(:disabled):active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
-  ['.icon-btn:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
-  ['.icon-btn:not(:disabled):active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
+  ['.btn:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': `${RAISED_BEVEL}, ${ELEVATION.raised}` }],
+  ['.btn:not(:disabled):active', KEY_CAP_PRESSED],
+  // Only the bordered icon buttons (IconBtn/ReadIconBtn add `border` unless borderless) are steel keys;
+  // borderless icon buttons are intentionally bare glyphs and stay that way
+  ['.icon-btn.border:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
+  ['.icon-btn.border:not(:disabled):active', KEY_CAP_PRESSED],
 
   // Text fields and selects: recessed display wells
   ['input:not([type=range]):not([type=checkbox]):not([type=radio])', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
   ['textarea', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
 
   // Dialog / menu panels: raised chassis
-  ['.modal .rounded-lg.bg-primary', { 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 6px 16px rgb(0 0 0 / 0.55)` }],
+  ['.modal .rounded-lg.bg-primary', { 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, ${ELEVATION.overlay}` }],
   // Up Next list: a recessed playlist well inside the chassis
-  ['.modal .queue-panel.rounded-lg.bg-primary', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': 'none', 'box-shadow': `${RECESSED_WELL}, 0 6px 16px rgb(0 0 0 / 0.55)` }],
+  ['.modal .queue-panel.rounded-lg.bg-primary', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': 'none', 'box-shadow': `${RECESSED_WELL}, ${ELEVATION.overlay}` }],
   // Chapters list: the same recessed well under a blue-gray chassis header strip (ChaptersModal hook class)
-  ['.modal .chapters-panel.bg-secondary', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': `${RECESSED_WELL}, 0 6px 16px rgb(0 0 0 / 0.55)` }],
+  ['.modal .chapters-panel.bg-secondary', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': `${RECESSED_WELL}, ${ELEVATION.overlay}` }],
   ['.modal .chapters-panel > .sticky.bg-secondary', { 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 1px 0 rgb(var(--color-edge-dark))` }],
   ['.modal .chapters-panel > .sticky.bg-secondary.shadow-md', { 'box-shadow': `${RAISED_BEVEL}, 0 1px 0 rgb(var(--color-edge-dark)), 0 4px 8px rgb(0 0 0 / 0.5)` }],
   ['.modal .chapters-panel > .sticky p.text-fg-muted', { color: 'rgb(var(--color-fg) / 0.85)' }],
   // Current chapter: a lit row on the dark well (the amber marker stays)
   ['.modal .chapters-panel li.bg-primary', { 'background-color': 'rgb(var(--color-bg))' }],
+  // Current-chapter marker: the same played-progress amber as the seek bar (same element, size and position)
+  ['.modal .chapters-panel li > .bg-yellow-400', { 'background-color': 'rgb(var(--color-track-cursor))' }],
 
   // Side drawer: chassis edge facing the page
   ['.layout-wrapper .w-64.bg-bg', { 'background-image': CHASSIS_SHEEN, 'box-shadow': 'inset 1px 0 0 rgb(var(--color-edge-light) / 0.45), -2px 0 8px rgb(0 0 0 / 0.5)' }],
 
-  // Artwork: thin outer frame (outside the image, so the artwork stays fully visible and unresized)
+  // Artwork: thin outer frame (outside the image, so the artwork stays fully visible and unresized).
+  // Card artwork is marked by the `card-artwork` hook: the grid card itself (it is the cover) and, in list
+  // rows, only the cover box, never the whole row
   ['.cover-wrapper', { 'box-shadow': ARTWORK_FRAME }],
-  ['[id^=book-card]', { 'box-shadow': `${ARTWORK_FRAME}, 3px 3px 6px rgb(0 0 0 / 0.5)` }],
+  ['.card-artwork', { 'box-shadow': `${ARTWORK_FRAME}, ${ELEVATION.panel}` }],
 
   // Player: recessed display behind the fullscreen seek/readout rows (content box only: padding stays chassis)
-  ['.fullscreen #playerTrack', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': '4px' }],
-  ['.fullscreen .total-track', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': '4px' }],
+  ['.fullscreen #playerTrack', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
+  ['.fullscreen .total-track', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
   // Seek channels read as inset slots; the played portion stays the amber token even after the player's
   // seek code swaps in its settled-state class (bg-gray-200); the pending-seek highlight is left as is
   ['#playerTrack div.relative.rounded-full', { 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)' }],
@@ -155,4 +197,4 @@ function presentationRules(themes) {
 
 const builtinPresentationRules = () => presentationRules(engine.THEMES)
 
-module.exports = { presentationRules, builtinPresentationRules, equipmentDerivedDeclarations, EQUIPMENT_RULES }
+module.exports = { presentationRules, builtinPresentationRules, equipmentDerivedDeclarations, EQUIPMENT_RULES, PRIMITIVES }
