@@ -143,31 +143,42 @@ class ExpandedFullTest {
     assertEquals(NORMAL, plan(360, 344).presentation)
     assertEquals(EXPANDED, plan(360, 464).presentation)
     assertEquals(EXPANDED, plan(360, 584).presentation) // the cover nearly fills the space: no room for LARGE
+    assertEquals(EXPANDED, plan(396, 651).presentation) // LARGE before the S26 refinement; now short of width + 259dp
+    assertEquals(EXPANDED, plan(496, 754).presentation)
     assertEquals(EXPANDED, plan(291, 458).presentation)
     assertEquals(EXPANDED, plan(496, 686).presentation)
   }
 
   @Test
   fun veryTallFullGetsTheLargeReadoutAndControls() {
-    assertEquals(LARGE, plan(360, 620).presentation) // e.g. the tallest S26 resize (~360x620dp)
+    assertEquals(LARGE, plan(360, 620).presentation)
     assertEquals(LARGE, plan(496, 861).presentation)
     assertEquals(LARGE, plan(291, 700).presentation)
   }
 
   @Test
   fun largeBoundaryIsWherePlentyOfHeightIsLeftAboveAFullWidthCover() {
-    // LARGE when height >= width + 226.6dp: its readout/controls (2-line title) plus 8dp fit above a full-width cover
-    assertEquals(EXPANDED, plan(360, 586).presentation)
-    assertEquals(LARGE, plan(360, 587).presentation)
-    assertEquals(EXPANDED, plan(496, 722).presentation)
-    assertEquals(LARGE, plan(496, 723).presentation)
+    // LARGE when height >= width + 259dp: just below, exactly at and just above the boundary
+    assertEquals(EXPANDED, plan(360f, 618.9f).presentation)
+    assertEquals(LARGE, plan(360, 619).presentation)
+    assertEquals(LARGE, plan(360, 620).presentation)
+    assertEquals(EXPANDED, plan(496f, 754.9f).presentation)
+    assertEquals(LARGE, plan(496, 755).presentation)
+    assertEquals(LARGE, plan(496, 756).presentation)
+    // The arithmetic behind 259: a full-width cover with the larger 2-line readout and controls needs width + 237dp,
+    // which leaves 22dp above the cover, more than the 18dp the floating icon reaches into the content
+    val fit = FullArtwork.LARGE_VERTICAL_CHROME_DP + FullArtwork.EXPANDED_READOUT_GAP_DP + FullArtwork.readoutHeightDp(titleLines = 2, large = true) - 2 * FullArtwork.CONTENT_PADDING_DP
+    assertEquals(237.04f, fit, 0.01f)
+    assertEquals(18f, FullArtwork.LARGE_ICON_REACH_DP, 0.01f)
+    assertTrue(FullArtwork.LARGE_MIN_EXTRA_HEIGHT_DP - fit > FullArtwork.LARGE_ICON_REACH_DP)
     for (w in 250..900 step 5) {
       var large = false
       for (h in 150..3000 step 5) {
         val p = plan(w, h)
         if (p.presentation == LARGE) {
           // LARGE never costs the cover anything: still the full content width with a two-line title
-          assertTrue("${w}x$h", FullArtwork.largeSpareDp(w.toFloat(), h.toFloat()) >= FullArtwork.LARGE_MARGIN_DP)
+          // ...and the spare height above it clears the floating icon
+          assertTrue("${w}x$h", FullArtwork.largeSpareDp(w.toFloat(), h.toFloat()) > FullArtwork.LARGE_ICON_REACH_DP)
           assertEquals("${w}x$h", w - 2 * FullArtwork.CONTENT_PADDING_DP, p.bounds.maxWidthDp, 0.01f)
           assertTrue("${w}x$h", p.bounds.maxHeightDp >= p.bounds.maxWidthDp)
         }
@@ -193,7 +204,9 @@ class ExpandedFullTest {
 
   @Test
   fun largerFontsNeedMoreHeightForLarge() {
-    assertEquals(LARGE, plan(360, 590).presentation)
-    assertEquals(EXPANDED, FullArtwork.plan(360f, 590f, 1.3f)!!.presentation)
+    assertEquals(LARGE, plan(360, 620).presentation)
+    assertEquals(EXPANDED, FullArtwork.plan(360f, 620f, 1.3f)!!.presentation)
+    // with a larger font LARGE still keeps the cover full width and clears the icon
+    for (h in 600..1400 step 2) if (FullArtwork.plan(360f, h.toFloat(), 1.3f)!!.presentation == LARGE) assertTrue("$h", FullArtwork.largeSpareDp(360f, h.toFloat(), 1.3f) > FullArtwork.LARGE_ICON_REACH_DP)
   }
 }

@@ -13,10 +13,13 @@ import android.util.SizeF
  *   cover stops growing at width - 48dp - that width; further height becomes space around the block.
  * - EXPANDED (media_player_widget_full_expanded*.xml): cover on top, readout below at full width. The cover can
  *   then use nearly the whole widget width, which is what tall widgets need for a large cover.
- * - LARGE (media_player_widget_full_expanded_large*.xml): EXPANDED with larger readout text (title 20sp, author and
- *   times 16sp) and controls (72dp row, 36dp glyphs), for very tall widgets. It is chosen only when the larger readout
- *   and controls fit into spare height above a full-width cover (with a two-line title and [LARGE_MARGIN_DP] to
- *   spare), so it never makes the cover smaller; widgets whose cover nearly fills the space keep EXPANDED sizing.
+ * - LARGE (media_player_widget_full_expanded_large*.xml): EXPANDED for very tall widgets, with larger readout text
+ *   (title 22sp, author and times 18sp), larger controls (72dp buttons, 40dp glyphs), a readout across the full
+ *   content width and the brand icon floating at the top-end corner instead of beside the readout. It is chosen when
+ *   height >= width + [LARGE_MIN_EXTRA_HEIGHT_DP] (plus the extra readout height of a larger font scale): there the
+ *   larger readout (two-line title) and controls fit under a full-width cover and the spare height above the cover
+ *   clears the floating icon, so LARGE never makes the cover smaller and the icon never touches it. Narrower margins
+ *   keep EXPANDED sizing.
  *
  * [plan] picks EXPANDED only when it gives a clearly larger cover than NORMAL (at least [EXPANDED_GAIN] times and
  * [EXPANDED_MIN_GAIN_DP] more), assuming a square cover and a two-line title, so normal two-row sizes always stay
@@ -44,14 +47,17 @@ object FullArtwork {
   const val CONTROLS_DP = 6f + 52f
   /** EXPANDED: margin between the cover area and the readout row. */
   const val EXPANDED_READOUT_GAP_DP = 8f
-  /** LARGE: widgetButtonContainer marginTop + height. */
-  const val LARGE_CONTROLS_DP = 6f + 72f
+  /** LARGE: widgetButtonContainer marginTop + height (72dp buttons inside 4dp margins). */
+  const val LARGE_CONTROLS_DP = 6f + 80f
+  /** LARGE: the floating brand icon's size and its inset from the widget's top and end edges. */
+  const val ICON_SIZE_DP = 16f
+  const val LARGE_ICON_INSET_DP = 10f
 
   /** Readout text sizes (sp): title, author and the elapsed/remaining times (author and times share a size). */
   const val TITLE_TEXT_SP = 16f
   const val TIME_TEXT_SP = 13f
-  const val LARGE_TITLE_TEXT_SP = 20f
-  const val LARGE_TIME_TEXT_SP = 16f
+  const val LARGE_TITLE_TEXT_SP = 22f
+  const val LARGE_TIME_TEXT_SP = 18f
   /** Space between readout lines: author marginTop + time row marginTop. */
   const val READOUT_LINE_GAPS_DP = 2f + 8f
   /** Line heights of the platform font at these sizes, in em (measured: 21.7dp / 40.3dp at 16sp, 17.5dp at 13sp). */
@@ -64,8 +70,12 @@ object FullArtwork {
   /** EXPANDED must beat NORMAL's cover by this factor and by this much. */
   const val EXPANDED_GAIN = 1.2f
   const val EXPANDED_MIN_GAIN_DP = 24f
-  /** LARGE needs this much spare height beyond its larger readout and controls. */
-  const val LARGE_MARGIN_DP = 8f
+  /**
+   * LARGE when height >= width + this (at the default font scale). With a two-line title, a full-width cover needs
+   * width + 237dp; the remaining 22dp above the cover clears the floating icon, whose bottom edge sits 18dp below the
+   * top of the content (ExpandedFullTest checks the arithmetic).
+   */
+  const val LARGE_MIN_EXTRA_HEIGHT_DP = 259f
 
   /** Never size the cover below this, even on a widget too small to protect everything. */
   const val MIN_ARTWORK_DP = 32f
@@ -142,6 +152,15 @@ object FullArtwork {
   fun largeSpareDp(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Float =
     heightDp - LARGE_VERTICAL_CHROME_DP - EXPANDED_READOUT_GAP_DP - readoutHeightDp(fontScale, titleLines = 2, large = true) - (widthDp - 2 * CONTENT_PADDING_DP)
 
+  /** How far below the top of the content the floating icon reaches (the spare height above the cover must exceed it). */
+  const val LARGE_ICON_REACH_DP = LARGE_ICON_INSET_DP + ICON_SIZE_DP - CONTENT_PADDING_DP
+
+  /** True when a FULL widget of this size uses LARGE: height >= width + 259dp, plus a larger font's extra readout height. */
+  fun isLarge(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Boolean {
+    val fontExtra = readoutHeightDp(fontScale, titleLines = 2, large = true) - readoutHeightDp(1f, titleLines = 2, large = true)
+    return heightDp - widthDp >= LARGE_MIN_EXTRA_HEIGHT_DP + fontExtra
+  }
+
   /** Presentation and cover bounds for a FULL widget of the given size, or null before a size is reported. */
   fun plan(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Plan? {
     val normal = bounds(widthDp, heightDp, fontScale) ?: return null
@@ -149,7 +168,7 @@ object FullArtwork {
     val side = normal.squareDp
     return when {
       stacked < side * EXPANDED_GAIN || stacked < side + EXPANDED_MIN_GAIN_DP -> Plan(Presentation.NORMAL, normal)
-      largeSpareDp(widthDp, heightDp, fontScale) >= LARGE_MARGIN_DP -> Plan(Presentation.LARGE, largeBounds(widthDp, heightDp, fontScale)!!)
+      isLarge(widthDp, heightDp, fontScale) -> Plan(Presentation.LARGE, largeBounds(widthDp, heightDp, fontScale)!!)
       else -> Plan(Presentation.EXPANDED, expandedBounds(widthDp, heightDp, fontScale)!!)
     }
   }

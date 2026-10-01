@@ -121,15 +121,18 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
   const expanded = [await read(LAYOUTS + 'media_player_widget_full_expanded.xml'), await read(LAYOUTS + 'media_player_widget_full_expanded_llama.xml')]
   const large = [await read(LAYOUTS + 'media_player_widget_full_expanded_large.xml'), await read(LAYOUTS + 'media_player_widget_full_expanded_large_llama.xml')]
   for (const xml of [std, llama]) assert.equal(dp(xml, 'widgetReadout', 'layout_marginStart'), k('READOUT_MARGIN_DP'))
-  for (const xml of [...expanded, ...large]) {
+  for (const xml of expanded) {
     // the readout row (the readout's parent) sits EXPANDED_READOUT_GAP_DP below the cover area
     const readoutAt = xml.indexOf('android:id="@+id/widgetReadout"')
     const row = xml.slice(xml.lastIndexOf('<LinearLayout', xml.lastIndexOf('<LinearLayout', readoutAt) - 1), xml.lastIndexOf('<LinearLayout', readoutAt))
     assert.equal(Number(row.match(/android:layout_marginTop="(\d+)dp"/)[1]), k('EXPANDED_READOUT_GAP_DP'))
   }
+  // LARGE has no row: the full-width readout itself sits the same gap below the cover area
+  for (const xml of large) assert.equal(dp(xml, 'widgetReadout', 'layout_marginTop'), k('EXPANDED_READOUT_GAP_DP'))
   for (const [xml, isLarge] of [std, llama, ...expanded].map((x) => [x, false]).concat(large.map((x) => [x, true]))) {
     assert.equal(dp(xml, 'widgetContent', 'padding'), k('CONTENT_PADDING_DP'))
-    assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width') + dp(xml, 'tinyCornerIcon', 'layout_marginStart'), k('CORNER_ICON_DP'))
+    if (isLarge) assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width'), k('ICON_SIZE_DP'))
+    else assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width') + dp(xml, 'tinyCornerIcon', 'layout_marginStart'), k('CORNER_ICON_DP'))
     assert.equal(dp(xml, 'widgetMediaTitle', 'textSize'), k(isLarge ? 'LARGE_TITLE_TEXT_SP' : 'TITLE_TEXT_SP'))
     assert.ok(attrs(xml, 'widgetMediaTitle').includes('android:maxLines="2"'), 'title wraps to at most two lines')
     assert.ok(attrs(xml, 'widgetArtistText').includes('android:maxLines="1"') && attrs(xml, 'widgetArtistText').includes('android:ellipsize="end"'), 'author: one line, ellipsized')
@@ -176,17 +179,22 @@ test('EXPANDED and LARGE FULL stack cover, readout, progress and controls withou
   }
 })
 
-test('LARGE differs from EXPANDED only in readout text, control height and glyph inset', async () => {
+test('LARGE is EXPANDED with larger readout text and controls, a full-width readout and a floating brand icon', async () => {
   const sizes = {
-    widgetMediaTitle: ['textSize', '16sp', '20sp'],
-    widgetArtistText: ['textSize', '13sp', '16sp'],
-    widgetElapsedText: ['textSize', '13sp', '16sp'],
-    widgetRemainingText: ['textSize', '13sp', '16sp'],
-    widgetButtonContainer: ['layout_height', '52dp', '72dp'],
-    widgetRewindButton: ['padding', '10dp', '14dp'],
-    widgetPlayPauseButton: ['padding', '10dp', '14dp'],
-    widgetFastForwardButton: ['padding', '10dp', '14dp']
+    widgetMediaTitle: ['textSize', '16sp', '22sp'],
+    widgetArtistText: ['textSize', '13sp', '18sp'],
+    widgetElapsedText: ['textSize', '13sp', '18sp'],
+    widgetRemainingText: ['textSize', '13sp', '18sp'],
+    widgetButtonContainer: ['layout_height', '52dp', '80dp'],
+    widgetRewindButton: ['padding', '10dp', '16dp'],
+    widgetPlayPauseButton: ['padding', '10dp', '16dp'],
+    widgetFastForwardButton: ['padding', '10dp', '16dp']
   }
+  const dimens = await read('../android/app/src/main/res/values/dimens.xml')
+  const kotlin = await read('../android/app/src/main/java/app/absplus/android/widget/FullArtwork.kt')
+  assert.equal(Number(dimens.match(/<dimen name="widget_large_icon_inset">(\d+)dp<\/dimen>/)[1]), Number(kotlin.match(/const val LARGE_ICON_INSET_DP = (\d+)f/)[1]))
+  // the elements of a layout as normalized tags (comments and indentation ignored)
+  const tags = (xml) => [...xml.replace(/<!--[\s\S]*?-->/g, '').matchAll(/<[^>]+>/g)].map((m) => m[0].replace(/\s+/g, ' '))
   for (const suffix of ['', '_llama']) {
     const expandedXml = await read(LAYOUTS + `media_player_widget_full_expanded${suffix}.xml`)
     let largeXml = await read(LAYOUTS + `media_player_widget_full_expanded_large${suffix}.xml`)
@@ -198,9 +206,31 @@ test('LARGE differs from EXPANDED only in readout text, control height and glyph
         end = largeXml.indexOf('>', at)
       largeXml = largeXml.slice(0, start) + largeXml.slice(start, end).replace(`android:${attr}="${to}"`, `android:${attr}="${from}"`) + largeXml.slice(end)
     }
-    // With those sizes reverted, LARGE is EXPANDED apart from its header comment: same structure, ids, paint and actions
-    const body = (xml) => xml.replace(/\r\n/g, '\n').replace(/^<!--.*?-->\n/, '')
-    assert.equal(body(largeXml), body(expandedXml), `large${suffix} structure`)
+    // The icon floats: last child of a FrameLayout around widgetContent, top|end with the inset, outside the content
+    const largeTags = tags(largeXml)
+    const icon = largeTags.find((t) => t.includes('android:id="@+id/tinyCornerIcon"'))
+    for (const a of ['android:layout_gravity="top|end"', 'android:layout_marginTop="@dimen/widget_large_icon_inset"', 'android:layout_marginEnd="@dimen/widget_large_icon_inset"']) assert.ok(icon.includes(a), `large${suffix} icon ${a}`)
+    assert.doesNotMatch(icon, /layout_marginStart/)
+    const frameOpen = largeTags.findIndex((t) => t.startsWith('<FrameLayout'))
+    assert.ok(largeTags[frameOpen + 1].includes('android:id="@+id/widgetContent"'), `large${suffix}: the frame wraps widgetContent`)
+    assert.deepEqual(largeTags.slice(-3), [icon, '</FrameLayout>', '</LinearLayout>'], `large${suffix}: icon is the frame's last child`)
+    // The readout is a direct child of widgetContent across the full content width (nothing beside it)
+    const readout = largeTags.find((t) => t.includes('android:id="@+id/widgetReadout"'))
+    assert.ok(readout.includes('android:layout_width="match_parent"') && !readout.includes('layout_weight'), `large${suffix}: full-width readout`)
+    const readoutIndex = largeTags.indexOf(readout)
+    assert.ok(largeTags[readoutIndex - 1] === '</LinearLayout>' && largeTags.slice(readoutIndex).findIndex((t) => t.startsWith('<ProgressBar')) > 0, `large${suffix}: readout follows the cover area`)
+    // Apart from that, LARGE is EXPANDED: same elements, ids, paint and actions, and the icon keeps its look
+    const expandedTags = tags(expandedXml)
+    const expandedIcon = expandedTags.find((t) => t.includes('android:id="@+id/tinyCornerIcon"'))
+    const strip = (t) => t.replace(/ android:layout_(gravity|marginTop|marginEnd|marginStart)="[^"]*"/g, '')
+    assert.equal(strip(icon), strip(expandedIcon), `large${suffix}: same icon`)
+    // EXPANDED with its readout row unwrapped: drop the row's opening tag and its closing tag (just before the progress bar)
+    const expandedReadout = expandedTags.findIndex((t) => t.includes('android:id="@+id/widgetReadout"'))
+    const expandedProgress = expandedTags.findIndex((t) => t.startsWith('<ProgressBar'))
+    assert.equal(expandedTags[expandedProgress - 1], '</LinearLayout>')
+    const unwrapped = expandedTags.filter((_, i) => i !== expandedReadout - 1 && i !== expandedProgress - 1)
+    const normalize = (list) => list.filter((t) => !t.includes('tinyCornerIcon') && !/^<\/?FrameLayout/.test(t)).map((t) => (t.includes('android:id="@+id/widgetReadout"') ? t.replace(/ android:layout_(width|weight|marginTop)="[^"]*"/g, '') : t))
+    assert.deepEqual(normalize(largeTags), normalize(unwrapped), `large${suffix} structure`)
   }
 })
 

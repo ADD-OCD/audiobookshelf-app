@@ -1,4 +1,4 @@
-<!-- Large expanded full (very tall sizes): media_player_widget_full_expanded.xml with larger readout text and controls; same ids and actions. -->
+<!-- Large expanded full (very tall sizes): the expanded layout with larger readout text and controls, a full-width readout and a floating brand icon; same ids and actions. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:tools="http://schemas.android.com/tools"
   android:id="@+id/widgetBackground"
@@ -8,50 +8,50 @@
   android:theme="@style/AppTheme.AppWidgetContainer"
   style="@style/Widget.Android.AppWidget.Container">
 
-  <LinearLayout
-    android:id="@+id/widgetContent"
+  <!-- Content plus a floating brand icon: the icon sits over the spare space above the cover (LARGE only starts where
+       that space is tall enough, see FullArtwork), so it takes no width or height from the content -->
+  <FrameLayout
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="?android:attr/colorAccent"
-    android:theme="@style/MediaPlayerWidgetTheme"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:layout_height="match_parent">
 
-    <!-- Flexible area: the cover grows into this space within the bounds the renderer sets (FullArtwork); once it
-         stops growing, it sits on its readout and any spare height goes above it -->
     <LinearLayout
+      android:id="@+id/widgetContent"
       android:layout_width="match_parent"
-      android:layout_height="0dp"
-      android:layout_weight="1"
-      android:gravity="bottom|center_horizontal"
-      android:orientation="vertical">
+      android:layout_height="match_parent"
+      android:background="?android:attr/colorAccent"
+      android:theme="@style/MediaPlayerWidgetTheme"
+      android:orientation="vertical"
+      android:padding="8dp">
 
-      <!-- Expanded artwork: as large as the space allows, at the cover's own aspect (no crop) -->
-      <ImageView
-        android:id="@+id/widgetAlbumArt"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:adjustViewBounds="true"
-        android:maxWidth="@dimen/widget_full_artwork_max"
-        android:maxHeight="@dimen/widget_full_artwork_max"
-        android:scaleType="fitCenter"
-        android:contentDescription="@null"
-        android:src="@drawable/icon" />
-    </LinearLayout>
+      <!-- Flexible area: the cover grows into this space within the bounds the renderer sets (FullArtwork); once it
+           stops growing, it sits on its readout and any spare height goes above it -->
+      <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="bottom|center_horizontal"
+        android:orientation="vertical">
 
-    <!-- Readout below the cover, full width beside the corner icon -->
-    <LinearLayout
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_marginTop="8dp"
-      android:orientation="horizontal">
+        <!-- Expanded artwork: as large as the space allows, at the cover's own aspect (no crop) -->
+        <ImageView
+          android:id="@+id/widgetAlbumArt"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_gravity="center_horizontal"
+          android:adjustViewBounds="true"
+          android:maxWidth="@dimen/widget_full_artwork_max"
+          android:maxHeight="@dimen/widget_full_artwork_max"
+          android:scaleType="fitCenter"
+          android:contentDescription="@null"
+          android:src="@drawable/icon" />
+      </LinearLayout>
 
+      <!-- Readout below the cover, across the full content width (the corner icon floats above, outside this flow) -->
       <LinearLayout
         android:id="@+id/widgetReadout"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
+        android:layout_marginTop="8dp"
         android:padding="6dp"
         android:gravity="center_vertical"
         android:orientation="vertical">
@@ -63,7 +63,7 @@
           android:ellipsize="end"
           android:maxLines="2"
           android:textColor="@color/widget_default_text"
-          android:textSize="20sp"
+          android:textSize="22sp"
           android:textStyle="bold"
           tools:text="Title" />
 
@@ -75,7 +75,7 @@
           android:ellipsize="end"
           android:maxLines="1"
           android:textColor="@color/widget_default_text_muted"
-          android:textSize="16sp"
+          android:textSize="18sp"
           tools:text="Artist" />
 
         <LinearLayout
@@ -93,7 +93,7 @@
             android:fontFamily="monospace"
             android:maxLines="1"
             android:textColor="@color/widget_default_text"
-            android:textSize="16sp"
+            android:textSize="18sp"
             tools:text="0:00" />
 
           <TextView
@@ -105,70 +105,72 @@
             android:gravity="end"
             android:maxLines="1"
             android:textColor="@color/widget_default_text"
-            android:textSize="16sp"
+            android:textSize="18sp"
             tools:text="-0:00" />
         </LinearLayout>
       </LinearLayout>
 
-      <ImageView
-        android:id="@+id/tinyCornerIcon"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
-        android:layout_marginStart="6dp"
-        android:adjustViewBounds="true"
-        android:contentDescription="@null"
-        android:src="@drawable/icon_monochrome" />
+      <ProgressBar
+        android:id="@+id/widgetProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layout_marginTop="8dp"
+        android:max="1000"
+        android:progress="0"
+        android:progressDrawable="@drawable/widget_progress_default" />
+
+      <LinearLayout
+        android:id="@+id/widgetButtonContainer"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <ImageView
+          android:id="@+id/widgetRewindButton"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:layout_margin="4dp"
+          android:padding="16dp"
+          android:background="@drawable/widget_button_bg"
+          android:contentDescription="@string/action_jump_backward"
+          android:src="@drawable/exo_icon_rewind" />
+
+        <ImageView
+          android:id="@+id/widgetPlayPauseButton"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:layout_margin="4dp"
+          android:padding="16dp"
+          android:background="@drawable/widget_button_bg"
+          android:contentDescription="@string/widget_play_pause"
+          android:src="@drawable/ic_media_play_dark" />
+
+        <ImageView
+          android:id="@+id/widgetFastForwardButton"
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:layout_margin="4dp"
+          android:padding="16dp"
+          android:background="@drawable/widget_button_bg"
+          android:contentDescription="@string/action_jump_forward"
+          android:src="@drawable/exo_icon_fastforward" />
+      </LinearLayout>
     </LinearLayout>
 
-    <ProgressBar
-      android:id="@+id/widgetProgress"
-      style="?android:attr/progressBarStyleHorizontal"
-      android:layout_width="match_parent"
-      android:layout_height="5dp"
-      android:layout_marginTop="8dp"
-      android:max="1000"
-      android:progress="0"
-      android:progressDrawable="@drawable/widget_progress_default" />
-
-    <LinearLayout
-      android:id="@+id/widgetButtonContainer"
-      android:layout_width="match_parent"
-      android:layout_height="72dp"
-      android:layout_marginTop="6dp"
-      android:orientation="horizontal">
-
-      <ImageView
-        android:id="@+id/widgetRewindButton"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:layout_margin="4dp"
-        android:padding="14dp"
-        android:background="@drawable/widget_button_bg"
-        android:contentDescription="@string/action_jump_backward"
-        android:src="@drawable/exo_icon_rewind" />
-
-      <ImageView
-        android:id="@+id/widgetPlayPauseButton"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:layout_margin="4dp"
-        android:padding="14dp"
-        android:background="@drawable/widget_button_bg"
-        android:contentDescription="@string/widget_play_pause"
-        android:src="@drawable/ic_media_play_dark" />
-
-      <ImageView
-        android:id="@+id/widgetFastForwardButton"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:layout_margin="4dp"
-        android:padding="14dp"
-        android:background="@drawable/widget_button_bg"
-        android:contentDescription="@string/action_jump_forward"
-        android:src="@drawable/exo_icon_fastforward" />
-    </LinearLayout>
-  </LinearLayout>
+    <ImageView
+      android:id="@+id/tinyCornerIcon"
+      android:layout_width="16dp"
+      android:layout_height="16dp"
+      android:layout_gravity="top|end"
+      android:layout_marginTop="@dimen/widget_large_icon_inset"
+      android:layout_marginEnd="@dimen/widget_large_icon_inset"
+      android:adjustViewBounds="true"
+      android:contentDescription="@null"
+      android:src="@drawable/icon_monochrome" />
+  </FrameLayout>
 </LinearLayout>
