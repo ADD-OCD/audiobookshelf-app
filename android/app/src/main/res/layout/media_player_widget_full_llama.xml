@@ -18,21 +18,33 @@
     android:orientation="vertical"
     android:padding="8dp">
 
+    <!-- Flexible area: extra launcher height becomes space around the artwork/readout block -->
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="0dp"
       android:layout_weight="1"
+      android:gravity="center_vertical"
+      android:orientation="vertical">
+
+    <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
       android:orientation="horizontal">
 
+      <!-- Bounded artwork: min(cap, available height, available width), at the cover's own aspect (no crop);
+           the cap includes the 2dp frame, so the frame always hugs the cover -->
       <ImageView
         android:id="@+id/widgetAlbumArt"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:adjustViewBounds="true"
+        android:maxWidth="@dimen/widget_full_artwork_max"
+        android:maxHeight="@dimen/widget_full_artwork_max"
         android:padding="2dp"
         android:background="@drawable/widget_llama_artwork_frame"
         android:cropToPadding="true"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         android:contentDescription="@null"
         android:src="@drawable/icon" />
 
@@ -110,6 +122,7 @@
         android:tint="@color/widget_llama_text_muted"
         android:contentDescription="@null"
         android:src="@drawable/icon_monochrome" />
+    </LinearLayout>
     </LinearLayout>
 
     <ProgressBar

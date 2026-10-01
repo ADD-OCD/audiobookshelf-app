@@ -7,4 +7,8 @@ http://developer.android.com/guide/topics/appwidgets/index.html#CreatingLayout
     -->
     <dimen name="widget_margin">0dp</dimen>
 
+    <!-- FULL widget artwork cap: just above the artwork height of a normal two-row FULL (~137dp), so that size is
+         unchanged; extra launcher height becomes breathing room, not a larger, cropped cover -->
+    <dimen name="widget_full_artwork_max">140dp</dimen>
+
 </resources>

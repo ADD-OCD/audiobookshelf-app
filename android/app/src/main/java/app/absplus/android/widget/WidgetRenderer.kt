@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.DisplayMetrics
 import android.view.View
 import android.widget.RemoteViews
 import androidx.media.session.MediaButtonReceiver
@@ -40,6 +41,7 @@ import java.util.concurrent.TimeUnit
 object WidgetRenderer {
   private const val TAG = "MediaPlayerWidget"
   private const val ARTWORK_PX = 300
+  internal const val ARTWORK_DENSITY = DisplayMetrics.DENSITY_MEDIUM
 
   /** What the widget shows; positions are milliseconds from the start of the item. */
   data class State(
@@ -180,7 +182,7 @@ object WidgetRenderer {
       val future = Glide.with(appContext).asBitmap().load(Uri.parse(key)).apply(RequestOptions().override(ARTWORK_PX, ARTWORK_PX)).submit()
       val bitmap =
         try {
-          future.get(20, TimeUnit.SECONDS)?.let { it.copy(it.config ?: Bitmap.Config.ARGB_8888, false) }
+          future.get(20, TimeUnit.SECONDS)?.let { widgetArtwork(it) }
         } catch (e: Exception) {
           DLog.w(TAG, "Widget artwork unavailable: ${e.javaClass.simpleName}")
           null
@@ -200,6 +202,15 @@ object WidgetRenderer {
       }
     }
   }
+
+  /**
+   * The widget's own copy of a loaded cover. Its density is fixed so the 300px bitmap has a ~300dp intrinsic
+   * size on every device: the FULL layouts' artwork cap (widget_full_artwork_max) then decides the displayed
+   * size, never the phone's screen density. Other sizes size the artwork from the row height, so this
+   * doesn't affect them.
+   */
+  internal fun widgetArtwork(source: Bitmap): Bitmap =
+    source.copy(source.config ?: Bitmap.Config.ARGB_8888, false).apply { density = ARTWORK_DENSITY }
 
   /** The widget's existing actions, shared by every size (unchanged intents and flags). */
   private class Actions(val playPause: PendingIntent, val fastForward: PendingIntent, val rewind: PendingIntent, val open: PendingIntent) {

@@ -49,6 +49,18 @@ class WidgetSizeTest {
   }
 
   @Test
+  fun extremeTallSizesStayFull() {
+    // Samsung allows very tall resizes; every width the widget can have (minWidth 275dp) stays FULL, which
+    // bounds its artwork, rather than falling back to a layout whose artwork scales with height
+    for (w in listOf(275f, 300f, 360f, 420f, 900f)) {
+      for (h in listOf(150f, 300f, 600f, 900f, 1400f, 2000f)) {
+        assertEquals("size ${w}x$h", WidgetSize.FULL, WidgetSize.classify(w, h))
+        assertEquals("size ${w}x$h", WidgetSize.FULL, platformChoice(w, h))
+      }
+    }
+  }
+
+  @Test
   fun responsiveIdealSizesAreDistinctAndWithinPlatformLimit() {
     val keys = WidgetSize.RESPONSIVE_IDEAL_SIZES.map { it.first }
     assertEquals(keys.size, keys.toSet().size)
