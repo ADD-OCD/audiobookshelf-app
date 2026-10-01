@@ -68,24 +68,71 @@ const attrs = (xml, id) => {
   return xml.slice(xml.lastIndexOf('<', start), xml.indexOf('>', start))
 }
 
-test('FULL artwork is bounded (cap, both dimensions wrap, aspect kept, no crop) in standard and LLAMA', async () => {
+test('FULL artwork is bounded (both dimensions wrap, aspect kept, no crop, fallback cap) in standard and LLAMA', async () => {
   const dimens = await read('../android/app/src/main/res/values/dimens.xml')
   const cap = Number(dimens.match(/<dimen name="widget_full_artwork_max">(\d+)dp<\/dimen>/)[1])
-  // Below the fixed-density cover's ~300dp intrinsic size (WidgetArtworkTest), so the cap is what bounds it
-  assert.ok(cap < 300, `cap ${cap}dp`)
-  // Normal two-row FULL artwork (~137dp on the emulator) stays uncapped, so that size renders as before
-  assert.ok(cap >= 137, `cap ${cap}dp`)
-  // Narrowest FULL (minWidth 275dp) minus content padding (16), readout margin (10), corner icon (22): the readout
-  // keeps a usable width however tall the widget gets (unbounded artwork used to squeeze it to nothing)
-  assert.ok(275 - 16 - 10 - 22 - cap >= 80, `readout width at 275dp with a ${cap}dp cap`)
+  // Fallback before the launcher reports a size: below the fixed-density cover's ~300dp intrinsic size
+  // (WidgetArtworkTest), and above a normal two-row FULL cover (~137dp), so that size renders as before
+  assert.ok(cap < 300 && cap >= 137, `cap ${cap}dp`)
   for (const file of ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml']) {
     const art = attrs(await read(LAYOUTS + file), 'widgetAlbumArt')
     for (const expected of ['android:layout_width="wrap_content"', 'android:layout_height="wrap_content"', 'android:adjustViewBounds="true"', 'android:maxWidth="@dimen/widget_full_artwork_max"', 'android:maxHeight="@dimen/widget_full_artwork_max"', 'android:scaleType="fitCenter"']) {
       assert.ok(art.includes(expected), `${file}: ${expected}`)
     }
   }
+  const llamaArt = attrs(await read(LAYOUTS + 'media_player_widget_full_llama.xml'), 'widgetAlbumArt')
+  for (const frame of ['android:padding="2dp"', 'android:background="@drawable/widget_llama_artwork_frame"', 'android:cropToPadding="true"']) assert.ok(llamaArt.includes(frame), `LLAMA frame stays on the artwork view: ${frame}`)
   const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
   assert.match(renderer, /widgetArtwork\(it\)/, 'loaded covers get the fixed-density widget copy')
+})
+
+test('responsive FULL bounds are applied only to FULL, from the reported size, on the artwork view', async () => {
+  const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
+  const sets = [...renderer.matchAll(/views\.setInt\(R\.id\.(\w+), "(setMax\w+)"/g)].map((m) => `${m[1]}.${m[2]}`)
+  assert.deepEqual(sets.sort(), ['widgetAlbumArt.setMaxHeight', 'widgetAlbumArt.setMaxWidth'])
+  const fullBlock = renderer.slice(renderer.indexOf('if (size == WidgetSize.FULL) {'), renderer.indexOf('return views', renderer.indexOf('if (size == WidgetSize.FULL) {')))
+  assert.match(fullBlock, /"setMaxWidth"/, 'bounds are set inside the FULL-only block')
+  assert.equal(renderer.split('"setMaxWidth"').length - 1, 1, 'and nowhere else')
+  assert.match(renderer, /FullArtwork\.sizeDp\(options\)/)
+})
+
+test('FullArtwork constants match the FULL layouts they reserve space for', async () => {
+  const kotlin = await read('../android/app/src/main/java/app/absplus/android/widget/FullArtwork.kt')
+  const k = (name) => {
+    const expr = kotlin.match(new RegExp(`const val ${name} = ([0-9f .+*]+)`))[1]
+    return expr.split('+').reduce((sum, part) => sum + part.split('*').reduce((p, f) => p * Number(f.trim().replace(/f$/, '')), 1), 0)
+  }
+  const dp = (xml, id, attr) => Number(attrs(xml, id).match(new RegExp(`android:${attr}="(\\d+)(?:dp|sp)"`))[1])
+  const std = await read(LAYOUTS + 'media_player_widget_full.xml')
+  const llama = await read(LAYOUTS + 'media_player_widget_full_llama.xml')
+  for (const xml of [std, llama]) {
+    assert.equal(dp(xml, 'widgetContent', 'padding'), k('CONTENT_PADDING_DP'))
+    assert.equal(dp(xml, 'widgetReadout', 'layout_marginStart'), k('READOUT_MARGIN_DP'))
+    assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width') + dp(xml, 'tinyCornerIcon', 'layout_marginStart'), k('CORNER_ICON_DP'))
+    assert.equal(dp(xml, 'widgetButtonContainer', 'layout_marginTop') + dp(xml, 'widgetButtonContainer', 'layout_height'), k('CONTROLS_DP'))
+    for (const id of ['widgetElapsedText', 'widgetRemainingText']) {
+      assert.equal(dp(xml, id, 'textSize'), k('TIME_TEXT_SP'))
+      assert.ok(attrs(xml, id).includes('android:fontFamily="monospace"'), `${id} is monospace`)
+    }
+  }
+  // Width reserve uses the larger readout padding; height backstop the smaller progress bar (the layout limits height anyway)
+  assert.equal(Math.max(dp(std, 'widgetReadout', 'padding'), dp(llama, 'widgetReadout', 'padding')), k('READOUT_PADDING_DP'))
+  const progress = (xml) => dp(xml, 'widgetProgress', 'layout_marginTop') + dp(xml, 'widgetProgress', 'layout_height')
+  assert.equal(Math.min(progress(std), progress(llama)), k('PROGRESS_DP'))
+})
+
+test('COMPACT and WIDE artwork keep their existing sizing (row height, crop) and get no responsive bounds', async () => {
+  const expected = {
+    'media_player_widget.xml': ['android:layout_width="0dp"', 'android:layout_height="match_parent"', 'android:layout_weight="2"', 'android:scaleType="centerCrop"'],
+    'media_player_widget_llama.xml': ['android:layout_width="0dp"', 'android:layout_height="match_parent"', 'android:layout_weight="2"', 'android:scaleType="centerCrop"'],
+    'media_player_widget_wide.xml': ['android:layout_width="wrap_content"', 'android:layout_height="match_parent"', 'android:adjustViewBounds="true"', 'android:scaleType="centerCrop"'],
+    'media_player_widget_wide_llama.xml': ['android:layout_width="wrap_content"', 'android:layout_height="match_parent"', 'android:adjustViewBounds="true"', 'android:scaleType="centerCrop"']
+  }
+  for (const [file, attributes] of Object.entries(expected)) {
+    const art = attrs(await read(LAYOUTS + file), 'widgetAlbumArt')
+    for (const a of attributes) assert.ok(art.includes(a), `${file}: ${a}`)
+    assert.doesNotMatch(art, /maxWidth|maxHeight/, `${file} has no artwork cap`)
+  }
 })
 
 test('provider identity is unchanged: one MediaPlayerWidget receiver with the same metadata', async () => {
@@ -109,7 +156,7 @@ test('widget actions are exactly play/pause, jump back, jump forward and open, o
 
 test('widget code schedules nothing (no alarms, jobs, timers, delayed posts or Chronometer)', async () => {
   const dir = '../android/app/src/main/java/app/absplus/android/'
-  const files = ['MediaPlayerWidget.kt', 'widget/WidgetRenderer.kt', 'widget/WidgetSize.kt', 'widget/WidgetTheme.kt', 'widget/WidgetText.kt']
+  const files = ['MediaPlayerWidget.kt', 'widget/WidgetRenderer.kt', 'widget/WidgetSize.kt', 'widget/WidgetTheme.kt', 'widget/WidgetText.kt', 'widget/FullArtwork.kt']
   for (const file of files) {
     assert.doesNotMatch(await read(dir + file), /AlarmManager|WorkManager|JobScheduler|postDelayed|scheduleAtFixedRate|Timer\(|Chronometer|setChronometer/, file)
   }

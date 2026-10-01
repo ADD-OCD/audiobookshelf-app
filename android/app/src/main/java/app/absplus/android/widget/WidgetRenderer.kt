@@ -61,6 +61,7 @@ object WidgetRenderer {
   private var artworkBitmap: Bitmap? = null
   private var loadingArtworkKey: String? = null
   private var failedArtworkKey: String? = null
+  private val loggedArtworkBounds = mutableMapOf<Int, FullArtwork.Bounds?>()
 
   /** A playback event for one placed widget (called on the main thread by the widget updater). */
   fun update(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, state: State) {
@@ -103,16 +104,32 @@ object WidgetRenderer {
     val bitmap = if (key == artworkKey) artworkBitmap else null
     val actions = Actions.create(context)
     val theme = WidgetTheme.current(context)
+    val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+    val artwork = fullArtworkBounds(context, appWidgetId, options)
     val views =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         // Android 12+: the launcher picks the layout for the current size, including while resizing
-        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, theme, state, bitmap, actions) })
+        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, theme, state, bitmap, actions, artwork) })
       } else {
         // API 24-30: pick the layout from the size the launcher reported (redrawn on onAppWidgetOptionsChanged)
-        build(context, sizeFromOptions(context, appWidgetManager.getAppWidgetOptions(appWidgetId)), theme, state, bitmap, actions)
+        build(context, sizeFromOptions(context, options), theme, state, bitmap, actions, artwork)
       }
     appWidgetManager.updateAppWidget(appWidgetId, views)
     if (bitmap == null && key != failedArtworkKey) loadArtwork(context, key)
+  }
+
+  /**
+   * FULL artwork bounds for this widget from its reported size (redrawn on onAppWidgetOptionsChanged), or null
+   * before the launcher has reported one, when the layouts' widget_full_artwork_max applies.
+   */
+  private fun fullArtworkBounds(context: Context, appWidgetId: Int, options: Bundle?): FullArtwork.Bounds? {
+    val size = FullArtwork.sizeDp(options)
+    val bounds = size?.let { FullArtwork.bounds(it.width, it.height, context.resources.configuration.fontScale) }
+    if (!loggedArtworkBounds.containsKey(appWidgetId) || loggedArtworkBounds[appWidgetId] != bounds) {
+      loggedArtworkBounds[appWidgetId] = bounds
+      DLog.d(TAG, "Widget $appWidgetId size ${size?.width}x${size?.height}dp, FULL artwork max ${bounds?.maxWidthDp}x${bounds?.maxHeightDp}dp")
+    }
+    return bounds
   }
 
   /** API 24-30 size: portrait uses min width x max height, landscape max width x min height (platform convention). */
@@ -141,7 +158,7 @@ object WidgetRenderer {
         }
     }
 
-  private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions): RemoteViews {
+  private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions, artwork: FullArtwork.Bounds?): RemoteViews {
     val views = RemoteViews(context.packageName, layoutFor(size, theme))
     views.setOnClickPendingIntent(R.id.widgetPlayPauseButton, actions.playPause)
     views.setOnClickPendingIntent(R.id.widgetFastForwardButton, actions.fastForward)
@@ -157,6 +174,12 @@ object WidgetRenderer {
     views.setImageViewResource(R.id.widgetPlayPauseButton, playPauseResource)
 
     if (size == WidgetSize.FULL) {
+      if (artwork != null) {
+        // Responsive cover bounds (FullArtwork); ImageView.setMaxWidth/setMaxHeight are RemoteViews-callable
+        val density = context.resources.displayMetrics.density
+        views.setInt(R.id.widgetAlbumArt, "setMaxWidth", (artwork.maxWidthDp * density).toInt())
+        views.setInt(R.id.widgetAlbumArt, "setMaxHeight", (artwork.maxHeightDp * density).toInt())
+      }
       // Snapshot only: fixed at this update, never advanced by a timer or scheduled work
       val snapshot = WidgetText.snapshot(state.positionMs, state.durationMs)
       views.setViewVisibility(R.id.widgetTimeRow, if (snapshot != null) View.VISIBLE else View.INVISIBLE)
@@ -205,9 +228,8 @@ object WidgetRenderer {
 
   /**
    * The widget's own copy of a loaded cover. Its density is fixed so the 300px bitmap has a ~300dp intrinsic
-   * size on every device: the FULL layouts' artwork cap (widget_full_artwork_max) then decides the displayed
-   * size, never the phone's screen density. Other sizes size the artwork from the row height, so this
-   * doesn't affect them.
+   * size on every device: the FULL artwork bounds (FullArtwork) then decide the displayed size, never the
+   * phone's screen density. Other sizes size the artwork from the row height, so this doesn't affect them.
    */
   internal fun widgetArtwork(source: Bitmap): Bitmap =
     source.copy(source.config ?: Bitmap.Config.ARGB_8888, false).apply { density = ARTWORK_DENSITY }

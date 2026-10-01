@@ -30,7 +30,8 @@
       android:layout_height="wrap_content"
       android:orientation="horizontal">
 
-      <!-- Bounded artwork: min(cap, available height, available width), at the cover's own aspect (no crop) -->
+      <!-- Bounded artwork at the cover's own aspect (no crop): the renderer sets maxWidth/maxHeight from the widget size
+           so the readout keeps its protected width (FullArtwork); the dimen is the fallback before a size is known -->
       <ImageView
         android:id="@+id/widgetAlbumArt"
         android:layout_width="wrap_content"

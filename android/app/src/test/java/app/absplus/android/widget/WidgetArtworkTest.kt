@@ -25,8 +25,8 @@ class WidgetArtworkTest {
     val art = WidgetRenderer.widgetArtwork(loaded)
     assertNotSame(loaded, art) // the widget keeps its own copy
     assertEquals(DisplayMetrics.DENSITY_MEDIUM, art.density)
-    // 300px shown as ~300dp, above the FULL cap (widget_full_artwork_max; checked in tests/widget-theme.test.mjs),
-    // so the cap, not the phone, bounds the artwork
+    // 300px shown as ~300dp on every phone, so the FULL bounds (FullArtwork, or the widget_full_artwork_max
+    // fallback), not the screen density, decide the displayed size up to ~300dp
     assertEquals(300f, intrinsicDp(art), 1f)
   }
 
