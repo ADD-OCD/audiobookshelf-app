@@ -66,23 +66,23 @@
       <div v-if="showFullscreen" class="absolute bottom-4 left-0 right-0 w-full pb-4 pt-2 mx-auto px-6" style="max-width: 414px">
         <div class="flex items-center justify-between pointer-events-auto">
           <!-- Optional queue icon: list glyph with a bordered "Q" badge, matches the chapters icon style -->
-          <div v-if="playerSettings.showQueueIcon" class="relative cursor-pointer" @click="$emit('showQueue')">
+          <div v-if="playerSettings.showQueueIcon" class="player-key relative cursor-pointer" @click="$emit('showQueue')">
             <span class="material-symbols text-3xl text-fg-muted">format_list_bulleted</span>
             <span class="absolute -bottom-1 -right-1 flex items-center justify-center rounded-full border border-fg-muted bg-bg text-fg-muted" style="width: 14px; height: 14px; font-size: 9px; line-height: 1">Q</span>
           </div>
-          <span v-if="!isPodcast && serverLibraryItemId && socketConnected" class="material-symbols text-3xl text-fg-muted cursor-pointer" :class="{ fill: bookmarks.length }" @click="$emit('showBookmarks')">bookmark</span>
+          <span v-if="!isPodcast && serverLibraryItemId && socketConnected" class="player-key material-symbols text-3xl text-fg-muted cursor-pointer" :class="{ fill: bookmarks.length }" @click="$emit('showBookmarks')">bookmark</span>
           <!-- hidden for podcasts but still using this as a placeholder -->
           <span v-else class="material-symbols text-3xl text-white text-opacity-0">bookmark</span>
 
           <span class="font-mono text-fg-muted cursor-pointer" style="font-size: 1.35rem" @click="$emit('selectPlaybackSpeed')">{{ currentPlaybackRate }}x</span>
-          <svg v-if="!sleepTimerRunning" xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-fg-muted cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" @click.stop="$emit('showSleepTimer')">
+          <svg v-if="!sleepTimerRunning" xmlns="http://www.w3.org/2000/svg" class="player-key h-7 w-7 text-fg-muted cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" @click.stop="$emit('showSleepTimer')">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
           </svg>
           <div v-else class="h-7 w-7 flex items-center justify-around cursor-pointer" @click.stop="$emit('showSleepTimer')">
-            <p class="text-xl font-mono text-success">{{ sleepTimeRemainingPretty }}</p>
+            <p class="sleep-readout text-xl font-mono text-success">{{ sleepTimeRemainingPretty }}</p>
           </div>
 
-          <span class="material-symbols text-3xl text-fg cursor-pointer" :class="chapters.length ? 'text-opacity-75' : 'text-opacity-10'" @click="clickChaptersBtn">format_list_bulleted</span>
+          <span class="player-key material-symbols text-3xl text-fg cursor-pointer" :class="chapters.length ? 'text-opacity-75' : 'text-opacity-10 key-disabled'" @click="clickChaptersBtn">format_list_bulleted</span>
         </div>
       </div>
       <div v-else class="w-full h-full absolute top-0 left-0 pointer-events-none" style="background: var(--gradient-minimized-audio-player)" />
@@ -90,22 +90,22 @@
       <!-- Playback controls - jump buttons, play/pause, chapter navigation -->
       <div id="playerControls" class="absolute right-0 bottom-0 mx-auto" style="max-width: 414px">
         <div class="flex items-center max-w-full" :class="playerSettings.lockUi ? 'justify-center' : 'justify-between'">
-          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpChapterStart">first_page</span>
-          <div v-show="!playerSettings.lockUi" class="jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpBackwards">
+          <span v-show="showFullscreen && !playerSettings.lockUi" class="player-key material-symbols next-icon text-fg cursor-pointer" :class="showLoadingState ? 'text-opacity-10 key-disabled' : 'text-opacity-75'" @click.stop="jumpChapterStart">first_page</span>
+          <div v-show="!playerSettings.lockUi" class="player-key jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10 key-disabled' : 'text-opacity-75'" @click.stop="jumpBackwards">
             <span class="material-symbols text-3xl leading-none">replay</span>
             <span v-if="showFullscreen" class="jump-label text-[10px] font-semibold leading-tight">{{ jumpBackwardsLabel }}</span>
           </div>
           <div class="play-btn cursor-pointer shadow-sm flex items-center justify-center rounded-full text-primary mx-4 relative overflow-hidden" :style="{ backgroundColor: coverChrome.control }" :class="{ 'animate-spin': seekLoading }" @mousedown.prevent @mouseup.prevent @click.stop="playPauseClick">
-            <div v-if="!coverChrome.isLight" class="absolute top-0 left-0 w-full h-full bg-white bg-opacity-20 pointer-events-none" />
+            <div v-if="coverChrome.controlWash" class="absolute top-0 left-0 w-full h-full bg-white bg-opacity-20 pointer-events-none" />
 
             <span v-if="!showLoadingState" class="material-symbols fill" :class="{ 'text-white': coverChrome.control && !coverChrome.isLight }">{{ seekLoading ? 'autorenew' : !isPlaying ? 'play_arrow' : 'pause' }}</span>
             <widgets-spinner-icon v-else class="h-8 w-8" />
           </div>
-          <div v-show="!playerSettings.lockUi" class="jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10' : 'text-opacity-75'" @click.stop="jumpForward">
+          <div v-show="!playerSettings.lockUi" class="player-key jump-icon text-fg cursor-pointer flex flex-col items-center" :class="showLoadingState ? 'text-opacity-10 key-disabled' : 'text-opacity-75'" @click.stop="jumpForward">
             <span class="material-symbols text-3xl leading-none">forward_media</span>
             <span v-if="showFullscreen" class="jump-label text-[10px] font-semibold leading-tight">{{ jumpForwardLabel }}</span>
           </div>
-          <span v-show="showFullscreen && !playerSettings.lockUi" class="material-symbols next-icon text-fg cursor-pointer" :class="nextChapter && !showLoadingState ? 'text-opacity-75' : 'text-opacity-10'" @click.stop="jumpNextChapter">last_page</span>
+          <span v-show="showFullscreen && !playerSettings.lockUi" class="player-key material-symbols next-icon text-fg cursor-pointer" :class="nextChapter && !showLoadingState ? 'text-opacity-75' : 'text-opacity-10 key-disabled'" @click.stop="jumpNextChapter">last_page</span>
         </div>
       </div>
 

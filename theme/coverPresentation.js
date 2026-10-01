@@ -8,6 +8,10 @@
  * - 'theme': chrome uses the theme's own surfaces. The values are fixed references to token variables
  *   owned by this repository, never theme-supplied strings. Cover art itself is unaffected.
  *
+ * `controlWash` says whether the play button keeps its translucent white wash over the control color.
+ * Legacy keeps it exactly as before (dark covers only); the theme policy drops it so the theme's own
+ * control finish (e.g. LLAMA's steel sheen and bevel) is not washed out.
+ *
  * CommonJS so node tests can load it; the app imports it as a module.
  */
 
@@ -18,16 +22,16 @@ const THEME_CONTROL = 'rgb(var(--color-secondary))'
 /**
  * @param {{ id: string, colorScheme: string, tokens: object }} theme a validated theme (engine.getTheme)
  * @param {{ rgb: string|null, isLight: boolean }} cover the sampled cover color, unchanged
- * @returns {{ usesTheme: boolean, backdrop: string|null, control: string|null, isLight: boolean, darkForeground: boolean }}
+ * @returns {{ usesTheme: boolean, backdrop: string|null, control: string|null, isLight: boolean, darkForeground: boolean, controlWash: boolean }}
  */
 function coverColorPresentation(theme, cover) {
   if (theme && theme.tokens && theme.tokens['presentation.cover-color'] === 'theme') {
     const isLight = theme.colorScheme === 'light'
-    return { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight, darkForeground: isLight }
+    return { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight, darkForeground: isLight, controlWash: false }
   }
   const rgb = cover && cover.rgb ? cover.rgb : null
   const isLight = !!(cover && cover.isLight)
-  return { usesTheme: false, backdrop: rgb, control: rgb, isLight, darkForeground: isLight && (!theme || theme.id !== 'black') }
+  return { usesTheme: false, backdrop: rgb, control: rgb, isLight, darkForeground: isLight && (!theme || theme.id !== 'black'), controlWash: !isLight }
 }
 
 module.exports = { coverColorPresentation, THEME_BACKDROP, THEME_CONTROL }

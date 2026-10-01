@@ -215,7 +215,7 @@ const SAFE_VALUE = /^[a-z0-9 .,%()/#-]+$/i
 test('shared equipment primitives exist as fixed, frozen, paint-only recipe values', () => {
   const P = presets.PRIMITIVES
   assert.ok(Object.isFrozen(P))
-  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
+  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'ENGRAVED_SEPARATOR_TOP', 'RECESSED_FACE', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
   // Radius scale: squared frames, squared keys/wells/panels, full rounding only for circular controls
   assert.deepEqual({ ...P.RADIUS }, { frame: '2px', key: '4px', round: '9999px' })
   assert.ok(Object.isFrozen(P.RADIUS) && Object.isFrozen(P.ELEVATION))
@@ -247,7 +247,7 @@ test('shared equipment primitives exist as fixed, frozen, paint-only recipe valu
   assert.deepEqual({ ...P.KEY_CAP }, { 'border-radius': P.RADIUS.key, 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
   assert.deepEqual({ ...P.KEY_CAP_PRESSED }, { 'background-image': 'none', 'box-shadow': P.PRESSED_BEVEL })
   // Every string primitive is a safe paint value that references only derived edge colors or the accent token
-  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
+  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.ENGRAVED_SEPARATOR_TOP, P.RECESSED_FACE, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
     assert.match(value, SAFE_VALUE, value)
     for (const v of value.match(/--[a-z-]+/g) || []) assert.ok(['--color-edge-light', '--color-edge-dark', '--color-accent'].includes(v), v)
   }
@@ -314,5 +314,119 @@ test('Gate A rules compile through Tailwind with their exact values; standard th
   assert.match(block("html[data-theme='llama'] .icon-btn.border:not(:disabled)"), /background-image: linear-gradient/)
   assert.ok(!/(^|\n)\s*\.card-artwork\s*\{/.test(css), 'no unscoped card-artwork rule')
   assert.ok(!css.includes('[id^=book-card]'), 'the old row-matching selector is gone')
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+// --- Phase 2C Gate B: full player and mini-player equipment fidelity (paint only) ---
+
+const GATE_B = ['.fullscreen .cover-wrapper', '.fullscreen #playerContent', '.fullscreen #playerControls', '#streamContainer:not(.fullscreen) #playerTrack', '#playerContent .player-key:not(.key-disabled)', '#playerContent .player-key:not(.key-disabled):active', '#playerContent .sleep-readout', '#playerTrack .bg-track-cursor.bg-yellow-300']
+
+test('Gate B player rules are paint only, built from the shared primitives', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const rule = (s) => rules[`${root} ${s}`]
+  for (const s of GATE_B) {
+    assert.ok(rule(s), s)
+    for (const [property, value] of Object.entries(rule(s))) {
+      assert.match(property, /^(background-color|background-image|box-shadow|border-radius|color)$/, `${s}: ${property}`)
+      assert.match(value, SAFE_VALUE, `${s}: ${value}`)
+    }
+  }
+  // Artwork: squared frame radius (replaces the player's 16px fullscreen card radius), mounted with the panel elevation
+  assert.equal(rule('.cover-wrapper')['border-radius'], P.RADIUS.frame)
+  assert.equal(rule('.fullscreen .cover-wrapper')['box-shadow'], `${P.ARTWORK_FRAME}, ${P.ELEVATION.panel}`)
+  // Transport deck: raised chassis panel with a dark seam above it
+  assert.deepEqual(rule('.fullscreen #playerContent'), { 'background-color': 'rgb(var(--color-bg))', 'background-image': P.CHASSIS_SHEEN, 'box-shadow': `${P.RAISED_BEVEL}, 0 -1px 0 rgb(var(--color-edge-dark))` })
+  // Seams: transport vs secondary row (fullscreen), panel vs seek region (mini)
+  assert.deepEqual(rule('.fullscreen #playerControls'), { 'box-shadow': P.ENGRAVED_SEPARATOR })
+  assert.deepEqual(rule('#streamContainer:not(.fullscreen) #playerTrack'), { 'box-shadow': P.ENGRAVED_SEPARATOR_TOP })
+  // Keys: exactly the key-cap primitive; pressed inverts it; unavailable keys get no cap
+  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled)'), { ...P.KEY_CAP })
+  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled):active'), { ...P.KEY_CAP_PRESSED })
+  // Recessed displays keep their content-box well and squared radius, now with a recessed face
+  for (const s of ['.fullscreen #playerTrack', '.fullscreen .total-track']) {
+    assert.equal(rule(s)['background-image'], P.RECESSED_FACE, s)
+    assert.equal(rule(s)['background-clip'], 'content-box', s)
+    assert.equal(rule(s)['border-radius'], P.RADIUS.key, s)
+  }
+  // Mirror-image seam: two inset lines, never a size change
+  const top = P.ENGRAVED_SEPARATOR_TOP.split(', ')
+  assert.equal(top.length, 2)
+  assert.match(top[0], /^inset 0 1px 0 rgb\(var\(--color-edge-dark\)\)$/)
+  assert.match(top[1], /^inset 0 2px 0 rgb\(var\(--color-edge-light\) \/ 0\.\d+\)$/)
+})
+
+test('Gate B readouts: sleep countdown is a phosphor readout in LLAMA only; success keeps its meaning', () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  assert.deepEqual(rules[`${root} #playerContent .sleep-readout`], { color: 'rgb(var(--color-accent))' })
+  // No LLAMA rule repaints success semantics anywhere
+  for (const [selector, declarations] of Object.entries(rules)) {
+    assert.doesNotMatch(selector, /success/, selector)
+    for (const value of Object.values(declarations)) assert.doesNotMatch(value, /--color-success/, selector)
+  }
+})
+
+test('Gate B pending seek stays the played-progress amber but segmented, distinct from the settled bar', async () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const pending = rules[`${root} #playerTrack .bg-track-cursor.bg-yellow-300`]
+  const settled = rules[`${root} #playerTrack .bg-track-cursor.bg-gray-200`]
+  assert.deepEqual(settled, { 'background-color': 'rgb(var(--color-track-cursor))' })
+  assert.equal(pending['background-color'], 'transparent')
+  assert.match(pending['background-image'], /^repeating-linear-gradient\(90deg, rgb\(var\(--color-track-cursor\)\) 0 \d+px, rgb\(var\(--color-track-cursor\) \/ 0\.\d+\) \d+px \d+px\)$/)
+  // The seek code still toggles exactly these two state classes on the played bar
+  const player = await read('../components/app/AudioPlayer.vue')
+  assert.match(player, /this\.\$refs\.playedTrack\.classList\.remove\('bg-gray-200'\)\s*this\.\$refs\.playedTrack\.classList\.add\('bg-yellow-300'\)/)
+  assert.match(player, /this\.\$refs\.playedTrack\.classList\.remove\('bg-yellow-300'\)\s*this\.\$refs\.playedTrack\.classList\.add\('bg-gray-200'\)/)
+})
+
+test('Gate B semantic hooks: player keys, unavailable state and sleep readout are marked in the player template', async () => {
+  const player = await read('../components/app/AudioPlayer.vue')
+  const template = player.slice(0, player.indexOf('</template>'))
+  // Eight keys: chapter start/end, both jumps, and queue, bookmark, sleep, chapters in the secondary row
+  assert.equal((template.match(/class="player-key /g) || []).length, 8)
+  assert.equal((template.match(/class="player-key [^"]*next-icon/g) || []).length, 2)
+  assert.equal((template.match(/class="player-key [^"]*jump-icon/g) || []).length, 2)
+  assert.match(template, /v-if="playerSettings\.showQueueIcon" class="player-key relative cursor-pointer"/)
+  assert.match(template, /class="player-key material-symbols text-3xl text-fg-muted cursor-pointer" :class="\{ fill: bookmarks\.length \}"/)
+  assert.match(template, /<svg v-if="!sleepTimerRunning" xmlns="http:\/\/www\.w3\.org\/2000\/svg" class="player-key h-7 w-7/)
+  assert.match(template, /class="player-key material-symbols text-3xl text-fg cursor-pointer" :class="chapters\.length \? 'text-opacity-75' : 'text-opacity-10 key-disabled'"/)
+  // Unavailable keys are marked together with the existing dimmed glyph state, never instead of it
+  assert.equal((template.match(/'text-opacity-10 key-disabled'/g) || []).length, 5)
+  assert.doesNotMatch(template, /'text-opacity-10'/)
+  // The invisible podcast placeholder, the speed readout and the round play button are not keys
+  assert.match(template, /<span v-else class="material-symbols text-3xl text-white text-opacity-0">bookmark<\/span>/)
+  assert.match(template, /<span class="font-mono text-fg-muted cursor-pointer" style="font-size: 1\.35rem"/)
+  assert.doesNotMatch(template, /player-key[^"]*play-btn|play-btn[^"]*player-key/)
+  assert.match(template, /<p class="sleep-readout text-xl font-mono text-success">/)
+  // The geometry the hooks sit on is unchanged: 120px mini-player, 200px fullscreen panel, control sizes
+  const style = player.slice(player.indexOf('<style>'))
+  assert.match(style, /\.playerContainer \{\s*height: 120px;\s*\}/)
+  assert.match(style, /\.fullscreen \.playerContainer \{\s*height: 200px;\s*\}/)
+  assert.match(style, /#playerControls \.play-btn \{[^}]*height: 40px;\s*width: 40px;/)
+  assert.match(style, /\.fullscreen #playerControls \.play-btn \{\s*height: 65px;\s*width: 65px;/)
+})
+
+test('Gate B rules compile through Tailwind under the LLAMA root only', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const block = (selector) => {
+    const i = css.indexOf(`${selector} {`)
+    assert.ok(i >= 0, selector)
+    return css.slice(i, css.indexOf('}', i))
+  }
+  const root = "html[data-theme='llama']"
+  assert.match(block(`${root} #playerContent .player-key:not(.key-disabled)`), /border-radius: 4px;[\s\S]*background-image: linear-gradient/)
+  assert.match(block(`${root} #playerContent .sleep-readout`), /color: rgb\(var\(--color-accent\)\)/)
+  assert.match(block(`${root} #playerTrack .bg-track-cursor.bg-yellow-300`), /background-image: repeating-linear-gradient/)
+  assert.match(block(`${root} .fullscreen #playerContent`), /background-color: rgb\(var\(--color-bg\)\)/)
+  assert.match(block(`${root} .cover-wrapper`), /border-radius: 2px/)
+  for (const hook of ['player-key', 'key-disabled', 'sleep-readout']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}`).test(css), `no unscoped ${hook} rule`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })

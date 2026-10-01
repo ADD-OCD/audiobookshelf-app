@@ -26,7 +26,8 @@ function legacyExpressions(themeId, cover) {
     backdrop: cover.rgb, // :style backgroundColor: coverRgb (backdrop, mini panel, body, item header)
     control: cover.rgb, // play button backgroundColor: coverRgb
     isLight: cover.isLight, // white wash v-if="!coverBgIsLight"; 'text-white': coverRgb && !coverBgIsLight
-    darkForeground: cover.isLight && themeId !== 'black' // coverBgIsLight && theme !== 'black'
+    darkForeground: cover.isLight && themeId !== 'black', // coverBgIsLight && theme !== 'black'
+    controlWash: !cover.isLight // play button white wash v-if="!coverBgIsLight"
   }
 }
 
@@ -40,6 +41,7 @@ test('Dark, Black and Light keep the exact legacy cover-derived chrome for every
       assert.equal(result.control, legacy.control, `${id}/${name} control`)
       assert.equal(result.isLight, legacy.isLight, `${id}/${name} isLight`)
       assert.equal(result.darkForeground, legacy.darkForeground, `${id}/${name} darkForeground`)
+      assert.equal(result.controlWash, legacy.controlWash, `${id}/${name} controlWash`)
       // the play icon's text-white condition: coverRgb && !coverBgIsLight
       assert.equal(!!(result.control && !result.isLight), !!(cover.rgb && !cover.isLight), `${id}/${name} play icon`)
     }
@@ -56,7 +58,7 @@ test('LLAMA chrome uses its own surfaces, whatever the cover (bright, dark, colo
   const llama = engine.getTheme('llama')
   for (const [name, cover] of Object.entries({ ...COVERS, hostile: { rgb: 'red; } body { display: none', isLight: true } })) {
     const result = coverColorPresentation(llama, cover)
-    assert.deepEqual({ ...result }, { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight: false, darkForeground: false }, name)
+    assert.deepEqual({ ...result }, { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight: false, darkForeground: false, controlWash: false }, name)
   }
 })
 
@@ -73,7 +75,7 @@ test('theme-policy chrome only references token variables that exist', () => {
 test('a theme-policy theme with a light color scheme would use dark foregrounds (future-proofing)', () => {
   const light = engine.getTheme('light')
   const { theme } = engine.validateTheme({ ...light, tokens: { ...light.tokens, 'presentation.cover-color': 'theme' } }, light.tokens)
-  assert.deepEqual({ ...coverColorPresentation(theme, COVERS.dark) }, { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight: true, darkForeground: true })
+  assert.deepEqual({ ...coverColorPresentation(theme, COVERS.dark) }, { usesTheme: true, backdrop: THEME_BACKDROP, control: THEME_CONTROL, isLight: true, darkForeground: true, controlWash: false })
 })
 
 test('no cover-derived style binding bypasses the policy in the player or item header', async () => {
@@ -83,6 +85,9 @@ test('no cover-derived style binding bypasses the policy in the player or item h
   assert.doesNotMatch(template, /coverBgIsLight/)
   assert.doesNotMatch(template, /theme !== 'black'/)
   assert.equal((template.match(/coverChrome\./g) || []).length, 10)
+  // The play button's white wash follows the projection, never a theme id check in the player
+  assert.match(template, /<div v-if="coverChrome\.controlWash" class="absolute top-0 left-0 w-full h-full bg-white bg-opacity-20 pointer-events-none" \/>/)
+  assert.doesNotMatch(player, /llama|theme\.id|\$theme\.(id|current)/i)
   const item = await read('../pages/item/_id/index.vue')
   const itemTemplate = item.slice(0, item.indexOf('</template>'))
   assert.doesNotMatch(itemTemplate, /coverRgb/)

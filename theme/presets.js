@@ -58,6 +58,11 @@ const ARTWORK_FRAME = '0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 2px rgb(var(
 // A seam cut into the bottom of an element: dark inset line with a faint light return line below it.
 // Drawn inside the element's own box (inset), so row dimensions never change.
 const ENGRAVED_SEPARATOR = 'inset 0 -1px 0 rgb(var(--color-edge-light) / 0.12), inset 0 -2px 0 rgb(var(--color-edge-dark))'
+// The same seam cut into the top of an element (dark line on top, faint light return under it)
+const ENGRAVED_SEPARATOR_TOP = 'inset 0 1px 0 rgb(var(--color-edge-dark)), inset 0 2px 0 rgb(var(--color-edge-light) / 0.12)'
+// Recessed display face as a background layer: dark upper lip with an inner shade falling down and a faint
+// light lower lip. Unlike an inset box-shadow it follows background-clip, so it fits a content-box well
+const RECESSED_FACE = 'linear-gradient(180deg, rgb(var(--color-edge-dark)) 0, rgb(var(--color-edge-dark)) 1px, rgb(0 0 0 / 0.4) 1px, rgb(0 0 0 / 0) 6px, rgb(0 0 0 / 0) calc(100% - 1px), rgb(var(--color-edge-light) / 0.22) calc(100% - 1px))'
 
 // Elevation: the only drop shadows the recipe uses (each value matches what existing rules already used)
 const ELEVATION = Object.freeze({
@@ -78,7 +83,7 @@ const SELECTED_KEY = Object.freeze({
   'box-shadow': `inset 0 0 0 1px rgb(var(--color-accent) / 0.9), ${PRESSED_BEVEL}, inset 0 2px 5px rgb(0 0 0 / 0.45)`
 })
 
-const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
+const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
 
 const EQUIPMENT_RULES = [
   // Navigation chrome: bevelled chassis strips
@@ -120,17 +125,40 @@ const EQUIPMENT_RULES = [
   // Artwork: thin outer frame (outside the image, so the artwork stays fully visible and unresized).
   // Card artwork is marked by the `card-artwork` hook: the grid card itself (it is the cover) and, in list
   // rows, only the cover box, never the whole row
-  ['.cover-wrapper', { 'box-shadow': ARTWORK_FRAME }],
+  ['.cover-wrapper', { 'box-shadow': ARTWORK_FRAME, 'border-radius': RADIUS.frame }],
   ['.card-artwork', { 'box-shadow': `${ARTWORK_FRAME}, ${ELEVATION.panel}` }],
 
+  // Player artwork uses the squared frame radius above (mini 3px, fullscreen 16px before); same box, crop and
+  // aspect ratio. Fullscreen artwork sits mounted on the chassis like card artwork
+  ['.fullscreen .cover-wrapper', { 'box-shadow': `${ARTWORK_FRAME}, ${ELEVATION.panel}` }],
+  // Fullscreen transport deck: the existing bottom player panel becomes a raised chassis panel (sheen, light
+  // top edge, dark seam above it against the artwork zone). Same box; the controls inside are untouched
+  ['.fullscreen #playerContent', { 'background-color': 'rgb(var(--color-bg))', 'background-image': CHASSIS_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 -1px 0 rgb(var(--color-edge-dark))` }],
+  // Panel seam between the primary transport row and the secondary control row
+  ['.fullscreen #playerControls', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Mini-player: seam across the panel above the seek region
+  ['#streamContainer:not(.fullscreen) #playerTrack', { 'box-shadow': ENGRAVED_SEPARATOR_TOP }],
+  // Physical keys: the transport and secondary controls marked with the player-key hook get a key cap on their
+  // own box (pressed inverts it). A control that is currently unavailable (key-disabled) has no cap at all,
+  // so it reads flat/unavailable by shape, not only by its dimmed glyph. Readouts (speed, sleep countdown)
+  // and the round play button are not player keys
+  ['#playerContent .player-key:not(.key-disabled)', KEY_CAP],
+  ['#playerContent .player-key:not(.key-disabled):active', KEY_CAP_PRESSED],
+  // Live sleep countdown is a readout: phosphor green like the other readouts (state.success keeps meaning
+  // finished/complete everywhere else)
+  ['#playerContent .sleep-readout', { color: 'rgb(var(--color-accent))' }],
+
   // Player: recessed display behind the fullscreen seek/readout rows (content box only: padding stays chassis)
-  ['.fullscreen #playerTrack', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
-  ['.fullscreen .total-track', { 'background-color': 'rgb(var(--color-recessed))', 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
+  ['.fullscreen #playerTrack', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': RECESSED_FACE, 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
+  ['.fullscreen .total-track', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': RECESSED_FACE, 'background-clip': 'content-box', 'border-radius': RADIUS.key }],
   // Seek channels read as inset slots; the played portion stays the amber token even after the player's
-  // seek code swaps in its settled-state class (bg-gray-200); the pending-seek highlight is left as is
+  // seek code swaps in its settled-state class (bg-gray-200)
   ['#playerTrack div.relative.rounded-full', { 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)' }],
   ['.total-track div.relative.rounded-full', { 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)' }],
   ['#playerTrack .bg-track-cursor.bg-gray-200', { 'background-color': 'rgb(var(--color-track-cursor))' }],
+  // Pending seek (the seek code's bg-yellow-300 state until playback confirms the position): the same amber,
+  // broken into segments, so it reads as not-yet-settled by pattern rather than by a near-identical yellow
+  ['#playerTrack .bg-track-cursor.bg-yellow-300', { 'background-color': 'transparent', 'background-image': 'repeating-linear-gradient(90deg, rgb(var(--color-track-cursor)) 0 4px, rgb(var(--color-track-cursor) / 0.3) 4px 7px)' }],
   ['#playerTrack .pointer-events-auto > .bg-track-cursor', { 'box-shadow': '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)' }],
   // Phosphor-green readouts: timestamps, playback speed and the playback-method label (titles stay neutral)
   ['#playerTrack p.font-mono', { color: 'rgb(var(--color-accent))' }],
