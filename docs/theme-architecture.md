@@ -119,7 +119,7 @@ A test compiles the real content with Tailwind and fails if any recipe selector 
 
   Each level equals a value existing rules already used, so adopting them changed nothing on screen. A few older shadows (the play button, the Chapters header, the drawer edge, the mini-player and shelf ledge, which mirror their components' own shadows) keep their values until the gate that restyles those surfaces.
 
-- **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
+- **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `PRIMARY_STEEL` / `PRIMARY_STEEL_PRESSED` (the round play button only, Gate B.1), `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
 - **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Gate B applies it to the player (transport vs secondary row); queue, chapter, table and dialog rows are later gates. `ENGRAVED_SEPARATOR_TOP` is the same seam on a top edge, and `RECESSED_FACE` is a recessed-display bevel as a background layer (both Gate B).
 - **Control states** (complete declaration sets):
   - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Gate B applies it to the player keys.
@@ -155,6 +155,13 @@ Paint only. Every player box, control position, size, order and touch target is 
   - `theme`: `false`.
 
   The wash sat above the steel sheen and inset bevel and flattened both. The template binds only to the projection; there are no theme-id checks in the player.
+
+  Without the wash, the subtle `STEEL_SHEEN` over the `surface.raised` fill read as dark slate, the same blue-gray as the chassis. Gate B.1 gives the play button (mini and fullscreen) its own stronger primitive, `PRIMARY_STEEL`:
+
+  - an upper-left highlight (same light source as the bevels);
+  - a near-opaque top-to-bottom steel falloff composed over the fill.
+
+  The face reads silver-gray, about 112 121 136 behind the glyph. The white glyph keeps at least 3:1, checked against the brightest point, and a test enforces it. Pressed uses `PRIMARY_STEEL_PRESSED`, a dimmer face with an inverted falloff, plus the inset bevel. Secondary keys, buttons and the other steel surfaces keep `STEEL_SHEEN`.
 
 - **Readouts:**
   - The sleep countdown (`sleep-readout` hook) uses the phosphor accent like the other live readouts. This is a presentation mapping; `state.success` still means finished/complete everywhere.
