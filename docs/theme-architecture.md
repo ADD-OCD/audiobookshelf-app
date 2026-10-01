@@ -168,6 +168,35 @@ Paint only. Every player box, control position, size, order and touch target is 
   - The fullscreen seek and total-track wells gain `RECESSED_FACE`, a background-layer bevel that follows `background-clip: content-box` (an inset shadow would span the padding). It adds a dark upper lip with an inner shade and a faint light lower lip.
 - **Pending seek:** the seek code's pending state (`bg-yellow-300`, until playback confirms the position) was a near-identical yellow next to the amber played bar. LLAMA draws it as the same amber broken into segments, so it reads as unsettled by pattern, not only by hue. Seek behavior and the class toggling are unchanged.
 
+### Up Next and player-adjacent overlays (Phase 2C Gate C)
+
+Paint only, scoped to the overlays opened from the player:
+
+- Up Next (`QueueModal`);
+- playback speed;
+- sleep timer;
+- bookmarks (`BookmarksModal` and `BookmarkItem`).
+
+`AudioPlayerContainer` is the only place these are used. Shared dialogs (`Dialog.vue`, the global `Modal` shell) are untouched. Geometry, queue semantics, drag/reorder, removal, scrolling and dismissal are unchanged. Chapters is the consistency reference and gets no new rules.
+
+They all follow one hierarchy: the existing raised chassis dialog panel, then a recessed list well, then engraved row seams, then the current or selected state. Rows stay flat display entries, not keys.
+
+- **Up Next:** the panel stays the recessed well it already was.
+  - The current item is the Now Playing block (`queue-current`), not a row in the list. It is now a lit entry with the same played-progress amber as Chapters' current-chapter marker, drawn as a 2px inset left edge (`CURRENT_MARKER`) rather than a new element. It is pressed in (`PRESSED_BEVEL`), so it reads by shape as well as color, and its divider becomes an engraved seam.
+  - Upcoming rows (`queue-row`) get `ENGRAVED_SEPARATOR` between rows, none after the last.
+  - The drag handle and the remove control keep their existing look.
+- **Speed and sleep option lists** (`playback-option-panel`):
+  - a recessed `ul[role=listbox]` well with seamed `li[role=option]` rows;
+  - the selected speed (`option-selected`, next to its existing wash class) is a `SELECTED_KEY` (pressed in, accent ring) on a lit row;
+  - the speed stepper strip (`option-panel-footer`) is a raised chassis strip, and its steppers are `KEY_CAP` keys (pressed inverts them; disabled steppers stay flat).
+- **Live readouts:** the current speed (`speed-readout`) and the running sleep countdown (`sleep-readout`) use the phosphor accent.
+- **Bookmarks:**
+  - a recessed list (`bookmarks-list`) with seamed rows (`bookmark-row`);
+  - the bookmark at the current position (`bookmark-current`, next to its existing highlight classes) is a lit, pressed entry with the amber marker;
+  - its icon (`bookmark-icon`) is amber, because it marks a position. It was success green, which now only means completion or a positive outcome. The Create Bookmark bar keeps its success color as a positive action.
+
+Cascade: a state rule outranks the row-seam rule it shares an element with, by equal specificity and later order; a test computes this. Without it, the selected speed lost its key to the seam rule.
+
 Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
 | Token                                              | RGB                               | Role                                                                                                              |
