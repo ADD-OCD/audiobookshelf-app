@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-flex">
+  <div class="range-input inline-flex">
     <input v-model="input" type="range" :min="min" :max="max" :step="step" :style="{ width: inputWidth }" />
 
     <p class="text-xs ml-2">{{ input }}%</p>

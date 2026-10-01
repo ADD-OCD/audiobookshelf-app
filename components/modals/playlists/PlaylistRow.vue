@@ -1,8 +1,8 @@
 <template>
   <div :key="playlist.id" :id="`playlist-row-${playlist.id}`" class="flex items-center px-3 py-2 justify-start relative border-y border-white/5" :class="inPlaylist ? 'bg-primary/20' : ''">
-    <div v-if="inPlaylist" class="absolute top-0 left-0 h-full w-1 bg-success z-10" />
+    <div v-if="inPlaylist" class="membership-marker absolute top-0 left-0 h-full w-1 bg-success z-10" />
     <div class="w-14 min-w-[56px] text-center" @click.stop="clickCover">
-      <covers-playlist-cover :items="items" :width="52" :height="52" />
+      <covers-playlist-cover class="card-artwork" :items="items" :width="52" :height="52" />
     </div>
     <div class="flex-grow overflow-hidden">
       <p class="px-2 truncate text-sm">{{ playlist.name }}</p>

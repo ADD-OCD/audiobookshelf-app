@@ -612,7 +612,11 @@ test('Gate D artwork hooks mark the artwork box of every card type, never a card
   assert.match(item, /<div v-if="!isPodcast" class="absolute bottom-0 left-0 h-1 z-10 box-shadow-progressbar" :class="userIsFinished \? 'bg-success' : 'bg-yellow-400'"/)
   assert.match(await read('../pages/collection/_id.vue'), /<covers-collection-cover class="detail-artwork" /)
   assert.match(await read('../pages/playlist/_id.vue'), /<covers-playlist-cover class="detail-artwork" /)
-  assert.doesNotMatch(await read('../components/modals/playlists/PlaylistRow.vue'), /detail-artwork|card-artwork/)
+  // Playlists-modal row (Gate E): its cover component is card artwork; the row root never is, and it has no detail artwork
+  const playlistRow = await read('../components/modals/playlists/PlaylistRow.vue')
+  assert.doesNotMatch(playlistRow, /detail-artwork/)
+  assert.doesNotMatch(playlistRow.match(/<div :key="playlist\.id"[^>]*>/)[0], /card-artwork/)
+  assert.match(playlistRow, /<covers-playlist-cover class="card-artwork" :items="items" :width="52" :height="52" \/>/)
 })
 
 test('Gate D semantic hooks are present on browsing and detail surfaces', async () => {
@@ -710,5 +714,125 @@ test('Gate D rules compile through Tailwind under the LLAMA root; standard theme
   const root = "html[data-theme='llama']"
   for (const s of ['.detail-artwork', '.detail-progress', '.section-bar', '.tracksTable tr:nth-child(even)', '.group-items', '.library-selector', '.modal .library-option-panel li[role=option].option-selected', '.row-play-btn', '.browse-toolbar .filter-indicator', '.shelf-section']) assert.ok(css.includes(`${root} ${s} {`), s)
   for (const hook of ['shelf-section', 'browse-toolbar', 'library-selector', 'library-option-panel', 'detail-artwork', 'detail-progress', 'section-bar', 'section-count', 'group-items', 'group-row', 'row-play-btn', 'filter-indicator', 'option-marker']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+// --- Phase 2C Gate E: forms, shared dialogs and interactive controls (paint only) ---
+
+const GATE_E = /toggle-btn|range-input|checkbox-box|dropdown-button|dropdown-menu|dialog-panel|membership-marker/
+
+test('Gate E hooks: shared controls keep their native semantics and carry purpose-named hooks', async () => {
+  const checkbox = await read('../components/ui/Checkbox.vue')
+  assert.match(checkbox, /<div class="checkbox-box border-2 rounded flex flex-shrink-0 justify-center items-center" :class="\[wrapperClass, \{ 'checkbox-checked': selected, 'checkbox-disabled': disabled \}\]">/)
+  assert.match(checkbox, /<input v-model="selected" :disabled="disabled" type="checkbox" class="opacity-0 absolute"/) // native input kept
+  assert.match(checkbox, /<svg v-if="selected" class="checkbox-mark fill-current pointer-events-none"/)
+  const range = await read('../components/ui/RangeInput.vue')
+  assert.match(range, /<div class="range-input inline-flex">\s*<input v-model="input" type="range" :min="min" :max="max" :step="step"/)
+  const dropdown = await read('../components/ui/Dropdown.vue')
+  assert.match(dropdown, /class="dropdown-button relative w-full border[^"]*"[^>]*aria-haspopup="listbox"/)
+  assert.match(dropdown, /<ul v-show="showMenu" class="dropdown-menu absolute z-10[^"]*" role="listbox">/)
+  const toggles = await read('../components/ui/ToggleBtns.vue')
+  assert.match(toggles, /class="toggle-btn outline-none relative border border-border px-4 py-1" :class="\{ selected: item\.value === value \}"/)
+  const dialog = await read('../components/modals/Dialog.vue')
+  assert.match(dialog, /<div ref="container" class="dialog-panel w-full overflow-x-hidden overflow-y-auto bg-primary rounded-lg border border-fg\/20 p-2"/)
+  assert.match(dialog, /:class="selected === item\.value \? 'bg-success bg-opacity-10 option-selected' : ''"/)
+  assert.match(dialog, /<ul class="h-full w-full" role="listbox"/)
+  const playlistRow = await read('../components/modals/playlists/PlaylistRow.vue')
+  assert.match(playlistRow, /<div v-if="inPlaylist" class="membership-marker absolute top-0 left-0 h-full w-1 bg-success z-10" \/>/)
+  // Search results: the cover is the artwork; the result card root never is
+  for (const [file, pattern] of [
+    ['../components/cards/ItemSearchCard.vue', /<covers-book-cover class="card-artwork" /],
+    ['../components/cards/EpisodeSearchCard.vue', /<covers-book-cover class="card-artwork" /],
+    ['../components/cards/SeriesSearchCard.vue', /<covers-group-cover class="card-artwork" /],
+    ['../components/cards/AuthorSearchCard.vue', /<div class="card-artwork overflow-hidden bg-primary rounded" style="height: 50px; width: 40px">/]
+  ]) {
+    const source = await read(file)
+    assert.match(source, pattern, file)
+    assert.equal((source.match(/card-artwork/g) || []).length, 1, file)
+    assert.match(source, /<template>\s*<div class="flex h-full px-1 overflow-hidden">/, `${file}: root unchanged`)
+  }
+})
+
+test('Gate E rules: paint only, primitives, and control-state semantics', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const rule = (s) => rules[`${root} ${s}`]
+  const gateE = Object.entries(rules).filter(([s]) => GATE_E.test(s))
+  assert.ok(gateE.length >= 21, `${gateE.length} rules`)
+  for (const [selector, declarations] of gateE) {
+    for (const [property, value] of Object.entries(declarations)) {
+      assert.match(property, /^(background-color|background-image|box-shadow|border-radius|border-color|color|outline|outline-color|outline-offset)$/, `${selector}: ${property}`)
+      assert.match(value, SAFE_VALUE, `${selector}: ${value}`)
+      assert.doesNotMatch(value, /--color-success|--color-warning|--color-error/, `${selector}: state colors keep their meaning`)
+    }
+    assert.ok(!Object.values(declarations).includes(P.PRIMARY_STEEL), `${selector}: PRIMARY_STEEL stays the play button's`)
+  }
+  // Toggles: raised segments; selected = selected key; pressed inverts
+  assert.deepEqual(rule('.toggle-btn'), { 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
+  assert.deepEqual(rule('.toggle-btn.selected'), { ...P.SELECTED_KEY })
+  assert.deepEqual(rule('.toggle-btn:active'), { ...P.KEY_CAP_PRESSED })
+  // Checkbox: recessed empty well, checked = pressed with accent edge and accent check, disabled = flat and muted
+  assert.equal(rule('.checkbox-box')['box-shadow'], P.RECESSED_WELL)
+  assert.deepEqual(rule('.checkbox-box.checkbox-checked'), { 'background-color': 'rgb(var(--color-bg))', 'border-color': 'rgb(var(--color-accent))', 'box-shadow': P.PRESSED_BEVEL })
+  assert.deepEqual(rule('.checkbox-box .checkbox-mark'), { color: 'rgb(var(--color-accent))' })
+  assert.equal(rule('.checkbox-box.checkbox-disabled')['box-shadow'], 'none')
+  assert.deepEqual(rule('.checkbox-box.checkbox-disabled .checkbox-mark'), { color: 'rgb(var(--color-fg-muted))' })
+  assert.match(rule('.checkbox-box:has(input:focus-visible)').outline, /rgb\(var\(--color-accent\)\)/)
+  // Range: recessed slot and steel thumb, never the playback amber (a setting is not progress)
+  for (const [selector, declarations] of gateE.filter(([s]) => s.includes('range-input'))) for (const value of Object.values(declarations)) assert.doesNotMatch(value, /--color-track-cursor/, selector)
+  assert.equal(rule('.range-input input[type=range]::-webkit-slider-thumb')['background-image'], P.STEEL_SHEEN)
+  // Dropdown: the enabled trigger is a key (disabled stays flat); the open list is a recessed module
+  assert.deepEqual(rule('.dropdown-button:not(:disabled)'), { ...P.KEY_CAP })
+  assert.ok(!rules[`${root} .dropdown-button`], 'no rule for the disabled trigger')
+  assert.ok(rule('.dropdown-menu')['box-shadow'].startsWith(P.RECESSED_WELL))
+  // Dialog: recessed list, seamed rows, selected key instead of the success wash
+  assert.deepEqual(rule('.modal .dialog-panel ul[role=listbox] > li.option-selected'), { 'background-color': 'rgb(var(--color-bg))', ...P.SELECTED_KEY })
+  assert.equal(rule('.modal .dialog-panel ul[role=listbox] > li:not(:last-child)')['box-shadow'], P.ENGRAVED_SEPARATOR)
+  assert.deepEqual(rule('.membership-marker'), { 'background-color': 'rgb(var(--color-accent))' })
+  // IconBtn contract from Gate A is untouched: only bordered icon buttons are keys
+  assert.ok(!gateE.some(([s]) => s.includes('icon-btn')))
+  assert.deepEqual(
+    Object.keys(rules).filter((s) => s.includes('icon-btn')),
+    [`${root} .icon-btn.border:not(:disabled)`, `${root} .icon-btn.border:not(:disabled):active`]
+  )
+})
+
+test('Gate E cascade: disabled, selected and pressed states win where they share an element', () => {
+  const root = engine.themeSelector('llama')
+  const order = Object.keys(presets.presentationRules([llama()]))
+  const r = (s) => `${root} ${s}`
+  assert.ok(outranks(r('.checkbox-box.checkbox-disabled'), r('.checkbox-box.checkbox-checked'), order), 'disabled checked never reads as active')
+  assert.ok(outranks(r('.checkbox-box.checkbox-disabled .checkbox-mark'), r('.checkbox-box .checkbox-mark'), order))
+  assert.ok(outranks(r('.toggle-btn.selected'), r('.toggle-btn'), order))
+  assert.ok(outranks(r('.toggle-btn:active'), r('.toggle-btn.selected'), order), 'pressing a selected segment still inverts')
+  assert.ok(outranks(r('.modal .dialog-panel ul[role=listbox] > li.option-selected'), r('.modal .dialog-panel ul[role=listbox] > li:not(:last-child)'), order))
+  // The LLAMA toggle rules outrank the component's scoped styles ([data-v] adds one attribute)
+  assert.ok(outranks(r('.toggle-btn.selected'), '.toggle-btn.selected[data-v-x]'))
+  assert.ok(outranks(r('.toggle-btn:not(.selected)'), '.toggle-btn[data-v-x]'))
+  assert.ok(outranks(r('.range-input input[type=range]::-webkit-slider-thumb'), 'input[type=range][data-v-x]::-webkit-slider-thumb'))
+})
+
+test('Gate E scoping: frozen player, overlays and browsing surfaces carry none of the Gate E hooks', async () => {
+  // Player seek is not a range input, so the range rules cannot reach it
+  assert.doesNotMatch(await read('../components/app/AudioPlayer.vue'), /type="range"|range-input/)
+  // Gate C/D option panels and Chapters are not Dialog panels, so the Dialog rules cannot repaint them
+  for (const file of ['../components/modals/QueueModal.vue', '../components/modals/PlaybackSpeedModal.vue', '../components/modals/SleepTimerModal.vue', '../components/modals/BookmarksModal.vue', '../components/modals/ChaptersModal.vue', '../components/modals/LibrariesModal.vue']) {
+    assert.doesNotMatch(await read(file), /dialog-panel|checkbox-box|dropdown-menu|membership-marker/, file)
+  }
+  const rules = presets.presentationRules([llama()])
+  for (const s of Object.keys(rules).filter((x) => GATE_E.test(x))) assert.doesNotMatch(s, /playerContent|playerTrack|queue-|playback-option-panel|chapters-panel|library-option-panel|bookmark/, s)
+})
+
+test('Gate E rules compile through Tailwind (pseudo-elements and :has included); standard themes get none', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const root = "html[data-theme='llama']"
+  for (const s of ['.toggle-btn.selected', '.range-input input[type=range]::-webkit-slider-thumb', '.checkbox-box:has(input:focus-visible)', '.checkbox-box.checkbox-disabled', '.dropdown-button:not(:disabled)', '.modal .dialog-panel ul[role=listbox] > li.option-selected', '.membership-marker']) assert.ok(css.includes(`${root} ${s} {`), s)
+  for (const hook of ['range-input', 'checkbox-box', 'dropdown-button', 'dropdown-menu', 'dialog-panel', 'membership-marker']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })

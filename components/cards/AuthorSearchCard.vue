@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full px-1 overflow-hidden">
-    <div class="overflow-hidden bg-primary rounded" style="height: 50px; width: 40px">
+    <div class="card-artwork overflow-hidden bg-primary rounded" style="height: 50px; width: 40px">
       <covers-author-image :author="author" />
     </div>
     <div class="flex-grow px-2 authorSearchCardContent h-full">

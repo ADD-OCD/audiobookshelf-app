@@ -92,6 +92,9 @@ const SELECTED_KEY = Object.freeze({
 // Current playback entry in a list (Up Next, bookmarks): a 2px amber edge along the left inside the row, the
 // same played-progress amber and width as Chapters' current-chapter marker, without adding an element
 const CURRENT_MARKER = 'inset 2px 0 0 rgb(var(--color-track-cursor))'
+// Slot and thumb edges, the same values as the player's seek channel and seek thumb
+const INSET_SLOT = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)'
+const THUMB_EDGE = '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)'
 
 const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
 
@@ -252,6 +255,46 @@ const EQUIPMENT_RULES = [
   // Row play buttons are real controls: equipment keys (glyph color and size unchanged)
   ['.row-play-btn', KEY_CAP],
   ['.row-play-btn:active', KEY_CAP_PRESSED],
+
+  // --- Forms, shared dialogs and interactive controls (Gate E) ---
+  // Segmented toggles (ui/ToggleBtns, existing toggle-btn / selected hooks): raised steel segments; the
+  // selected choice is a selected key (pressed in, accent ring) on its existing lit fill, so it reads by shape
+  // and not color alone; pressing any segment inverts its bevel. Segment shapes and borders are unchanged
+  ['.toggle-btn', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
+  ['.toggle-btn.selected', SELECTED_KEY],
+  ['.toggle-btn:active', KEY_CAP_PRESSED],
+  // Unselected segment labels keep a readability margin on the steel face (the component dims them to fg/0.5,
+  // 3.3:1 under the sheen); selection still reads by the pressed bevel, accent ring and lit fill
+  ['.toggle-btn:not(.selected)', { color: 'rgb(var(--color-fg) / 0.78)' }],
+  // Range input (ui/RangeInput, range-input hook): a recessed slot like the seek channels, with a steel thumb
+  // rather than the playback amber (a setting is not playback progress); focus keeps its outline, in the accent
+  ['.range-input input[type=range]::-webkit-slider-runnable-track', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': INSET_SLOT }],
+  ['.range-input input[type=range]::-webkit-slider-thumb', { 'background-color': 'rgb(var(--color-edge-light))', 'background-image': STEEL_SHEEN, 'box-shadow': THUMB_EDGE }],
+  ['.range-input input[type=range]:focus::-webkit-slider-thumb', { 'border-color': 'rgb(var(--color-edge-dark))', 'outline-color': 'rgb(var(--color-accent))' }],
+  // Checkbox (ui/Checkbox): an empty recessed well; checked = lit, pressed in, accent edge and accent check
+  // (checked is not success); disabled = flat, dark edge and muted check, so it never reads as active.
+  // The native input stays (invisible, as before); its keyboard focus now shows on the box
+  ['.checkbox-box', { 'background-color': 'rgb(var(--color-recessed))', 'border-color': 'rgb(var(--color-border))', 'box-shadow': RECESSED_WELL }],
+  ['.checkbox-box.checkbox-checked', { 'background-color': 'rgb(var(--color-bg))', 'border-color': 'rgb(var(--color-accent))', 'box-shadow': PRESSED_BEVEL }],
+  ['.checkbox-box .checkbox-mark', { color: 'rgb(var(--color-accent))' }],
+  ['.checkbox-box.checkbox-disabled', { 'background-color': 'rgb(var(--color-primary))', 'border-color': 'rgb(var(--color-edge-dark))', 'box-shadow': 'none' }],
+  ['.checkbox-box.checkbox-disabled .checkbox-mark', { color: 'rgb(var(--color-fg-muted))' }],
+  ['.checkbox-box:has(input:focus-visible)', { outline: '2px solid rgb(var(--color-accent))', 'outline-offset': '2px' }],
+  // Dropdown (ui/Dropdown): the trigger is a key (a disabled trigger stays flat); its open list is a recessed
+  // module floating above the page with seamed options (it has no selected state of its own)
+  ['.dropdown-button:not(:disabled)', KEY_CAP],
+  ['.dropdown-button:not(:disabled):active', KEY_CAP_PRESSED],
+  ['.dropdown-menu', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': `${RECESSED_WELL}, ${ELEVATION.overlay}` }],
+  ['.dropdown-menu li:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Shared Dialog (menus and option lists everywhere): the chassis panel (dialog rule above) holds a recessed
+  // list with seamed rows; a selected option is a selected key on a lit row instead of a success-green wash.
+  // Panel radius, size, position, animation and dismissal are unchanged
+  ['.modal .dialog-panel ul[role=listbox]', { 'background-color': 'rgb(var(--color-recessed))', 'border-radius': RADIUS.key, 'box-shadow': RECESSED_WELL }],
+  ['.modal .dialog-panel ul[role=listbox] > li:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  ['.modal .dialog-panel ul[role=listbox] > li.option-selected', { 'background-color': 'rgb(var(--color-bg))', ...SELECTED_KEY }],
+  // Playlists modal row: membership is a state, so its marker uses the accent (the row's Add/Remove buttons
+  // and the cover's card-artwork frame come from the existing rules)
+  ['.membership-marker', { 'background-color': 'rgb(var(--color-accent))' }],
 
   // Toggle switch (ui/ToggleSwitch): recessed slot with a steel thumb; state still reads from thumb position
   ['.w-10.rounded-full.border-gray-400', { 'border-color': 'rgb(var(--color-border))', 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset 0 1px 3px rgb(0 0 0 / 0.5)' }],

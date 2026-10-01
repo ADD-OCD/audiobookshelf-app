@@ -1,8 +1,8 @@
 <template>
   <label class="flex justify-start items-center" :class="!disabled ? 'cursor-pointer' : ''">
-    <div class="border-2 rounded flex flex-shrink-0 justify-center items-center" :class="wrapperClass">
+    <div class="checkbox-box border-2 rounded flex flex-shrink-0 justify-center items-center" :class="[wrapperClass, { 'checkbox-checked': selected, 'checkbox-disabled': disabled }]">
       <input v-model="selected" :disabled="disabled" type="checkbox" class="opacity-0 absolute" :class="!disabled ? 'cursor-pointer' : ''" />
-      <svg v-if="selected" class="fill-current pointer-events-none" :class="svgClass" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z" /></svg>
+      <svg v-if="selected" class="checkbox-mark fill-current pointer-events-none" :class="svgClass" viewBox="0 0 20 20"><path d="M0 11l2-2 5 5L18 3l2 2L7 18z" /></svg>
     </div>
     <div v-if="label" class="select-none text-fg" :class="labelClassname">{{ label }}</div>
   </label>
