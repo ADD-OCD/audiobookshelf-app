@@ -24,4 +24,15 @@ class WidgetLayoutTest {
     assertEquals(R.layout.media_player_widget_wide_llama, WidgetRenderer.layoutFor(WidgetSize.WIDE, WidgetTheme.LLAMA))
     assertEquals(R.layout.media_player_widget_full_llama, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.LLAMA))
   }
+
+  @Test
+  fun expandedOnlyChangesFullAndKeepsTheTheme() {
+    assertEquals(R.layout.media_player_widget_full_expanded, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.STANDARD, expanded = true))
+    assertEquals(R.layout.media_player_widget_full_expanded_llama, WidgetRenderer.layoutFor(WidgetSize.FULL, WidgetTheme.LLAMA, expanded = true))
+    for (theme in WidgetTheme.values()) {
+      for (size in listOf(WidgetSize.COMPACT, WidgetSize.WIDE)) {
+        assertEquals("$size $theme", WidgetRenderer.layoutFor(size, theme), WidgetRenderer.layoutFor(size, theme, expanded = true))
+      }
+    }
+  }
 }

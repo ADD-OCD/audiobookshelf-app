@@ -41,7 +41,9 @@ import java.util.concurrent.TimeUnit
 object WidgetRenderer {
   private const val TAG = "MediaPlayerWidget"
   private const val ARTWORK_PX = 300
-  internal const val ARTWORK_DENSITY = DisplayMetrics.DENSITY_MEDIUM
+  /** Intrinsic size of a loaded cover: above any FULL bounds, so the bounds (not the bitmap) decide its size. */
+  internal const val ARTWORK_INTRINSIC_DP = 1200
+  internal const val ARTWORK_DENSITY = ARTWORK_PX * DisplayMetrics.DENSITY_MEDIUM / ARTWORK_INTRINSIC_DP
 
   /** What the widget shows; positions are milliseconds from the start of the item. */
   data class State(
@@ -61,7 +63,7 @@ object WidgetRenderer {
   private var artworkBitmap: Bitmap? = null
   private var loadingArtworkKey: String? = null
   private var failedArtworkKey: String? = null
-  private val loggedArtworkBounds = mutableMapOf<Int, FullArtwork.Bounds?>()
+  private val loggedFullPlans = mutableMapOf<Int, FullArtwork.Plan?>()
 
   /** A playback event for one placed widget (called on the main thread by the widget updater). */
   fun update(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int, state: State) {
@@ -105,31 +107,32 @@ object WidgetRenderer {
     val actions = Actions.create(context)
     val theme = WidgetTheme.current(context)
     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-    val artwork = fullArtworkBounds(context, appWidgetId, options)
+    val full = fullPlan(context, appWidgetId, options)
     val views =
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         // Android 12+: the launcher picks the layout for the current size, including while resizing
-        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, theme, state, bitmap, actions, artwork) })
+        RemoteViews(WidgetSize.RESPONSIVE_IDEAL_SIZES.associate { (idealSize, size) -> idealSize to build(context, size, theme, state, bitmap, actions, full) })
       } else {
         // API 24-30: pick the layout from the size the launcher reported (redrawn on onAppWidgetOptionsChanged)
-        build(context, sizeFromOptions(context, options), theme, state, bitmap, actions, artwork)
+        build(context, sizeFromOptions(context, options), theme, state, bitmap, actions, full)
       }
     appWidgetManager.updateAppWidget(appWidgetId, views)
     if (bitmap == null && key != failedArtworkKey) loadArtwork(context, key)
   }
 
   /**
-   * FULL artwork bounds for this widget from its reported size (redrawn on onAppWidgetOptionsChanged), or null
-   * before the launcher has reported one, when the layouts' widget_full_artwork_max applies.
+   * FULL presentation (side-by-side or expanded) and cover bounds for this widget from its reported size (redrawn
+   * on onAppWidgetOptionsChanged), or null before the launcher has reported one: then FULL is side-by-side with
+   * the layouts' widget_full_artwork_max.
    */
-  private fun fullArtworkBounds(context: Context, appWidgetId: Int, options: Bundle?): FullArtwork.Bounds? {
+  private fun fullPlan(context: Context, appWidgetId: Int, options: Bundle?): FullArtwork.Plan? {
     val size = FullArtwork.sizeDp(options)
-    val bounds = size?.let { FullArtwork.bounds(it.width, it.height, context.resources.configuration.fontScale) }
-    if (!loggedArtworkBounds.containsKey(appWidgetId) || loggedArtworkBounds[appWidgetId] != bounds) {
-      loggedArtworkBounds[appWidgetId] = bounds
-      DLog.d(TAG, "Widget $appWidgetId size ${size?.width}x${size?.height}dp, FULL artwork max ${bounds?.maxWidthDp}x${bounds?.maxHeightDp}dp")
+    val plan = size?.let { FullArtwork.plan(it.width, it.height, context.resources.configuration.fontScale) }
+    if (!loggedFullPlans.containsKey(appWidgetId) || loggedFullPlans[appWidgetId] != plan) {
+      loggedFullPlans[appWidgetId] = plan
+      DLog.d(TAG, "Widget $appWidgetId size ${size?.width}x${size?.height}dp, FULL ${plan?.presentation} artwork max ${plan?.bounds?.maxWidthDp}x${plan?.bounds?.maxHeightDp}dp")
     }
-    return bounds
+    return plan
   }
 
   /** API 24-30 size: portrait uses min width x max height, landscape max width x min height (platform convention). */
@@ -141,25 +144,28 @@ object WidgetRenderer {
     return WidgetSize.classify(width.toFloat(), height.toFloat())
   }
 
-  /** Layout per size; LLAMA has paint-only variants with the same ids, Dark/Black/Light keep the existing layouts. */
-  fun layoutFor(size: WidgetSize, theme: WidgetTheme): Int =
+  /**
+   * Layout per size; LLAMA has paint-only variants with the same ids, Dark/Black/Light keep the existing layouts.
+   * [expanded] selects FULL's stacked presentation (same ids); it doesn't affect COMPACT or WIDE.
+   */
+  fun layoutFor(size: WidgetSize, theme: WidgetTheme, expanded: Boolean = false): Int =
     when (theme) {
       WidgetTheme.STANDARD ->
         when (size) {
           WidgetSize.COMPACT -> R.layout.media_player_widget
           WidgetSize.WIDE -> R.layout.media_player_widget_wide
-          WidgetSize.FULL -> R.layout.media_player_widget_full
+          WidgetSize.FULL -> if (expanded) R.layout.media_player_widget_full_expanded else R.layout.media_player_widget_full
         }
       WidgetTheme.LLAMA ->
         when (size) {
           WidgetSize.COMPACT -> R.layout.media_player_widget_llama
           WidgetSize.WIDE -> R.layout.media_player_widget_wide_llama
-          WidgetSize.FULL -> R.layout.media_player_widget_full_llama
+          WidgetSize.FULL -> if (expanded) R.layout.media_player_widget_full_expanded_llama else R.layout.media_player_widget_full_llama
         }
     }
 
-  private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions, artwork: FullArtwork.Bounds?): RemoteViews {
-    val views = RemoteViews(context.packageName, layoutFor(size, theme))
+  private fun build(context: Context, size: WidgetSize, theme: WidgetTheme, state: State, bitmap: Bitmap?, actions: Actions, full: FullArtwork.Plan?): RemoteViews {
+    val views = RemoteViews(context.packageName, layoutFor(size, theme, expanded = full?.presentation == FullArtwork.Presentation.EXPANDED))
     views.setOnClickPendingIntent(R.id.widgetPlayPauseButton, actions.playPause)
     views.setOnClickPendingIntent(R.id.widgetFastForwardButton, actions.fastForward)
     views.setOnClickPendingIntent(R.id.widgetRewindButton, actions.rewind)
@@ -174,11 +180,9 @@ object WidgetRenderer {
     views.setImageViewResource(R.id.widgetPlayPauseButton, playPauseResource)
 
     if (size == WidgetSize.FULL) {
-      if (artwork != null) {
-        // Responsive cover bounds (FullArtwork); ImageView.setMaxWidth/setMaxHeight are RemoteViews-callable
+      if (full != null) {
         val density = context.resources.displayMetrics.density
-        views.setInt(R.id.widgetAlbumArt, "setMaxWidth", (artwork.maxWidthDp * density).toInt())
-        views.setInt(R.id.widgetAlbumArt, "setMaxHeight", (artwork.maxHeightDp * density).toInt())
+        applyArtworkBounds(views, R.id.widgetAlbumArt, (full.bounds.maxWidthDp * density).toInt(), (full.bounds.maxHeightDp * density).toInt())
       }
       // Snapshot only: fixed at this update, never advanced by a timer or scheduled work
       val snapshot = WidgetText.snapshot(state.positionMs, state.durationMs)
@@ -190,6 +194,19 @@ object WidgetRenderer {
       }
     }
     return views
+  }
+
+  /**
+   * Responsive cover bounds (FullArtwork). ImageView.setMaxWidth/setMaxHeight are RemoteViews-callable but don't
+   * request a layout, and a launcher reapplies an update to the views it already has, after it has laid out the
+   * new size: on its own, a widget that grew would keep the old bounds. Hiding the artwork and showing it again
+   * in the same update requests a layout (both are applied before the next frame, so nothing flickers).
+   */
+  internal fun applyArtworkBounds(views: RemoteViews, viewId: Int, maxWidthPx: Int, maxHeightPx: Int) {
+    views.setInt(viewId, "setMaxWidth", maxWidthPx)
+    views.setInt(viewId, "setMaxHeight", maxHeightPx)
+    views.setViewVisibility(viewId, View.GONE)
+    views.setViewVisibility(viewId, View.VISIBLE)
   }
 
   private fun artworkUri(context: Context, session: PlaybackSession?): Uri =
@@ -227,9 +244,10 @@ object WidgetRenderer {
   }
 
   /**
-   * The widget's own copy of a loaded cover. Its density is fixed so the 300px bitmap has a ~300dp intrinsic
-   * size on every device: the FULL artwork bounds (FullArtwork) then decide the displayed size, never the
-   * phone's screen density. Other sizes size the artwork from the row height, so this doesn't affect them.
+   * The widget's own copy of a loaded cover. Its density is fixed so the 300px bitmap has a [ARTWORK_INTRINSIC_DP]
+   * intrinsic size on every device: the FULL artwork bounds (FullArtwork, up to an expanded cover's full width)
+   * then decide the displayed size, never the bitmap or the phone's screen density. COMPACT and WIDE size the
+   * artwork from the row height, so this doesn't affect them.
    */
   internal fun widgetArtwork(source: Bitmap): Bitmap =
     source.copy(source.config ?: Bitmap.Config.ARGB_8888, false).apply { density = ARTWORK_DENSITY }

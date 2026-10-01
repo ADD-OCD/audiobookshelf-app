@@ -24,16 +24,16 @@ class WidgetArtworkTest {
     val loaded = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888).apply { density = DisplayMetrics.DENSITY_XXHIGH }
     val art = WidgetRenderer.widgetArtwork(loaded)
     assertNotSame(loaded, art) // the widget keeps its own copy
-    assertEquals(DisplayMetrics.DENSITY_MEDIUM, art.density)
-    // 300px shown as ~300dp on every phone, so the FULL bounds (FullArtwork, or the widget_full_artwork_max
-    // fallback), not the screen density, decide the displayed size up to ~300dp
-    assertEquals(300f, intrinsicDp(art), 1f)
+    assertEquals(WidgetRenderer.ARTWORK_DENSITY, art.density)
+    // The same intrinsic size on every phone, above any FULL bounds (an expanded cover can be the widget's full
+    // width), so the bounds (FullArtwork, or the widget_full_artwork_max fallback) decide the displayed size
+    assertEquals(WidgetRenderer.ARTWORK_INTRINSIC_DP.toFloat(), intrinsicDp(art), 1f)
   }
 
   @Test
   @Config(sdk = [35], qualifiers = "xxxhdpi")
   fun coverIntrinsicSizeIsTheSameAtAnotherDensity() {
     val art = WidgetRenderer.widgetArtwork(Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888))
-    assertEquals(300f, intrinsicDp(art), 1f)
+    assertEquals(WidgetRenderer.ARTWORK_INTRINSIC_DP.toFloat(), intrinsicDp(art), 1f)
   }
 }

@@ -4,11 +4,13 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.os.Bundle
 import android.util.SizeF
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.RemoteViews
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -132,10 +134,38 @@ class FullArtworkTest {
   fun maxWidthAndHeightCanBeSetThroughRemoteViews() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val views = RemoteViews(context.packageName, android.R.layout.activity_list_item)
-    views.setInt(android.R.id.icon, "setMaxWidth", 123)
-    views.setInt(android.R.id.icon, "setMaxHeight", 456)
+    WidgetRenderer.applyArtworkBounds(views, android.R.id.icon, 123, 456)
     val image = views.apply(context, FrameLayout(context)).findViewById<ImageView>(android.R.id.icon)
     assertEquals(123, image.maxWidth)
     assertEquals(456, image.maxHeight)
+    assertEquals(View.VISIBLE, image.visibility) // shown in the end
+  }
+
+  /** A launcher reapplies an update to views it has already laid out at the new size; new bounds must relayout. */
+  @Test
+  @Config(sdk = [24, 26, 28, 30, 31, 33, 35])
+  fun newBoundsRelayOutViewsTheLauncherAlreadyHas() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val host = FrameLayout(context)
+    val first = RemoteViews(context.packageName, android.R.layout.activity_list_item)
+    WidgetRenderer.applyArtworkBounds(first, android.R.id.icon, 100, 100)
+    val root = first.apply(context, host)
+    host.addView(root)
+    fun layOut() {
+      host.measure(View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1000, View.MeasureSpec.EXACTLY))
+      host.layout(0, 0, 1000, 1000)
+    }
+    layOut()
+    val image = root.findViewById<ImageView>(android.R.id.icon)
+    assertFalse(image.isLayoutRequested)
+    // Max width/height alone don't request a layout (why the bounds helper exists)
+    RemoteViews(context.packageName, android.R.layout.activity_list_item).apply { setInt(android.R.id.icon, "setMaxWidth", 300) }.reapply(context, root)
+    assertFalse(image.isLayoutRequested)
+    // The helper's update does, and leaves the new bounds in place
+    RemoteViews(context.packageName, android.R.layout.activity_list_item).also { WidgetRenderer.applyArtworkBounds(it, android.R.id.icon, 400, 500) }.reapply(context, root)
+    assertTrue(image.isLayoutRequested)
+    assertEquals(400, image.maxWidth)
+    assertEquals(500, image.maxHeight)
+    assertEquals(View.VISIBLE, image.visibility)
   }
 }

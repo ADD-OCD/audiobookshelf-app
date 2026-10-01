@@ -40,8 +40,10 @@ const LAYOUTS = '../android/app/src/main/res/layout/'
 const VARIANTS = [
   ['media_player_widget.xml', 'media_player_widget_llama.xml'],
   ['media_player_widget_wide.xml', 'media_player_widget_wide_llama.xml'],
-  ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml']
+  ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml'],
+  ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']
 ]
+const FULL_LAYOUTS = ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml', 'media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']
 const viewIds = (xml) => [...xml.matchAll(/android:id="@\+id\/([A-Za-z]+)"/g)].map((m) => m[1]).sort()
 
 test('each LLAMA layout has exactly the view ids (and so the actions) of its standard layout', async () => {
@@ -68,31 +70,40 @@ const attrs = (xml, id) => {
   return xml.slice(xml.lastIndexOf('<', start), xml.indexOf('>', start))
 }
 
-test('FULL artwork is bounded (both dimensions wrap, aspect kept, no crop, fallback cap) in standard and LLAMA', async () => {
+test('FULL artwork is bounded (both dimensions wrap, aspect kept, no crop, fallback cap) in every FULL layout', async () => {
   const dimens = await read('../android/app/src/main/res/values/dimens.xml')
   const cap = Number(dimens.match(/<dimen name="widget_full_artwork_max">(\d+)dp<\/dimen>/)[1])
-  // Fallback before the launcher reports a size: below the fixed-density cover's ~300dp intrinsic size
-  // (WidgetArtworkTest), and above a normal two-row FULL cover (~137dp), so that size renders as before
+  // Fallback before the launcher reports a size: above a normal two-row FULL cover (~137dp), so that size
+  // renders as before, and far below the cover's intrinsic size (WidgetArtworkTest), so the cap is what bounds it
   assert.ok(cap < 300 && cap >= 137, `cap ${cap}dp`)
-  for (const file of ['media_player_widget_full.xml', 'media_player_widget_full_llama.xml']) {
+  for (const file of FULL_LAYOUTS) {
     const art = attrs(await read(LAYOUTS + file), 'widgetAlbumArt')
     for (const expected of ['android:layout_width="wrap_content"', 'android:layout_height="wrap_content"', 'android:adjustViewBounds="true"', 'android:maxWidth="@dimen/widget_full_artwork_max"', 'android:maxHeight="@dimen/widget_full_artwork_max"', 'android:scaleType="fitCenter"']) {
       assert.ok(art.includes(expected), `${file}: ${expected}`)
     }
   }
-  const llamaArt = attrs(await read(LAYOUTS + 'media_player_widget_full_llama.xml'), 'widgetAlbumArt')
-  for (const frame of ['android:padding="2dp"', 'android:background="@drawable/widget_llama_artwork_frame"', 'android:cropToPadding="true"']) assert.ok(llamaArt.includes(frame), `LLAMA frame stays on the artwork view: ${frame}`)
+  for (const file of ['media_player_widget_full_llama.xml', 'media_player_widget_full_expanded_llama.xml']) {
+    const llamaArt = attrs(await read(LAYOUTS + file), 'widgetAlbumArt')
+    for (const frame of ['android:padding="2dp"', 'android:background="@drawable/widget_llama_artwork_frame"', 'android:cropToPadding="true"']) assert.ok(llamaArt.includes(frame), `${file}: LLAMA frame stays on the artwork view: ${frame}`)
+  }
   const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
   assert.match(renderer, /widgetArtwork\(it\)/, 'loaded covers get the fixed-density widget copy')
 })
 
 test('responsive FULL bounds are applied only to FULL, from the reported size, on the artwork view', async () => {
   const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
-  const sets = [...renderer.matchAll(/views\.setInt\(R\.id\.(\w+), "(setMax\w+)"/g)].map((m) => `${m[1]}.${m[2]}`)
-  assert.deepEqual(sets.sort(), ['widgetAlbumArt.setMaxHeight', 'widgetAlbumArt.setMaxWidth'])
+  // The helper sets max width/height and forces a relayout (hidden, then shown again in the same update)
+  const helper = renderer.slice(renderer.indexOf('internal fun applyArtworkBounds'), renderer.indexOf('\n  }\n', renderer.indexOf('internal fun applyArtworkBounds')))
+  assert.deepEqual(
+    [...helper.matchAll(/views\.setInt\(viewId, "(\w+)", ([\w-]+)\)/g)].map((m) => `${m[1]}(${m[2]})`),
+    ['setMaxWidth(maxWidthPx)', 'setMaxHeight(maxHeightPx)']
+  )
+  assert.match(helper, /views\.setViewVisibility\(viewId, View\.GONE\)\n\s*views\.setViewVisibility\(viewId, View\.VISIBLE\)/)
+  // ...and is called once, on the artwork, inside the FULL-only block
   const fullBlock = renderer.slice(renderer.indexOf('if (size == WidgetSize.FULL) {'), renderer.indexOf('return views', renderer.indexOf('if (size == WidgetSize.FULL) {')))
-  assert.match(fullBlock, /"setMaxWidth"/, 'bounds are set inside the FULL-only block')
-  assert.equal(renderer.split('"setMaxWidth"').length - 1, 1, 'and nowhere else')
+  assert.match(fullBlock, /applyArtworkBounds\(views, R\.id\.widgetAlbumArt,/, 'bounds are set inside the FULL-only block')
+  assert.equal(renderer.split('applyArtworkBounds(').length - 1, 2, 'defined once and called once')
+  assert.equal(renderer.split('"setMaxWidth"').length - 1, 1, 'and set nowhere else')
   assert.match(renderer, /FullArtwork\.sizeDp\(options\)/)
 })
 
@@ -105,10 +116,20 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
   const dp = (xml, id, attr) => Number(attrs(xml, id).match(new RegExp(`android:${attr}="(\\d+)(?:dp|sp)"`))[1])
   const std = await read(LAYOUTS + 'media_player_widget_full.xml')
   const llama = await read(LAYOUTS + 'media_player_widget_full_llama.xml')
-  for (const xml of [std, llama]) {
+  const expanded = [await read(LAYOUTS + 'media_player_widget_full_expanded.xml'), await read(LAYOUTS + 'media_player_widget_full_expanded_llama.xml')]
+  for (const xml of [std, llama]) assert.equal(dp(xml, 'widgetReadout', 'layout_marginStart'), k('READOUT_MARGIN_DP'))
+  for (const xml of expanded) {
+    // the readout row (the readout's parent) sits EXPANDED_READOUT_GAP_DP below the cover area
+    const readoutAt = xml.indexOf('android:id="@+id/widgetReadout"')
+    const row = xml.slice(xml.lastIndexOf('<LinearLayout', xml.lastIndexOf('<LinearLayout', readoutAt) - 1), xml.lastIndexOf('<LinearLayout', readoutAt))
+    assert.equal(Number(row.match(/android:layout_marginTop="(\d+)dp"/)[1]), k('EXPANDED_READOUT_GAP_DP'))
+  }
+  for (const xml of [std, llama, ...expanded]) {
     assert.equal(dp(xml, 'widgetContent', 'padding'), k('CONTENT_PADDING_DP'))
-    assert.equal(dp(xml, 'widgetReadout', 'layout_marginStart'), k('READOUT_MARGIN_DP'))
     assert.equal(dp(xml, 'tinyCornerIcon', 'layout_width') + dp(xml, 'tinyCornerIcon', 'layout_marginStart'), k('CORNER_ICON_DP'))
+    assert.equal(dp(xml, 'widgetMediaTitle', 'textSize'), k('TITLE_TEXT_SP'))
+    assert.ok(attrs(xml, 'widgetMediaTitle').includes('android:maxLines="2"'), 'title wraps to at most two lines')
+    assert.equal(dp(xml, 'widgetArtistText', 'layout_marginTop') + dp(xml, 'widgetTimeRow', 'layout_marginTop'), k('READOUT_LINE_GAPS_DP'))
     assert.equal(dp(xml, 'widgetButtonContainer', 'layout_marginTop') + dp(xml, 'widgetButtonContainer', 'layout_height'), k('CONTROLS_DP'))
     for (const id of ['widgetElapsedText', 'widgetRemainingText']) {
       assert.equal(dp(xml, id, 'textSize'), k('TIME_TEXT_SP'))
@@ -116,9 +137,30 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
     }
   }
   // Width reserve uses the larger readout padding; height backstop the smaller progress bar (the layout limits height anyway)
-  assert.equal(Math.max(dp(std, 'widgetReadout', 'padding'), dp(llama, 'widgetReadout', 'padding')), k('READOUT_PADDING_DP'))
+  const all = [std, llama, ...expanded]
+  assert.equal(Math.max(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_DP'))
+  assert.equal(Math.min(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_MIN_DP'))
   const progress = (xml) => dp(xml, 'widgetProgress', 'layout_marginTop') + dp(xml, 'widgetProgress', 'layout_height')
-  assert.equal(Math.min(progress(std), progress(llama)), k('PROGRESS_DP'))
+  assert.equal(Math.min(...all.map(progress)), k('PROGRESS_DP'))
+})
+
+test('EXPANDED FULL stacks cover, readout, progress and controls without overlap', async () => {
+  for (const file of ['media_player_widget_full_expanded.xml', 'media_player_widget_full_expanded_llama.xml']) {
+    const xml = await read(LAYOUTS + file)
+    const at = (id) => xml.indexOf(`android:id="@+id/${id}"`)
+    // One vertical column inside widgetContent, in this order: cover area, readout row, progress, controls
+    assert.ok(attrs(xml, 'widgetContent').includes('android:orientation="vertical"'), file)
+    assert.ok(at('widgetAlbumArt') < at('widgetReadout') && at('widgetReadout') < at('widgetProgress') && at('widgetProgress') < at('widgetButtonContainer'), `${file}: order`)
+    // The cover alone fills the flexible area (weight 1, centered); readout, progress and controls keep their own height
+    const area = xml.slice(xml.lastIndexOf('<LinearLayout', at('widgetAlbumArt')), at('widgetAlbumArt'))
+    for (const a of ['android:layout_height="0dp"', 'android:layout_weight="1"', 'android:gravity="center"']) assert.ok(area.includes(a), `${file}: cover area ${a}`)
+    assert.ok(attrs(xml, 'widgetAlbumArt').includes('android:layout_gravity="center_horizontal"'), `${file}: cover centered`)
+    assert.ok(attrs(xml, 'widgetReadout').includes('android:layout_height="wrap_content"'), `${file}: readout keeps its height`)
+    assert.equal(xml.slice(at('widgetAlbumArt'), at('widgetReadout')).match(/<\/LinearLayout>/g).length, 1, `${file}: the readout is outside the cover area`)
+  }
+  const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
+  assert.match(renderer, /WidgetSize\.FULL -> if \(expanded\) R\.layout\.media_player_widget_full_expanded else R\.layout\.media_player_widget_full\n/)
+  assert.match(renderer, /WidgetSize\.FULL -> if \(expanded\) R\.layout\.media_player_widget_full_expanded_llama else R\.layout\.media_player_widget_full_llama\n/)
 })
 
 test('COMPACT and WIDE artwork keep their existing sizing (row height, crop) and get no responsive bounds', async () => {

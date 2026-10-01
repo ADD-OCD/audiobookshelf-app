@@ -6,64 +6,121 @@ import android.os.Bundle
 import android.util.SizeF
 
 /**
- * Responsive artwork bounds for the FULL widget.
+ * Responsive presentation and artwork bounds for the FULL widget.
  *
- * The FULL layouts size the cover as wrap_content with adjustViewBounds + fitCenter, so the layout already
- * keeps it within the height left above the progress bar and controls, at the cover's own aspect. What the
- * layout can't express is "leave the readout enough width", which is how very tall widgets used to grow the
- * cover across the readout until title/author/times disappeared. The renderer therefore sets the cover's
- * maxWidth/maxHeight from the widget's reported size: the cover grows with the widget until the protected
- * readout width (or the available height) stops it, and any further height becomes space around it.
+ * FULL has two presentations with the same views and ids:
+ * - NORMAL (media_player_widget_full*.xml): cover beside the readout. The readout keeps a protected width, so the
+ *   cover stops growing at width - 48dp - that width; further height becomes space around the block.
+ * - EXPANDED (media_player_widget_full_expanded*.xml): cover on top, readout below at full width. The cover can
+ *   then use nearly the whole widget width, which is what tall widgets need for a large cover.
  *
- * The dp values below mirror media_player_widget_full.xml / media_player_widget_full_llama.xml; where they
- * differ, the width reserve uses the larger value (the readout is never squeezed) and the height backstop the
- * smaller one (never tighter than the layout itself). tests/widget-theme.test.mjs fails if the layouts drift.
+ * [plan] picks EXPANDED only when it gives a clearly larger cover than NORMAL (at least [EXPANDED_GAIN] times and
+ * [EXPANDED_MIN_GAIN_DP] more), assuming a square cover and a two-line title, so normal two-row sizes always stay
+ * NORMAL and the choice doesn't change from book to book. The renderer then sets the cover's maxWidth/maxHeight
+ * from the plan; the layouts keep the cover at its own aspect (wrap_content + adjustViewBounds + fitCenter) and
+ * within the space actually available, so it is never cropped and never overlaps the readout.
+ *
+ * The dp values below mirror the FULL layouts; where standard and LLAMA differ, reserves that protect the readout
+ * use the larger value and the height backstops the smaller one (never tighter than the layout itself).
+ * tests/widget-theme.test.mjs fails if the layouts drift.
  */
 object FullArtwork {
   /** widgetContent padding, each side. */
   const val CONTENT_PADDING_DP = 8f
-  /** widgetReadout marginStart. */
+  /** widgetReadout marginStart (NORMAL). */
   const val READOUT_MARGIN_DP = 10f
   /** tinyCornerIcon width + marginStart. */
   const val CORNER_ICON_DP = 16f + 6f
   /** widgetReadout padding, each side (standard 6dp, LLAMA 8dp). */
   const val READOUT_PADDING_DP = 8f
+  const val READOUT_PADDING_MIN_DP = 6f
   /** widgetProgress marginTop + height (standard 5dp; LLAMA's 6dp is enforced by its own layout). */
   const val PROGRESS_DP = 8f + 5f
   /** widgetButtonContainer marginTop + height. */
   const val CONTROLS_DP = 6f + 52f
+  /** EXPANDED: margin between the cover area and the readout row. */
+  const val EXPANDED_READOUT_GAP_DP = 8f
 
-  /** Elapsed/remaining text size (sp) and the longest common remaining time, "-12:34:56" (books of 10h+). */
+  /** Readout text sizes (sp): title, author and the elapsed/remaining times. */
+  const val TITLE_TEXT_SP = 16f
   const val TIME_TEXT_SP = 13f
+  /** Space between readout lines: author marginTop + time row marginTop. */
+  const val READOUT_LINE_GAPS_DP = 2f + 8f
+  /** Line heights of the platform font at these sizes, in em (measured: 21.7dp / 40.3dp at 16sp, 17.5dp at 13sp). */
+  const val LINE_HEIGHT_EM = 1.35f
+  const val TWO_LINE_HEIGHT_EM = 2.52f
+  /** The longest common remaining time, "-12:34:56" (books of 10h+), and a monospace glyph's advance in em. */
   const val TIME_CHARS = 9
-  /** Advance of a monospace glyph, in em. */
   const val MONOSPACE_ADVANCE_EM = 0.6f
+
+  /** EXPANDED must beat NORMAL's cover by this factor and by this much. */
+  const val EXPANDED_GAIN = 1.2f
+  const val EXPANDED_MIN_GAIN_DP = 24f
 
   /** Never size the cover below this, even on a widget too small to protect everything. */
   const val MIN_ARTWORK_DP = 32f
 
-  /** Width beside the cover that is never artwork: padding, readout margin and the corner icon. */
+  /** NORMAL: width beside the cover that is never artwork: padding, readout margin and the corner icon. */
   const val HORIZONTAL_CHROME_DP = 2 * CONTENT_PADDING_DP + READOUT_MARGIN_DP + CORNER_ICON_DP
 
-  /** Height that is never artwork: padding, progress bar and controls (a backstop; the layout limits height too). */
+  /** Height that is never artwork in either presentation: padding, progress bar and controls. */
   const val VERTICAL_CHROME_DP = 2 * CONTENT_PADDING_DP + PROGRESS_DP + CONTROLS_DP
 
-  /**
-   * The readout width that is protected from the artwork: the time row splits it into two equal halves, each
-   * of which must fit a 9-character remaining time; title and author ellipsize within the same width. The text
-   * part follows the user's font size.
-   */
-  fun minReadoutWidthDp(fontScale: Float = 1f): Float = 2 * TIME_CHARS * MONOSPACE_ADVANCE_EM * TIME_TEXT_SP * fontScale.coerceAtLeast(1f) + 2 * READOUT_PADDING_DP
+  enum class Presentation {
+    NORMAL,
+    EXPANDED
+  }
 
   /** Largest box the cover (frame included) may use; it keeps its aspect within it. */
-  data class Bounds(val maxWidthDp: Float, val maxHeightDp: Float)
+  data class Bounds(val maxWidthDp: Float, val maxHeightDp: Float) {
+    val squareDp: Float get() = minOf(maxWidthDp, maxHeightDp)
+  }
 
-  /** Bounds for a FULL widget of the given size, or null when no usable size has been reported yet. */
+  data class Plan(val presentation: Presentation, val bounds: Bounds)
+
+  private fun scale(fontScale: Float) = fontScale.coerceAtLeast(1f)
+
+  /**
+   * NORMAL: the readout width protected from the artwork. The time row splits it into two equal halves, each of
+   * which must fit a 9-character remaining time; title and author ellipsize within the same width.
+   */
+  fun minReadoutWidthDp(fontScale: Float = 1f): Float = 2 * TIME_CHARS * MONOSPACE_ADVANCE_EM * TIME_TEXT_SP * scale(fontScale) + 2 * READOUT_PADDING_DP
+
+  /** EXPANDED: the readout's height with a one- or two-line title. */
+  fun readoutHeightDp(fontScale: Float = 1f, titleLines: Int = 2, paddingDp: Float = READOUT_PADDING_DP): Float {
+    val title = TITLE_TEXT_SP * if (titleLines >= 2) TWO_LINE_HEIGHT_EM else LINE_HEIGHT_EM
+    return (title + 2 * TIME_TEXT_SP * LINE_HEIGHT_EM) * scale(fontScale) + READOUT_LINE_GAPS_DP + 2 * paddingDp
+  }
+
+  /** NORMAL bounds for a widget of the given size, or null when no usable size has been reported yet. */
   fun bounds(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Bounds? {
     if (widthDp <= 0f || heightDp <= 0f) return null
     val maxWidth = widthDp - HORIZONTAL_CHROME_DP - minReadoutWidthDp(fontScale)
     val maxHeight = heightDp - VERTICAL_CHROME_DP
     return Bounds(maxWidth.coerceAtLeast(MIN_ARTWORK_DP), maxHeight.coerceAtLeast(MIN_ARTWORK_DP))
+  }
+
+  /**
+   * EXPANDED bounds: the full content width, and the height above the readout (backstop with a one-line title;
+   * a two-line title is limited by the layout itself).
+   */
+  fun expandedBounds(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Bounds? {
+    if (widthDp <= 0f || heightDp <= 0f) return null
+    val maxWidth = widthDp - 2 * CONTENT_PADDING_DP
+    val maxHeight = heightDp - VERTICAL_CHROME_DP - EXPANDED_READOUT_GAP_DP - readoutHeightDp(fontScale, titleLines = 1, paddingDp = READOUT_PADDING_MIN_DP)
+    return Bounds(maxWidth.coerceAtLeast(MIN_ARTWORK_DP), maxHeight.coerceAtLeast(MIN_ARTWORK_DP))
+  }
+
+  /** The square cover EXPANDED guarantees even with a two-line title (used to choose the presentation). */
+  fun expandedSquareDp(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Float =
+    minOf(widthDp - 2 * CONTENT_PADDING_DP, heightDp - VERTICAL_CHROME_DP - EXPANDED_READOUT_GAP_DP - readoutHeightDp(fontScale, titleLines = 2)).coerceAtLeast(0f)
+
+  /** Presentation and cover bounds for a FULL widget of the given size, or null before a size is reported. */
+  fun plan(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Plan? {
+    val normal = bounds(widthDp, heightDp, fontScale) ?: return null
+    val stacked = expandedSquareDp(widthDp, heightDp, fontScale)
+    val side = normal.squareDp
+    return if (stacked >= side * EXPANDED_GAIN && stacked >= side + EXPANDED_MIN_GAIN_DP) Plan(Presentation.EXPANDED, expandedBounds(widthDp, heightDp, fontScale)!!) else Plan(Presentation.NORMAL, normal)
   }
 
   /**
