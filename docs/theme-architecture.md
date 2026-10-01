@@ -91,19 +91,41 @@ LLAMA is an original Audiobookshelf+ theme inspired by the material language of 
 The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. It covers:
 
 - bevelled chassis on the app bar, bookshelf navigation, dialogs/menus and the drawer, with the selected tab shown as a pressed key plus an accent underline;
-- steel buttons over their semantic colors (pressed = inset), and a steel play button;
+- steel buttons over their semantic colors (pressed = inset), bordered icon buttons as steel keys (borderless icon buttons stay bare glyphs), and a steel play button;
 - recessed wells for text fields and selects, the Up Next list, and a recessed readout strip behind the fullscreen seek and time rows;
 - inset seek channels. The played portion stays amber even after the player's seek code swaps in its settled-state class;
 - phosphor-green timestamps, speed readout and playback-method label. Titles and other text stay neutral;
-- a thin outer steel frame around player artwork and book cards, drawn outside the image;
+- a thin outer steel frame around player artwork and book-card artwork, drawn outside the image (in list view, around the cover only, not the row);
 - a visible accent focus outline;
 - Checkpoint F polish, each needed by LLAMA:
   - the bookshelf view's wood material becomes graphite/blue-gray equipment (steel ledge, recessed placards with neutral text); alternative-view placards match;
   - toggle switches get a recessed off slot and a steel thumb. On keeps the success color, state also reads from thumb position, and the disabled thumb reads dimmer than the enabled one;
-  - unfinished playback progress bars (cards, list rows, playlist rows, item cover) use the amber played-progress token. Finished bars (success) and other yellow uses keep their colors;
+  - unfinished playback progress bars (cards, list rows, playlist rows, item cover) and the current-chapter marker in Chapters use the amber played-progress token. Finished bars (success) and other yellow uses keep their colors;
   - a contrast safety margin for small uppercase muted headers and inactive navigation icons, using primary text at reduced alpha (6.6:1 and 4.8:1 measured, up from 4.6:1 and 3.05:1).
 
 A test compiles the real content with Tailwind and fails if any recipe selector would be pruned. Tailwind drops selectors whose classes only exist at runtime, such as router-added classes.
+
+### Shared equipment primitives (Phase 2C Gate A)
+
+`theme/presets.js` exports `PRIMITIVES`. Rules are composed from these instead of new one-off values. They are fixed repository values: theme data can't supply or adjust any of them, and they only reference the derived edge colors and the accent token.
+
+- **Light source:** light upper/left edges, dark lower/right edges, drop shadows falling down.
+- **Radius scale (`RADIUS`):** `frame` 2px (artwork frames and fine detail), `key` 4px (wells, panels and equipment keys), `round` (circular playback controls only). Every `border-radius` in the recipe must come from this scale; a test enforces it.
+- **Elevation (`ELEVATION`):** the only drop shadows rules should use.
+
+  - `raised` (buttons);
+  - `panel` (cards and framed artwork);
+  - `overlay` (dialogs and menus).
+
+  Each level equals a value existing rules already used, so adopting them changed nothing on screen. A few older shadows (the play button, the Chapters header, the drawer edge, the mini-player and shelf ledge, which mirror their components' own shadows) keep their values until the gate that restyles those surfaces.
+
+- **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
+- **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Defined for later use (queue, chapter, table and dialog rows, toolbar and player-zone boundaries); not applied yet.
+- **Control states** (complete declaration sets):
+  - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Not applied yet; Gate B decides where it fits.
+  - `SELECTED_KEY`: pressed in (inset bevel plus inner shade) with an accent ring inside the edge. Selection reads as a physical state, not only a color. Not applied yet; Gates C and E consume it.
+
+Semantic hooks: artwork framing targets the generic `card-artwork` class instead of the `book-card-*` id prefix. `LazyBookCard` (whose root is the cover) and the cover box of `LazyListBookCard` carry it. The old id-prefix selector also matched the list card's whole row, so list view used to frame every row. A test checks both templates.
 
 Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
