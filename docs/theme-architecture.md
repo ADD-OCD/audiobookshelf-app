@@ -341,11 +341,10 @@ Phase 1 status:
 - **Declared:** `tailwind.config.js` sets `sans: 'Source Sans Pro', …defaults` and `mono: 'Ubuntu Mono', …defaults`. `assets/fonts.css` declares Source Sans Pro (Light, Regular, SemiBold) and Ubuntu Mono (Regular) from `static/fonts/` (OFL/UFL licensed files). It also declares the Material Symbols Rounded and absicons icon fonts.
 - **Actual (verified in the Android WebView):**
   - Only the two icon fonts are registered.
-  - All 27 text `@font-face` rules use `format('ttf')`, which is not a valid format hint (the valid one is `truetype`), so the browser discards them. The files themselves are served fine.
-  - Text renders in the next family in the stack, `system-ui` (**Roboto** on Android).
-  - Monospace renders in the system monospace font.
-  - Bold is synthesized or taken from Roboto.
-- **Phase 1 keeps this unchanged:** Roboto _is_ the current appearance. Fixing the format hint would visibly change every screen, so it is a deliberate later decision.
+  - All 27 text `@font-face` rules use `format('ttf')`, which is not a valid format hint (the valid one is `truetype`), so the browser discards their `src`. The files themselves are packaged and would be served fine.
+  - In general, text therefore renders in the **system sans-serif** reached through the stack (`system-ui`), and monospace text in the **system monospace** font. Which faces those are depends on the device.
+  - On the tested Pixel emulator (Android 15) they are **Roboto** and **Droid Sans Mono**. Semibold and bold come from real Roboto variable-font weight instances, not synthesized bold. Samsung/One UI may resolve the system fallback differently; that is not verified.
+- **Phase 1 keeps this unchanged:** the system fallback _is_ the current appearance. Fixing the format hint would visibly change every screen, so it is a deliberate later decision.
 - **Scripts:**
   - Roboto covers Latin (including Slovak diacritics), Cyrillic and Greek.
   - Android's system fallback supplies Noto Naskh Arabic, Noto Sans Hebrew and Noto Sans CJK/Korean per glyph.
@@ -356,6 +355,54 @@ Phase 1 status:
   - always end in a generic family (`sans-serif` / `monospace`) so unsupported scripts fall back instead of rendering as boxes;
   - apply display or decorative fonts only to limited roles, never to body text;
   - use `font-display: swap` and a correct format hint.
+
+### Typography runtime audit and deferral (Phase 2C Gate G)
+
+Gate G was a read-only audit of what the Android WebView actually renders. It **changed no runtime behavior**: the inherited font-loading issue is documented and deferred (see "Bundled text fonts" in `docs/future-work.md`).
+
+Environment: Pixel emulator, Android 15 / API 35 Google APIs x86_64, 1080×2400 at 420 dpi, Android System WebView 124.0.6367.219, font scale 1.0. Inspection used the Chrome DevTools Protocol against the app's WebView.
+
+Evidence:
+
+- `CSS.getPlatformFontsForNode` (the DevTools "Rendered Fonts" data) identified the face that actually drew each text node on 11 surfaces, in Dark and LLAMA.
+- The CSSOM still contains all 27 Source Sans Pro / Ubuntu Mono rules, but each has an **empty `src`** descriptor.
+- `document.fonts` holds only Material Symbols Rounded and absicons, which load correctly.
+- No Source Sans Pro or Ubuntu Mono file is ever requested. No warning is logged; the WebView drops the invalid `src` silently.
+- `document.fonts.check()` is **not** usable as proof: it returned `true` even for a nonexistent family, because there was no face to load. `getComputedStyle().fontFamily` only repeats the declared stack.
+
+Rendered faces on the tested Pixel:
+
+| Requested           | Rendered today                    |
+| ------------------- | --------------------------------- |
+| Source Sans Pro 400 | Roboto                            |
+| Source Sans Pro 300 | Roboto 300 variable-font instance |
+| Source Sans Pro 600 | Roboto 600 variable-font instance |
+| Source Sans Pro 700 | Roboto 700 variable-font instance |
+| Ubuntu Mono 400     | Droid Sans Mono                   |
+
+The emulator image happens to ship Source Sans Pro as the system family `source-sans-pro`. The CSS name `Source Sans Pro` does not match it, so it is not used.
+
+Inventory and provenance:
+
+- Bundled files: `SourceSansPro-Light.ttf` (300), `SourceSansPro-Regular.ttf` (400), `SourceSansPro-SemiBold.ttf` (600) and `UbuntuMono-Regular.ttf` (400), identified from their internal name and OS/2 tables. Licenses: OFL (Source Sans Pro) and UFL (Ubuntu Mono).
+- **Not bundled:** Source Sans Pro Medium (500), Bold (700) and any italic; Ubuntu Mono Bold.
+- The 27 `format('ttf')` hints (21 Source Sans Pro, 6 Ubuntu Mono) live in `assets/fonts.css`. The minified bundle keeps them (as `format("ttf")`), and the font files reach the Android assets byte-identical. The failure is the declaration, not missing files.
+- `assets/fonts.css`, `assets/absicons.css` and `static/fonts/` are identical to upstream. The hints date from upstream commit `30d86279` ("Update:Host fonts locally", 2022-05-05). Audiobookshelf+ and LLAMA did not introduce or modify them.
+- `theme/presets.js` declares no font family, size or weight; its LLAMA `.font-mono` rules set color only. Dark and LLAMA had **0** differences in computed family, weight, size and line-height. The behavior is global, not theme-specific.
+
+Intended-font experiment: a temporary, runtime-only `<style>` re-declared the same files, families, weights and unicode ranges with only the hint corrected to `truetype`. The bundled faces then loaded. The style was removed afterwards and no repository file changed. Results:
+
+- Proportional text was about 5–9% narrower than the current Roboto rendering; Ubuntu Mono readouts were 16.7% narrower than Droid Sans Mono.
+- Source Sans Pro Regular drew about 22% less ink than Roboto Regular, and has a smaller x-height (0.486 em vs 0.528 em).
+- Requested 700 mapped to the bundled SemiBold (600) with no synthesized bold; requested 500 mapped to Regular. Today 700 is a real Roboto 700 instance, so the weight hierarchy would flatten.
+- Across 22 theme × surface pairs: 0 line-count changes, 0 truncation flips, and 0 changes to the measured block heights and line boxes (explicit line-heights govern them). Fixed and container geometry stayed identical, including the 120px mini-player, the ~65×65 full-player and ~40×40 mini-player play buttons, the full-player cover, controls and panel, and the modal panels. Content-sized elements (navbar tabs, the library selector pill) narrowed by a few pixels.
+- One behavior change: the borderline mini-player title "The Name of the Wind | Chapter 12" scrolls as a marquee today but fits statically in Source Sans Pro. `WrappingMarquee` decides once, at `init()`, from the width measured at that moment. Typography can change behavior even when container geometry is stable.
+
+The experiment is not proof of zero geometry risk. Not covered: WebView font scale 1.3, non-Latin fallback, a cold start (font-swap timing), complete item-detail matching, several Gate E controls (toggles, checkboxes, dropdowns, search cards), and tables or collection/playlist rows.
+
+The home-screen widget is **not** affected. It renders with native RemoteViews typography (system sans-serif and `fontFamily="monospace"`) and never consumes the WebView `@font-face` rules. Gate G does not reopen Gate F.
+
+**Phase 2C typography policy:** for the rest of Phase 2C, the inherited WebView font-loading behavior is not repaired as part of LLAMA. LLAMA keeps the same effective typography as the other themes and does not get its own font family unless a later typography or customization phase authorizes it. This keeps the baseline under which Gates A–F were designed and accepted.
 
 ## Content-derived color (intentionally not tokens)
 

@@ -21,7 +21,29 @@ Apply the `system.status-bar`, `system.navigation-bar` and `system.bar-icons` to
 
 ## Bundled text fonts
 
-Source Sans Pro and Ubuntu Mono never load: their `@font-face` rules use the invalid `format('ttf')`, so the app renders in Roboto and the system monospace font. Fixing the hint would visibly change every screen. Decide deliberately, together with future typography presets that always fall back safely for Arabic, Hebrew and Korean.
+Source Sans Pro and Ubuntu Mono never load: their `@font-face` rules use the invalid `format('ttf')`, so the app renders in the system sans-serif and monospace fonts (Roboto and Droid Sans Mono on the tested Pixel emulator). This is inherited unchanged from upstream and affects every theme. Phase 2C Gate G verified it at runtime and deferred it; the evidence and measurements are in `docs/theme-architecture.md` ("Typography runtime audit and deferral").
+
+Restoring the bundled fonts is a global typography change, not a LLAMA fix. It would change appearance, weight hierarchy (no Bold is bundled, so 700 becomes SemiBold), readability, text metrics, some content-sized elements and some marquee decisions, and possibly consistency across devices. Decide deliberately, together with future typography presets that always fall back safely for Arabic, Hebrew and Korean.
+
+Options to evaluate (no solution chosen):
+
+- **A.** Correct the existing declarations to valid TrueType hints, keeping the current bundled files.
+- **B.** Correct the declarations and add properly licensed missing weights with clear provenance, especially a true Source Sans Pro Bold (700).
+- **C.** Convert to or replace with WOFF2, preserving the intended metrics and licensing.
+- **D.** Standardize on Android system fonts on purpose, retiring the dead declarations and assets where appropriate.
+- **E.** Offer typography as an opt-in preference or theme capability, if that fits later customization work.
+
+Validation for any change:
+
+- Dark, Black, Light and LLAMA.
+- Pixel/emulator, and Samsung/One UI where appropriate.
+- Font scales 1.0 and 1.3.
+- Light, normal, semibold and bold requests.
+- Non-Latin fallback.
+- Marquee initialization and cold start.
+- The 22-role geometry comparison and representative Gate B–E surfaces.
+- Accessibility and readability.
+- Native widget non-regression (the widget uses native typography and should not change).
 
 ## Startup theme flash
 
