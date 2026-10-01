@@ -53,6 +53,7 @@ A `Chronometer` was considered and rejected: it counts wall-clock time at 1×, s
 - LLAMA layouts use `android:tint` (platform `ImageView`); `app:tint` needs AppCompat and does nothing in `RemoteViews`, so lint's `UseAppTint` is suppressed there.
 - Artwork in LLAMA uses `cropToPadding` so the cover never paints over its frame, and an 8dp content inset clears the launcher's corner radius.
 - `progressDrawable` can't be set at runtime before API 31, which is one reason LLAMA uses separate layouts instead of runtime restyling.
+- **Bounded FULL artwork (Phase 2C).** On the S26 Ultra, very tall One UI resizes made the FULL artwork grow with the row height, squeeze the metadata to nothing, and finally crop into the cover. FULL artwork is now `wrap_content` in both directions with `adjustViewBounds`, `maxWidth`/`maxHeight` = `@dimen/widget_full_artwork_max` (140dp, just above the ~137dp artwork of a normal two-row FULL, so that size renders as before) and `fitCenter`, inside a content-height row centered in the flexible area. It is min(cap, available height, available width) at the cover's own aspect, the readout matches its height, and extra launcher height becomes space around that block. Loaded covers get a fixed bitmap density (`WidgetRenderer.widgetArtwork`), so the 300px bitmap's intrinsic size is ~300dp on every phone and the cap, not the screen density, bounds it. WIDE and COMPACT size their artwork from the row height and are unaffected.
 
 ## Emulator validation (AOSP API 35, Pixel launcher)
 
@@ -68,6 +69,10 @@ A `Chronometer` was considered and rejected: it counts wall-clock time at 1×, s
 | Snapshot while playing                                                  | Unchanged after 40 s of playback; the package has no alarms or scheduled jobs                      |
 
 Observed, not changed (pre-existing, outside the widget): after a restart the widget shows `deviceData.lastPlaybackSession`, while widget Play resumes the session chosen by the restoration store; on the test device these were different books. The baseline build shows the same session.
+
+## Galaxy S26 Ultra findings (One UI, first real-device pass)
+
+The CI-signed debug build installed alongside production. Player, item page, mini-player, Up Next and normal widget sizes were accepted. Two corrections followed (Phase 2C): the FULL widget's artwork at very tall resizes (above), and a LLAMA-only recessed treatment for the Chapters list. Extreme resizes are only approximated on the emulator; the S26 retest is the real check.
 
 ## Galaxy S22 Ultra checklist (One UI; not yet verified)
 
