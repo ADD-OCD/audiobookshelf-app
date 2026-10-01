@@ -235,6 +235,51 @@ Geometry, navigation, data loading, filters, sorting and actions are unchanged. 
   - No Gate D rule uses success or warning colors.
   - Cascade checks: the selected library outranks its row seam; the LLAMA table zebra outranks both the LLAMA base rows and `assets/app.css`; the artwork frame outranks the author card's `box-shadow-book` utility.
 
+### Forms, shared dialogs and interactive controls (Phase 2C Gate E)
+
+Paint only:
+
+- the shared form controls;
+- the shared `Dialog`;
+- the playlists-modal row;
+- search result artwork.
+
+Sizes, behavior, validation, native inputs, ARIA roles, focus handling and dismissal are unchanged. The completed player, the Gate C overlays and the Gate D surfaces carry none of these hooks, and tests check that. The player seek is not a range input, so the range rules cannot reach it.
+
+- **Segmented toggles** (`ui/ToggleBtns`, existing `toggle-btn` and `selected` hooks):
+
+  - segments are raised steel;
+  - the selected choice is a `SELECTED_KEY` on its existing lit fill;
+  - pressing inverts the bevel;
+  - unselected labels keep a readability margin (78% text, 5.4:1 on the sheen).
+
+  Segment shapes and borders are unchanged.
+
+- **Range** (`range-input`): a recessed slot with the seek channel's edges, and a steel thumb instead of playback amber (a setting is not progress). Focus keeps its outline, now in the accent.
+- **Checkbox** (`checkbox-box`, `checkbox-checked`, `checkbox-disabled`, `checkbox-mark`):
+
+  - unchecked is an empty recessed well;
+  - checked is lit and pressed, with an accent edge and accent check (checked is not success);
+  - disabled is flat, with a dark edge and a muted check, and outranks checked, so a disabled checked box never reads as active.
+
+  The native input stays, still invisible. Its keyboard focus now outlines the visible box via `:has(input:focus-visible)`; before, keyboard focus on a checkbox showed nothing.
+
+- **Dropdown** (`dropdown-button`, `dropdown-menu`): an enabled trigger is a key, and a disabled trigger stays flat. The open list is a recessed module with seamed options; it has no selected state of its own.
+- **Shared Dialog** (`dialog-panel`, all menus and option lists): the existing chassis panel holds a recessed list with seamed rows. A selected option (`option-selected`, next to the existing wash classes) is a `SELECTED_KEY` on a lit row instead of a success-green wash.
+- **Playlists-modal row:** the cover component is `card-artwork` (never the row root). The membership marker (`membership-marker`) is the accent instead of success.
+- **Search results:** item, episode and series covers and the author portrait box are `card-artwork`. Narrator and tag results have no artwork.
+- **Unchanged, already consistent:**
+  - text inputs and textareas: Gate A recessed wells with the accent focus outline;
+  - `ui-btn`: steel over its semantic color; destructive and positive keep their colors, and disabled stays flat;
+  - `IconBtn`: only bordered icon buttons are keys (the Gate A contract, re-tested);
+  - `ToggleSwitch` (Checkpoint F);
+  - the `Modal` shell (a backdrop only).
+- **Deferred:**
+  - reducing the 8px dialog radius: the radius comes from the shared dialog-panel rule that also draws the frozen Gate C panels;
+  - `MultiSelect` (podcast-only chips);
+  - `FullscreenModal`: the reader's sheet follows the independent reader theme;
+  - unused `DropdownMenu` and `Menu`.
+
 Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
 
 | Token                                              | RGB                               | Role                                                                                                              |
