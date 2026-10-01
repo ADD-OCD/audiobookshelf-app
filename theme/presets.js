@@ -53,6 +53,12 @@ const RAISED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-light) / 0.55), inset
 const PRESSED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.35)'
 const RECESSED_WELL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.25), inset 0 2px 6px rgb(0 0 0 / 0.45)'
 const STEEL_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)'
+// Primary playback control (the round play/pause button): a stronger, near-opaque brushed-steel face so it reads
+// as silver-gray metal against the blue-gray chassis. It composes over the control's own fill: an upper-left
+// specular highlight (same light source as the bevels) over a top-to-bottom falloff. Secondary keys keep the
+// subtler STEEL_SHEEN. Pressed: the face dims and its falloff inverts (lit from below while pushed in)
+const PRIMARY_STEEL = 'radial-gradient(circle at 35% 25%, rgb(var(--color-edge-light) / 0.4) 0%, rgb(var(--color-edge-light) / 0) 55%), linear-gradient(180deg, rgb(var(--color-edge-light) / 0.72) 0%, rgb(var(--color-edge-light) / 0.5) 50%, rgb(var(--color-edge-light) / 0.28) 100%)'
+const PRIMARY_STEEL_PRESSED = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.3) 0%, rgb(var(--color-edge-light) / 0.45) 100%)'
 const CHASSIS_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.1) 0%, rgb(var(--color-edge-light) / 0) 40%, rgb(0 0 0 / 0.2) 100%)'
 const ARTWORK_FRAME = '0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 2px rgb(var(--color-edge-light) / 0.45)'
 // A seam cut into the bottom of an element: dark inset line with a faint light return line below it.
@@ -83,7 +89,7 @@ const SELECTED_KEY = Object.freeze({
   'box-shadow': `inset 0 0 0 1px rgb(var(--color-accent) / 0.9), ${PRESSED_BEVEL}, inset 0 2px 5px rgb(0 0 0 / 0.45)`
 })
 
-const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
+const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
 
 const EQUIPMENT_RULES = [
   // Navigation chrome: bevelled chassis strips
@@ -166,8 +172,8 @@ const EQUIPMENT_RULES = [
   ['#playerContent span.font-mono', { color: 'rgb(var(--color-accent))' }],
   ['#streamContainer p.tracking-widest', { color: 'rgb(var(--color-accent) / 0.85)' }],
   // Transport: steel play button, raised; pressed = inset (other transport glyphs keep their look)
-  ['#playerControls .play-btn', { 'background-image': STEEL_SHEEN, 'box-shadow': `${RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` }],
-  ['#playerControls .play-btn:active', { 'background-image': 'none', 'box-shadow': PRESSED_BEVEL }],
+  ['#playerControls .play-btn', { 'background-image': PRIMARY_STEEL, 'box-shadow': `${RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` }],
+  ['#playerControls .play-btn:active', { 'background-image': PRIMARY_STEEL_PRESSED, 'box-shadow': PRESSED_BEVEL }],
   // Collapsed mini-player: chassis top edge (same footprint)
   ['#streamContainer:not(.fullscreen) #playerContent', { 'box-shadow': 'inset 0 1px 0 rgb(var(--color-edge-light) / 0.45), 0 -8px 8px rgb(0 0 0 / 0.33)' }],
 

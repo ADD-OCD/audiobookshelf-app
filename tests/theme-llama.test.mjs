@@ -215,7 +215,7 @@ const SAFE_VALUE = /^[a-z0-9 .,%()/#-]+$/i
 test('shared equipment primitives exist as fixed, frozen, paint-only recipe values', () => {
   const P = presets.PRIMITIVES
   assert.ok(Object.isFrozen(P))
-  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'ENGRAVED_SEPARATOR_TOP', 'RECESSED_FACE', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
+  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'PRIMARY_STEEL', 'PRIMARY_STEEL_PRESSED', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'ENGRAVED_SEPARATOR_TOP', 'RECESSED_FACE', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
   // Radius scale: squared frames, squared keys/wells/panels, full rounding only for circular controls
   assert.deepEqual({ ...P.RADIUS }, { frame: '2px', key: '4px', round: '9999px' })
   assert.ok(Object.isFrozen(P.RADIUS) && Object.isFrozen(P.ELEVATION))
@@ -247,7 +247,7 @@ test('shared equipment primitives exist as fixed, frozen, paint-only recipe valu
   assert.deepEqual({ ...P.KEY_CAP }, { 'border-radius': P.RADIUS.key, 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
   assert.deepEqual({ ...P.KEY_CAP_PRESSED }, { 'background-image': 'none', 'box-shadow': P.PRESSED_BEVEL })
   // Every string primitive is a safe paint value that references only derived edge colors or the accent token
-  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.ENGRAVED_SEPARATOR_TOP, P.RECESSED_FACE, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
+  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.PRIMARY_STEEL, P.PRIMARY_STEEL_PRESSED, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.ENGRAVED_SEPARATOR_TOP, P.RECESSED_FACE, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
     assert.match(value, SAFE_VALUE, value)
     for (const v of value.match(/--[a-z-]+/g) || []) assert.ok(['--color-edge-light', '--color-edge-dark', '--color-accent'].includes(v), v)
   }
@@ -428,5 +428,40 @@ test('Gate B rules compile through Tailwind under the LLAMA root only', async ()
   assert.match(block(`${root} .fullscreen #playerContent`), /background-color: rgb\(var\(--color-bg\)\)/)
   assert.match(block(`${root} .cover-wrapper`), /border-radius: 2px/)
   for (const hook of ['player-key', 'key-disabled', 'sleep-readout']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}`).test(css), `no unscoped ${hook} rule`)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+// --- Phase 2C Gate B.1: primary play control steel finish ---
+
+test('Gate B.1 the round play button uses the stronger primary steel; every other steel surface keeps STEEL_SHEEN', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { 'background-image': P.PRIMARY_STEEL, 'box-shadow': `${P.RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` })
+  // Same pressed behavior (inset bevel on :active); the face dims and inverts instead of dropping to the bare fill
+  assert.deepEqual(rules[`${root} #playerControls .play-btn:active`], { 'background-image': P.PRIMARY_STEEL_PRESSED, 'box-shadow': P.PRESSED_BEVEL })
+  // Only the play button uses the primary steel
+  const users = Object.entries(rules)
+    .filter(([, d]) => Object.values(d).some((v) => v === P.PRIMARY_STEEL || v === P.PRIMARY_STEEL_PRESSED))
+    .map(([s]) => s)
+  assert.deepEqual(users, [`${root} #playerControls .play-btn`, `${root} #playerControls .play-btn:active`])
+  // Secondary keys and the other steel surfaces are unchanged
+  assert.equal(P.KEY_CAP['background-image'], P.STEEL_SHEEN)
+  assert.equal(P.STEEL_SHEEN, 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)')
+  for (const s of ['#bookshelf-navbar', '.btn:not(:disabled)', '.icon-btn.border:not(:disabled)', '.bookshelfDivider']) assert.equal(rules[`${root} ${s}`]['background-image'], P.STEEL_SHEEN, s)
+  // Lit from the upper left like the bevels; the falloff darkens downward, and pressed inverts and dims it
+  assert.match(P.PRIMARY_STEEL, /^radial-gradient\(circle at \d+% \d+%, rgb\(var\(--color-edge-light\) \/ 0\.\d+\) 0%, rgb\(var\(--color-edge-light\) \/ 0\) \d+%\), linear-gradient\(180deg, /)
+  const alphas = (v) => [...v.matchAll(/--color-edge-light\) \/ (0\.\d+)\)/g)].map((m) => Number(m[1]))
+  const fall = alphas(P.PRIMARY_STEEL.slice(P.PRIMARY_STEEL.indexOf('linear-gradient')))
+  assert.ok(fall.length === 3 && fall[0] > fall[1] && fall[1] > fall[2], 'top-lit falloff')
+  const pressed = alphas(P.PRIMARY_STEEL_PRESSED)
+  assert.ok(pressed.length === 2 && pressed[0] < pressed[1] && pressed[1] < fall[0], 'pressed: inverted and dimmer')
+  // The white glyph keeps at least 3:1 against the brightest face point (falloff top plus the full highlight over surface.raised)
+  const t = llama().tokens
+  const edge = presets.equipmentDerivedDeclarations(t)['--color-edge-light'].split(' ').map(Number)
+  const over = (base, a) => base.map((c, i) => c + (edge[i] - c) * a)
+  const highlight = alphas(P.PRIMARY_STEEL)[0]
+  const brightest = over(over(t['surface.raised'], fall[0]), highlight)
+  assert.ok(contrast([255, 255, 255], brightest) >= 3, `glyph contrast ${contrast([255, 255, 255], brightest)}`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
