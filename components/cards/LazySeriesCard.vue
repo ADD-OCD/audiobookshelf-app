@@ -1,7 +1,7 @@
 <template>
   <div ref="card" :id="`series-card-${index}`" :style="{ width: width + 'px', height: height + 'px' }" class="rounded-sm cursor-pointer z-30" @click="clickCard">
     <div class="absolute top-0 left-0 w-full box-shadow-book shadow-height" />
-    <div class="w-full h-full bg-primary relative rounded overflow-hidden">
+    <div class="card-artwork w-full h-full bg-primary relative rounded overflow-hidden">
       <covers-group-cover v-if="series" ref="cover" :id="seriesId" :name="title" :book-items="books" :width="width" :height="height" :book-cover-aspect-ratio="bookCoverAspectRatio" />
     </div>
 

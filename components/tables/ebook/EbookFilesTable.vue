@@ -1,8 +1,8 @@
 <template>
   <div class="w-full my-2">
-    <div class="w-full bg-primary px-4 py-2 flex items-center" :class="showFiles ? 'rounded-t-md' : 'rounded-md'" @click.stop="clickBar">
+    <div class="section-bar w-full bg-primary px-4 py-2 flex items-center" :class="showFiles ? 'rounded-t-md' : 'rounded-md'" @click.stop="clickBar">
       <p class="pr-2">{{ $strings.HeaderEbookFiles }}</p>
-      <div class="h-6 w-6 rounded-full bg-fg/10 flex items-center justify-center">
+      <div class="section-count h-6 w-6 rounded-full bg-fg/10 flex items-center justify-center">
         <span class="text-xs font-mono">{{ ebookFiles.length }}</span>
       </div>
       <div class="flex-grow" />

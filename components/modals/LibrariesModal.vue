@@ -7,11 +7,11 @@
     </template>
 
     <div class="w-full h-full overflow-hidden absolute top-0 left-0 flex items-center justify-center" @click="show = false">
-      <div class="w-full overflow-x-hidden overflow-y-auto bg-secondary rounded-lg border border-border" style="max-height: 75%" @click.stop>
+      <div class="library-option-panel w-full overflow-x-hidden overflow-y-auto bg-secondary rounded-lg border border-border" style="max-height: 75%" @click.stop>
         <ul class="h-full w-full" role="listbox" aria-labelledby="listbox-label">
           <template v-for="library in libraries">
-            <li :key="library.id" class="text-fg select-none relative py-3 cursor-pointer" :class="currentLibraryId === library.id ? 'bg-primary bg-opacity-80' : ''" role="option" @click="clickedOption(library)">
-              <div v-show="currentLibraryId === library.id" class="absolute top-0 left-0 w-0.5 bg-warning h-full" />
+            <li :key="library.id" class="text-fg select-none relative py-3 cursor-pointer" :class="currentLibraryId === library.id ? 'bg-primary bg-opacity-80 option-selected' : ''" role="option" @click="clickedOption(library)">
+              <div v-show="currentLibraryId === library.id" class="option-marker absolute top-0 left-0 w-0.5 bg-warning h-full" />
               <div class="flex items-center px-3">
                 <ui-library-icon :icon="library.icon" />
                 <span class="font-normal block truncate text-lg ml-4">{{ library.name }}</span>

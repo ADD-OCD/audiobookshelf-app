@@ -2,7 +2,7 @@
   <div class="w-full px-1.5 pb-1.5">
     <div class="w-full h-full p-2 rounded-lg relative bg-bg overflow-hidden">
       <nuxt-link v-if="libraryItem" :to="itemUrl" class="flex items-center w-full">
-        <div class="h-full relative" :style="{ width: '50px' }">
+        <div class="card-artwork h-full relative" :style="{ width: '50px' }">
           <covers-book-cover :library-item="libraryItem" :width="50" :book-cover-aspect-ratio="bookCoverAspectRatio" />
         </div>
         <div class="item-table-content h-full px-2 flex items-center">
@@ -13,7 +13,7 @@
           </div>
         </div>
         <div class="w-8 min-w-8 flex justify-center">
-          <button v-if="showPlayBtn" class="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center" @click.stop.prevent="playClick">
+          <button v-if="showPlayBtn" class="row-play-btn w-8 h-8 rounded-full border border-white/20 flex items-center justify-center" @click.stop.prevent="playClick">
             <span v-if="!playerIsStartingForThisMedia" class="material-symbols text-2xl fill" :class="streamIsPlaying ? '' : 'text-success'">{{ streamIsPlaying ? 'pause' : 'play_arrow' }}</span>
             <svg v-else class="animate-spin" style="width: 18px; height: 18px" viewBox="0 0 24 24">
               <path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z" />

@@ -1,14 +1,14 @@
 <template>
-  <div class="w-full bg-primary bg-opacity-40">
-    <div class="w-full h-14 flex items-center px-4 bg-primary">
+  <div class="group-items w-full bg-primary bg-opacity-40">
+    <div class="section-bar w-full h-14 flex items-center px-4 bg-primary">
       <p class="pr-4">{{ $strings.HeaderCollectionItems }}</p>
 
-      <div class="w-6 h-6 md:w-7 md:h-7 bg-fg/10 rounded-full flex items-center justify-center">
+      <div class="section-count w-6 h-6 md:w-7 md:h-7 bg-fg/10 rounded-full flex items-center justify-center">
         <span class="text-xs md:text-sm font-mono leading-none">{{ books.length }}</span>
       </div>
 
       <div class="flex-grow" />
-      <p v-if="totalDuration" class="text-sm text-fg">{{ totalDurationPretty }}</p>
+      <p v-if="totalDuration" class="section-readout text-sm text-fg">{{ totalDurationPretty }}</p>
     </div>
     <template v-for="book in booksCopy">
       <tables-collection-book-table-row :key="book.id" :book="book" :queue-books="books" :collection-id="collectionId" class="item collection-book-item" @edit="editBook" />

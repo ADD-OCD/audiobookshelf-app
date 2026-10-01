@@ -2,7 +2,7 @@
   <div class="w-full h-full">
     <div class="w-full h-full overflow-y-auto py-6 md:p-8">
       <div class="w-full flex justify-center">
-        <covers-playlist-cover :items="playlistItems" :width="180" :height="180" />
+        <covers-playlist-cover class="detail-artwork" :items="playlistItems" :width="180" :height="180" />
       </div>
       <div class="flex-grow px-1 py-6">
         <div class="flex items-center px-3">

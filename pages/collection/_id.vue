@@ -3,7 +3,7 @@
     <div class="w-full h-full overflow-y-auto px-2 py-6 md:p-8">
       <div class="w-full flex justify-center md:block sm:w-32 md:w-52" style="min-width: 240px">
         <div class="relative" style="height: fit-content">
-          <covers-collection-cover :book-items="bookItems" :width="240" :height="120 * bookCoverAspectRatio" :book-cover-aspect-ratio="bookCoverAspectRatio" />
+          <covers-collection-cover class="detail-artwork" :book-items="bookItems" :width="240" :height="120 * bookCoverAspectRatio" :book-cover-aspect-ratio="bookCoverAspectRatio" />
         </div>
       </div>
       <div class="flex-grow py-6">

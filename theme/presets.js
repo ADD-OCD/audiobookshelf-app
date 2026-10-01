@@ -213,6 +213,46 @@ const EQUIPMENT_RULES = [
   ['.shinyBlack', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': 'none', 'border-color': 'rgb(var(--color-border))', color: 'rgb(var(--color-fg))' }],
   ['.altBookshelfLabel', { 'background-color': 'rgb(var(--color-recessed))', 'background-image': 'none', 'border-color': 'rgb(var(--color-border))', color: 'rgb(var(--color-fg))' }],
 
+  // --- Browsing and detail surfaces (Gate D) ---
+  // Content stays dominant: artwork is mounted, information sits in recessed displays, tappable section
+  // headers are raised strips, and only real controls become keys. Card artwork for every entity type uses
+  // the card-artwork hook above (series/collection/playlist covers, author portraits, group-table row covers)
+  // on its artwork box only, never a card root or row.
+  // Home sections: an engraved seam closes each shelf (drawn under the shelf content, so the standard
+  // shelf's own divider covers it and it only shows in the alternative view)
+  ['.shelf-section', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Bookshelf toolbar: a chassis strip under the navigation bar, seamed off from the content below
+  ['.browse-toolbar', { 'background-image': CHASSIS_SHEEN, 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Active-filter indicator: an active state, so the accent (success green only means completion)
+  ['.browse-toolbar .filter-indicator', { 'background-color': 'rgb(var(--color-accent))', 'border-color': 'rgb(var(--color-edge-dark))' }],
+  // Library selector (app bar): a physical key; pressed inverts it
+  ['.library-selector', KEY_CAP],
+  ['.library-selector:active', KEY_CAP_PRESSED],
+  // Library list: recessed well, seamed rows; the current library is a selected key (pressed, accent ring) on
+  // a lit row, and its marker uses the accent instead of warning orange (selection is not a warning)
+  ['.modal .library-option-panel ul[role=listbox]', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+  ['.modal .library-option-panel li[role=option]:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  ['.modal .library-option-panel li[role=option].option-selected', { 'background-color': 'rgb(var(--color-bg))', ...SELECTED_KEY }],
+  ['.modal .library-option-panel .option-marker', { 'background-color': 'rgb(var(--color-accent))' }],
+  // Detail artwork (item, collection and playlist pages): the same mounted frame as card artwork
+  ['.detail-artwork', { 'border-radius': RADIUS.frame, 'box-shadow': `${ARTWORK_FRAME}, ${ELEVATION.panel}` }],
+  // Item progress: a recessed information display (text and values unchanged)
+  ['.detail-progress', { 'background-color': 'rgb(var(--color-recessed))', 'border-radius': RADIUS.key, 'box-shadow': RECESSED_WELL }],
+  // Tappable section headers (chapters/tracks/ebook files, collection/playlist items): raised chassis strips
+  ['.section-bar', { 'background-image': CHASSIS_SHEEN, 'box-shadow': RAISED_BEVEL }],
+  // Their count badge and the total-duration value are small recessed readouts
+  ['.section-bar .section-count', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL, color: 'rgb(var(--color-accent))' }],
+  ['.section-bar .section-readout', { color: 'rgb(var(--color-accent))' }],
+  // Detail tables (assets/app.css tracksTable): a recessed display with a dark zebra instead of bright strips
+  ['.tracksTable tr', { 'background-color': 'rgb(var(--color-recessed))' }],
+  ['.tracksTable tr:nth-child(even)', { 'background-color': 'rgb(var(--color-primary))' }],
+  // Group detail items (collection/playlist): a recessed well; collection rows are seamed display entries
+  ['.group-items', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+  ['.group-items .group-row:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Row play buttons are real controls: equipment keys (glyph color and size unchanged)
+  ['.row-play-btn', KEY_CAP],
+  ['.row-play-btn:active', KEY_CAP_PRESSED],
+
   // Toggle switch (ui/ToggleSwitch): recessed slot with a steel thumb; state still reads from thumb position
   ['.w-10.rounded-full.border-gray-400', { 'border-color': 'rgb(var(--color-border))', 'box-shadow': 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset 0 1px 3px rgb(0 0 0 / 0.5)' }],
   ['.w-10.rounded-full.border-gray-400.bg-primary', { 'background-color': 'rgb(var(--color-recessed))' }],

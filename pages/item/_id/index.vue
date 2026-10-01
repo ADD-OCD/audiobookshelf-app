@@ -12,7 +12,7 @@
           </div>
         </div>
       </div>
-      <div class="relative" @click="showFullscreenCover = true">
+      <div class="detail-artwork relative" @click="showFullscreenCover = true">
         <covers-book-cover :library-item="libraryItem" :width="coverWidth" :book-cover-aspect-ratio="bookCoverAspectRatio" no-bg raw />
         <div v-if="!isPodcast" class="absolute bottom-0 left-0 h-1 z-10 box-shadow-progressbar" :class="userIsFinished ? 'bg-success' : 'bg-yellow-400'" :style="{ width: coverWidth * progressPercent + 'px' }"></div>
       </div>
@@ -71,7 +71,7 @@
             <span class="px-1 text-base">{{ $strings.LabelMissing }}</span>
           </ui-btn>
 
-          <div v-if="!isPodcast && progressPercent > 0" class="px-4 py-2 bg-primary text-sm font-semibold rounded-md text-fg mt-4 text-center">
+          <div v-if="!isPodcast && progressPercent > 0" class="detail-progress px-4 py-2 bg-primary text-sm font-semibold rounded-md text-fg mt-4 text-center">
             <p>{{ $strings.LabelYourProgress }}: {{ Math.round(progressPercent * 100) }}%</p>
             <p v-if="!useEBookProgress && !userIsFinished" class="text-fg-muted text-xs">{{ $getString('LabelTimeRemaining', [$elapsedPretty(userTimeRemaining)]) }}</p>
             <p v-else-if="userIsFinished" class="text-fg-muted text-xs">{{ $strings.LabelFinished }} {{ $formatDate(userProgressFinishedAt) }}</p>

@@ -567,3 +567,148 @@ test('Gate C rules compile through Tailwind; Dark, Black and Light still get no 
   for (const hook of ['queue-current', 'queue-row', 'playback-option-panel', 'option-selected', 'bookmark-row', 'bookmark-current', 'bookmarks-list', 'speed-readout']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
+
+// --- Phase 2C Gate D: browsing and detail surfaces (paint only) ---
+
+// [ids, classes/attributes/pseudo-classes, elements] for the simple selectors the recipe and app.css use
+const specificityOf = (selector) => {
+  const s = selector.replace(/:not\(([^)]*)\)/g, ' $1')
+  return [(s.match(/#[\w-]+/g) || []).length, (s.match(/\.[\w-]+|\[[^\]]+\]|:(?!not)[\w-]+/g) || []).length, (s.match(/(^|[\s>+~])[a-z]+/g) || []).length]
+}
+const outranks = (a, b, order = []) => {
+  const [x, y] = [specificityOf(a), specificityOf(b)]
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]
+  return order.indexOf(a) > order.indexOf(b)
+}
+
+test('Gate D artwork hooks mark the artwork box of every card type, never a card root or row', async () => {
+  // Series, collection and playlist cards: the root is the card, the inner box is the cover
+  for (const [file, id] of [
+    ['../components/cards/LazySeriesCard.vue', 'series-card'],
+    ['../components/cards/LazyCollectionCard.vue', 'collection-card'],
+    ['../components/cards/LazyPlaylistCard.vue', 'playlist-card']
+  ]) {
+    const source = await read(file)
+    const root = source.match(new RegExp(`<div ref="card" :id="\`${id}-\\$\\{index\\}\`"[^>]*>`))[0]
+    assert.doesNotMatch(root, /card-artwork/, `${file} root`)
+    assert.match(source, /<div class="card-artwork w-full h-full bg-primary relative rounded overflow-hidden">/, file)
+    assert.equal((source.match(/card-artwork/g) || []).length, 1, file)
+  }
+  // Author card: the portrait box (its own rounded portrait shape is kept), not the outer wrapper
+  const author = await read('../components/cards/AuthorCard.vue')
+  assert.match(author, /<div :style="\{ width: width \+ 'px', height: height \+ 'px' \}" class="card-artwork bg-primary box-shadow-book rounded-md relative overflow-hidden">/)
+  assert.equal((author.match(/card-artwork/g) || []).length, 1)
+  // Group-table rows: the cover box only; the collection row root is a group-row, not artwork
+  const bookRow = await read('../components/tables/collection/BookTableRow.vue')
+  assert.match(bookRow, /<div class="group-row w-full px-2 py-2 overflow-hidden relative">/)
+  assert.match(bookRow, /<div class="card-artwork h-full relative" :style="\{ width: bookWidth \+ 'px' \}">/)
+  const itemRow = await read('../components/tables/playlist/ItemTableRow.vue')
+  assert.match(itemRow, /<div class="card-artwork h-full relative" :style="\{ width: '50px' \}">/)
+  for (const row of [bookRow, itemRow]) assert.equal((row.match(/card-artwork/g) || []).length, 1)
+  // Detail artwork: the item cover box (it also holds the progress bar), and the collection/playlist cover
+  // components at their detail usage only (cards and the playlists modal keep their own treatment)
+  const item = await read('../pages/item/_id/index.vue')
+  assert.match(item, /<div class="detail-artwork relative" @click="showFullscreenCover = true">/)
+  assert.match(item, /<div v-if="!isPodcast" class="absolute bottom-0 left-0 h-1 z-10 box-shadow-progressbar" :class="userIsFinished \? 'bg-success' : 'bg-yellow-400'"/)
+  assert.match(await read('../pages/collection/_id.vue'), /<covers-collection-cover class="detail-artwork" /)
+  assert.match(await read('../pages/playlist/_id.vue'), /<covers-playlist-cover class="detail-artwork" /)
+  assert.doesNotMatch(await read('../components/modals/playlists/PlaylistRow.vue'), /detail-artwork|card-artwork/)
+})
+
+test('Gate D semantic hooks are present on browsing and detail surfaces', async () => {
+  const hooks = {
+    '../components/bookshelf/Shelf.vue': [/<div class="shelf-section w-full relative">/],
+    '../components/home/BookshelfToolbar.vue': [/<div class="browse-toolbar w-full h-9 bg-bg relative z-20">/, /class="filter-indicator absolute top-0 right-2 w-2 h-2 rounded-full bg-success/],
+    '../components/app/Appbar.vue': [/aria-label="Show library modal" class="library-selector /],
+    '../components/modals/LibrariesModal.vue': [/class="library-option-panel /, /'bg-primary bg-opacity-80 option-selected'/, /class="option-marker absolute top-0 left-0 w-0\.5 bg-warning h-full"/],
+    '../pages/item/_id/index.vue': [/class="detail-progress px-4 py-2 bg-primary text-sm font-semibold rounded-md/],
+    '../components/tables/ChaptersTable.vue': [/<div class="section-bar w-full bg-primary/, /<div class="section-count h-6 w-6 rounded-full/],
+    '../components/tables/TracksTable.vue': [/<div class="section-bar w-full bg-primary/, /<div class="section-count h-6 w-6 rounded-full/],
+    '../components/tables/ebook/EbookFilesTable.vue': [/<div class="section-bar w-full bg-primary/, /<div class="section-count h-6 w-6 rounded-full/],
+    '../components/tables/collection/CollectionBooksTable.vue': [/<div class="group-items /, /<div class="section-bar w-full h-14/, /class="section-count /, /class="section-readout text-sm text-fg"/],
+    '../components/tables/playlist/PlaylistItemsTable.vue': [/<div class="group-items /, /<div class="section-bar w-full h-14/, /class="section-count /, /class="section-readout text-sm text-fg"/],
+    '../components/tables/collection/BookTableRow.vue': [/<button v-if="showPlayBtn" class="row-play-btn w-8 h-8 rounded-full/],
+    '../components/tables/playlist/ItemTableRow.vue': [/<button v-if="showPlayBtn" class="row-play-btn w-8 h-8 rounded-full/]
+  }
+  for (const [file, patterns] of Object.entries(hooks)) {
+    const source = await read(file)
+    for (const pattern of patterns) assert.match(source, pattern, `${file}: ${pattern}`)
+  }
+  // Completed player/overlay surfaces carry none of the Gate D hooks, so no Gate D rule can repaint them
+  for (const file of ['../components/app/AudioPlayer.vue', '../components/modals/QueueModal.vue', '../components/modals/ChaptersModal.vue', '../components/modals/PlaybackSpeedModal.vue', '../components/modals/SleepTimerModal.vue', '../components/modals/BookmarksModal.vue']) {
+    assert.doesNotMatch(await read(file), /shelf-section|browse-toolbar|library-selector|library-option-panel|detail-artwork|detail-progress|section-bar|section-count|group-items|group-row|row-play-btn|tracksTable/, file)
+  }
+})
+
+test('Gate D rules: paint only, built from the shared primitives, with LLAMA color semantics', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const rule = (s) => rules[`${root} ${s}`]
+  const gateD = Object.entries(rules).filter(([s]) => /shelf-section|browse-toolbar|library-selector|library-option-panel|detail-artwork|detail-progress|section-bar|tracksTable|group-items|row-play-btn/.test(s))
+  assert.ok(gateD.length >= 20, `${gateD.length} rules`)
+  for (const [selector, declarations] of gateD) {
+    for (const [property, value] of Object.entries(declarations)) {
+      assert.match(property, /^(background-color|background-image|box-shadow|border-radius|border-color|color)$/, `${selector}: ${property}`)
+      assert.match(value, SAFE_VALUE, `${selector}: ${value}`)
+      assert.doesNotMatch(value, /--color-success|--color-warning/, `${selector}: success/warning never mean selected or active`)
+    }
+  }
+  // Artwork: detail artwork is mounted exactly like card artwork, on the squared frame radius
+  assert.deepEqual(rule('.detail-artwork'), { 'border-radius': P.RADIUS.frame, 'box-shadow': `${P.ARTWORK_FRAME}, ${P.ELEVATION.panel}` })
+  assert.equal(rule('.card-artwork')['box-shadow'], `${P.ARTWORK_FRAME}, ${P.ELEVATION.panel}`)
+  // Information displays are recessed; tappable section headers are raised strips; their readouts are accent
+  assert.deepEqual(rule('.detail-progress'), { 'background-color': 'rgb(var(--color-recessed))', 'border-radius': P.RADIUS.key, 'box-shadow': P.RECESSED_WELL })
+  assert.deepEqual(rule('.section-bar'), { 'background-image': P.CHASSIS_SHEEN, 'box-shadow': P.RAISED_BEVEL })
+  assert.equal(rule('.section-bar .section-count').color, 'rgb(var(--color-accent))')
+  assert.deepEqual(rule('.section-bar .section-readout'), { color: 'rgb(var(--color-accent))' })
+  assert.deepEqual(rule('.group-items'), { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': P.RECESSED_WELL })
+  // Seams: shelf sections, the toolbar, list/group rows (never after the last row)
+  for (const s of ['.shelf-section', '.group-items .group-row:not(:last-child)', '.modal .library-option-panel li[role=option]:not(:last-child)']) assert.equal(rule(s)['box-shadow'], P.ENGRAVED_SEPARATOR, s)
+  assert.deepEqual(rule('.browse-toolbar'), { 'background-image': P.CHASSIS_SHEEN, 'box-shadow': P.ENGRAVED_SEPARATOR })
+  // Keys: only real controls (library selector, row play buttons), with the pressed state
+  for (const s of ['.library-selector', '.row-play-btn']) {
+    assert.deepEqual(rule(s), { ...P.KEY_CAP }, s)
+    assert.deepEqual(rule(`${s}:active`), { ...P.KEY_CAP_PRESSED }, s)
+  }
+  for (const [selector, declarations] of gateD) assert.ok(!Object.values(declarations).includes(P.PRIMARY_STEEL), `${selector}: PRIMARY_STEEL is reserved for the play button`)
+  // Selection and activity: selected key + accent, never warning orange or success green
+  assert.deepEqual(rule('.modal .library-option-panel li[role=option].option-selected'), { 'background-color': 'rgb(var(--color-bg))', ...P.SELECTED_KEY })
+  assert.deepEqual(rule('.modal .library-option-panel .option-marker'), { 'background-color': 'rgb(var(--color-accent))' })
+  assert.equal(rule('.browse-toolbar .filter-indicator')['background-color'], 'rgb(var(--color-accent))')
+  // Progress semantics are untouched: unfinished bars stay amber via the existing rule, finished bars keep success
+  assert.deepEqual(rules[`${root} .absolute.bottom-0.left-0.z-10.bg-yellow-400`], { 'background-color': 'rgb(var(--color-track-cursor))' })
+  assert.ok(!Object.keys(rules).some((s) => /bg-success/.test(s)))
+})
+
+test('Gate D cascade: state, zebra and artwork rules win over the rules they share an element with', async () => {
+  const root = engine.themeSelector('llama')
+  const order = Object.keys(presets.presentationRules([llama()]))
+  const r = (s) => `${root} ${s}`
+  // Selected library outranks the row seam
+  assert.ok(outranks(r('.modal .library-option-panel li[role=option].option-selected'), r('.modal .library-option-panel li[role=option]:not(:last-child)'), order))
+  // Table zebra: the LLAMA even rows outrank the LLAMA base rows, and both outrank assets/app.css
+  const css = await read('../assets/app.css')
+  for (const base of ['.tracksTable tr', '.tracksTable tr:nth-child(even)']) assert.ok(css.includes(`${base} {`), base)
+  assert.ok(outranks(r('.tracksTable tr:nth-child(even)'), r('.tracksTable tr'), order))
+  assert.ok(outranks(r('.tracksTable tr:nth-child(even)'), '.tracksTable tr:nth-child(even)'))
+  assert.ok(outranks(r('.tracksTable tr'), '.tracksTable tr'))
+  // The frame outranks the author card's own box-shadow utility, and the item cover's progress bar keeps its
+  // amber/success rule (no Gate D rule targets it)
+  assert.ok(outranks(r('.card-artwork'), '.box-shadow-book'))
+  const gateD = order.filter((s) => /detail-artwork/.test(s))
+  assert.deepEqual(gateD, [r('.detail-artwork')])
+})
+
+test('Gate D rules compile through Tailwind under the LLAMA root; standard themes get none', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const root = "html[data-theme='llama']"
+  for (const s of ['.detail-artwork', '.detail-progress', '.section-bar', '.tracksTable tr:nth-child(even)', '.group-items', '.library-selector', '.modal .library-option-panel li[role=option].option-selected', '.row-play-btn', '.browse-toolbar .filter-indicator', '.shelf-section']) assert.ok(css.includes(`${root} ${s} {`), s)
+  for (const hook of ['shelf-section', 'browse-toolbar', 'library-selector', 'library-option-panel', 'detail-artwork', 'detail-progress', 'section-bar', 'section-count', 'group-items', 'group-row', 'row-play-btn', 'filter-indicator', 'option-marker']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
