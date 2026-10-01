@@ -12,7 +12,9 @@ http://developer.android.com/guide/topics/appwidgets/index.html#CreatingLayout
          is unchanged either way. -->
     <dimen name="widget_full_artwork_max">140dp</dimen>
 
-    <!-- LARGE FULL: the floating brand icon's inset from the widget's top and end edges (inside launcher corner rounding) -->
-    <dimen name="widget_large_icon_inset">10dp</dimen>
+    <!-- FULL: the floating brand icon's inset from the widget's top and end edges (inside launcher corner rounding),
+         and the inset of its alternative slot inside the readout panel's top-end corner (NORMAL) -->
+    <dimen name="widget_floating_icon_inset">10dp</dimen>
+    <dimen name="widget_panel_icon_inset">4dp</dimen>
 
 </resources>

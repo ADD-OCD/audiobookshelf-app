@@ -11,8 +11,8 @@
   android:background="@drawable/widget_llama_chassis"
   tools:ignore="UseAppTint">
 
-  <!-- Content plus a floating brand icon: the icon sits over the spare space above the cover (LARGE only starts where
-       that space is tall enough, see FullArtwork), so it takes no width or height from the content -->
+  <!-- Content plus the floating brand icon (it takes no width or height from the content; the renderer shows it
+       only where it clears the cover and the text, see FullArtwork) -->
   <FrameLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -50,7 +50,7 @@
           android:src="@drawable/icon" />
       </LinearLayout>
 
-      <!-- Readout below the cover, across the full content width (the corner icon floats above, outside this flow) -->
+      <!-- Readout below the cover, across the full content width (the brand icon floats above, outside this flow) -->
       <LinearLayout
         android:id="@+id/widgetReadout"
         android:layout_width="match_parent"
@@ -87,7 +87,7 @@
           android:id="@+id/widgetTimeRow"
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
-          android:layout_marginTop="8dp"
+        android:layout_marginTop="8dp"
           android:orientation="horizontal">
 
           <TextView
@@ -175,8 +175,8 @@
       android:layout_width="16dp"
       android:layout_height="16dp"
       android:layout_gravity="top|end"
-      android:layout_marginTop="@dimen/widget_large_icon_inset"
-      android:layout_marginEnd="@dimen/widget_large_icon_inset"
+      android:layout_marginTop="@dimen/widget_floating_icon_inset"
+      android:layout_marginEnd="@dimen/widget_floating_icon_inset"
       android:adjustViewBounds="true"
       android:tint="@color/widget_llama_text_muted"
       android:contentDescription="@null"

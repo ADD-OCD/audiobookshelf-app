@@ -27,6 +27,10 @@ import android.util.SizeF
  * from the plan; the layouts keep the cover at its own aspect (wrap_content + adjustViewBounds + fitCenter) and
  * within the space actually available, so it is never cropped and never overlaps the readout.
  *
+ * The brand icon never takes layout space in any presentation. In FULL it floats over the content and [Plan.icon]
+ * says where it can show without touching the cover or the text: the widget's top-end corner, the readout panel's
+ * top-end corner (NORMAL only, above the title), or nowhere when neither is clear.
+ *
  * The dp values below mirror the FULL layouts; where standard and LLAMA differ, reserves that protect the readout
  * use the larger value and the height backstops the smaller one (never tighter than the layout itself).
  * tests/widget-theme.test.mjs fails if the layouts drift.
@@ -36,7 +40,11 @@ object FullArtwork {
   const val CONTENT_PADDING_DP = 8f
   /** widgetReadout marginStart (NORMAL). */
   const val READOUT_MARGIN_DP = 10f
-  /** tinyCornerIcon width + marginStart. */
+  /**
+   * The width the brand icon used to take beside the NORMAL readout (16dp + 6dp margin). The icon now floats, but
+   * this stays in the NORMAL width reserve so the cover bounds and the NORMAL/EXPANDED switch don't move; the
+   * readout gets this width instead.
+   */
   const val CORNER_ICON_DP = 16f + 6f
   /** widgetReadout padding, each side (standard 6dp, LLAMA 8dp). */
   const val READOUT_PADDING_DP = 8f
@@ -49,9 +57,14 @@ object FullArtwork {
   const val EXPANDED_READOUT_GAP_DP = 8f
   /** LARGE: widgetButtonContainer marginTop + height (72dp buttons inside 4dp margins). */
   const val LARGE_CONTROLS_DP = 6f + 80f
-  /** LARGE: the floating brand icon's size and its inset from the widget's top and end edges. */
+  /** The floating brand icon's size, its inset from the widget's top and end edges, and its inset in the panel slot. */
   const val ICON_SIZE_DP = 16f
-  const val LARGE_ICON_INSET_DP = 10f
+  const val FLOATING_ICON_INSET_DP = 10f
+  const val PANEL_ICON_INSET_DP = 4f
+  /** Minimum gap between the brand icon and the cover or the text. */
+  const val ICON_CLEARANCE_DP = 2f
+  /** widgetProgress marginTop + height in LLAMA (6dp), the taller bar: used where a smaller flexible area is the worst case. */
+  const val PROGRESS_MAX_DP = 8f + 6f
 
   /** Readout text sizes (sp): title, author and the elapsed/remaining times (author and times share a size). */
   const val TITLE_TEXT_SP = 16f
@@ -94,12 +107,19 @@ object FullArtwork {
     LARGE
   }
 
+  /** Where the floating brand icon shows: the widget's top-end corner, the NORMAL panel's top-end corner, or nowhere. */
+  enum class IconSlot {
+    CORNER,
+    PANEL,
+    HIDDEN
+  }
+
   /** Largest box the cover (frame included) may use; it keeps its aspect within it. */
   data class Bounds(val maxWidthDp: Float, val maxHeightDp: Float) {
     val squareDp: Float get() = minOf(maxWidthDp, maxHeightDp)
   }
 
-  data class Plan(val presentation: Presentation, val bounds: Bounds)
+  data class Plan(val presentation: Presentation, val bounds: Bounds, val icon: IconSlot = IconSlot.CORNER)
 
   private fun scale(fontScale: Float) = fontScale.coerceAtLeast(1f)
 
@@ -152,8 +172,37 @@ object FullArtwork {
   fun largeSpareDp(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Float =
     heightDp - LARGE_VERTICAL_CHROME_DP - EXPANDED_READOUT_GAP_DP - readoutHeightDp(fontScale, titleLines = 2, large = true) - (widthDp - 2 * CONTENT_PADDING_DP)
 
-  /** How far below the top of the content the floating icon reaches (the spare height above the cover must exceed it). */
-  const val LARGE_ICON_REACH_DP = LARGE_ICON_INSET_DP + ICON_SIZE_DP - CONTENT_PADDING_DP
+  /** How far below the top of the content the floating corner icon reaches (the spare height above the cover must exceed it). */
+  const val FLOATING_ICON_REACH_DP = FLOATING_ICON_INSET_DP + ICON_SIZE_DP - CONTENT_PADDING_DP
+
+  /**
+   * NORMAL: the cover/readout row is centered in the flexible area, so the corner slot is clear when the space above
+   * the row exceeds the icon's reach; otherwise the panel slot is clear when the readout's text block (two-line title,
+   * centered in the panel) starts below the icon. Worst cases: LLAMA's taller progress bar, a square cover.
+   */
+  fun normalIconSlot(widthDp: Float, heightDp: Float, fontScale: Float = 1f): IconSlot {
+    val normal = bounds(widthDp, heightDp, fontScale) ?: return IconSlot.HIDDEN
+    val flex = heightDp - 2 * CONTENT_PADDING_DP - PROGRESS_MAX_DP - CONTROLS_DP
+    val readout = readoutHeightDp(fontScale, titleLines = 2)
+    val row = maxOf(minOf(normal.squareDp, flex), readout)
+    val spareAbove = (flex - row) / 2
+    val titleTop = (row - readout) / 2 + READOUT_PADDING_DP
+    return when {
+      spareAbove >= FLOATING_ICON_REACH_DP + ICON_CLEARANCE_DP -> IconSlot.CORNER
+      titleTop >= PANEL_ICON_INSET_DP + ICON_SIZE_DP + ICON_CLEARANCE_DP -> IconSlot.PANEL
+      else -> IconSlot.HIDDEN
+    }
+  }
+
+  /** True when the floating corner icon clears a cover inside [cover] at this widget size (bottom-resting, centered). */
+  fun cornerClearsCover(widthDp: Float, cover: Bounds): Boolean {
+    val side = minOf(widthDp - 2 * CONTENT_PADDING_DP, cover.maxHeightDp) // a square cover is the widest/tallest case
+    val coverTop = CONTENT_PADDING_DP + (cover.maxHeightDp - side)
+    val coverEnd = CONTENT_PADDING_DP + (widthDp - 2 * CONTENT_PADDING_DP + side) / 2
+    val iconStart = widthDp - FLOATING_ICON_INSET_DP - ICON_SIZE_DP
+    val iconBottom = FLOATING_ICON_INSET_DP + ICON_SIZE_DP
+    return coverEnd + ICON_CLEARANCE_DP <= iconStart || coverTop >= iconBottom + ICON_CLEARANCE_DP
+  }
 
   /** True when a FULL widget of this size uses LARGE: height >= width + 259dp, plus a larger font's extra readout height. */
   fun isLarge(widthDp: Float, heightDp: Float, fontScale: Float = 1f): Boolean {
@@ -167,9 +216,13 @@ object FullArtwork {
     val stacked = expandedSquareDp(widthDp, heightDp, fontScale)
     val side = normal.squareDp
     return when {
-      stacked < side * EXPANDED_GAIN || stacked < side + EXPANDED_MIN_GAIN_DP -> Plan(Presentation.NORMAL, normal)
-      isLarge(widthDp, heightDp, fontScale) -> Plan(Presentation.LARGE, largeBounds(widthDp, heightDp, fontScale)!!)
-      else -> Plan(Presentation.EXPANDED, expandedBounds(widthDp, heightDp, fontScale)!!)
+      stacked < side * EXPANDED_GAIN || stacked < side + EXPANDED_MIN_GAIN_DP -> Plan(Presentation.NORMAL, normal, normalIconSlot(widthDp, heightDp, fontScale))
+      isLarge(widthDp, heightDp, fontScale) -> Plan(Presentation.LARGE, largeBounds(widthDp, heightDp, fontScale)!!, IconSlot.CORNER)
+      else -> {
+        // The backstop bounds are the largest cover EXPANDED can show (one-line title): the worst case for the icon
+        val expanded = expandedBounds(widthDp, heightDp, fontScale)!!
+        Plan(Presentation.EXPANDED, expanded, if (cornerClearsCover(widthDp, expanded)) IconSlot.CORNER else IconSlot.HIDDEN)
+      }
     }
   }
 

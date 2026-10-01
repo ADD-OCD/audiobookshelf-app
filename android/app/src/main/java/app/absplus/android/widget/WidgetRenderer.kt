@@ -193,6 +193,11 @@ object WidgetRenderer {
       if (full != null) {
         val density = context.resources.displayMetrics.density
         applyArtworkBounds(views, R.id.widgetAlbumArt, (full.bounds.maxWidthDp * density).toInt(), (full.bounds.maxHeightDp * density).toInt())
+        // The floating brand icon shows only where it clears the cover and the text (FullArtwork.Plan.icon)
+        views.setViewVisibility(R.id.tinyCornerIcon, if (full.icon == FullArtwork.IconSlot.CORNER) View.VISIBLE else View.GONE)
+        if (full.presentation == FullArtwork.Presentation.NORMAL) {
+          views.setViewVisibility(R.id.tinyCornerIconPanel, if (full.icon == FullArtwork.IconSlot.PANEL) View.VISIBLE else View.GONE)
+        }
       }
       // Snapshot only: fixed at this update, never advanced by a timer or scheduled work
       val snapshot = WidgetText.snapshot(state.positionMs, state.durationMs)

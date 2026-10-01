@@ -31,9 +31,10 @@
       android:contentDescription="@null"
       android:src="@drawable/icon" />
 
+    <!-- Readout: weighted as before plus a fixed 33dp (the former icon column), so the cover keeps its width and the text gains it -->
     <LinearLayout
       android:id="@+id/widgetReadout"
-      android:layout_width="0dp"
+      android:layout_width="33dp"
       android:layout_height="match_parent"
       android:layout_weight="3"
       android:layout_marginStart="6dp"
@@ -67,66 +68,67 @@
           tools:text="Title" />
       </LinearLayout>
 
-      <LinearLayout
-        android:id="@+id/widgetButtonContainer"
+      <!-- Controls row: the buttons keep their width (end margin = the former 33dp icon column); the brand icon sits in that margin -->
+      <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="4"
-        android:orientation="horizontal">
+        android:layout_weight="4">
+
+        <LinearLayout
+          android:id="@+id/widgetButtonContainer"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:layout_marginEnd="33dp"
+          android:orientation="horizontal">
+
+          <ImageView
+            android:id="@+id/widgetRewindButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_llama_button"
+            android:tint="@color/widget_llama_text"
+            android:contentDescription="@string/action_jump_backward"
+            android:src="@drawable/exo_icon_rewind" />
+
+          <ImageView
+            android:id="@+id/widgetPlayPauseButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_llama_button"
+            android:tint="@color/widget_llama_accent"
+            android:contentDescription="@string/widget_play_pause"
+            android:src="@drawable/ic_media_play_dark" />
+
+          <ImageView
+            android:id="@+id/widgetFastForwardButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="3dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_llama_button"
+            android:tint="@color/widget_llama_text"
+            android:contentDescription="@string/action_jump_forward"
+            android:src="@drawable/exo_icon_fastforward" />
+        </LinearLayout>
 
         <ImageView
-          android:id="@+id/widgetRewindButton"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
-          android:layout_margin="3dp"
-          android:padding="7dp"
-          android:background="@drawable/widget_llama_button"
-          android:tint="@color/widget_llama_text"
-          android:contentDescription="@string/action_jump_backward"
-          android:src="@drawable/exo_icon_rewind" />
-
-        <ImageView
-          android:id="@+id/widgetPlayPauseButton"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
-          android:layout_margin="3dp"
-          android:padding="7dp"
-          android:background="@drawable/widget_llama_button"
-          android:tint="@color/widget_llama_accent"
-          android:contentDescription="@string/widget_play_pause"
-          android:src="@drawable/ic_media_play_dark" />
-
-        <ImageView
-          android:id="@+id/widgetFastForwardButton"
-          android:layout_width="0dp"
-          android:layout_height="match_parent"
-          android:layout_weight="1"
-          android:layout_margin="3dp"
-          android:padding="7dp"
-          android:background="@drawable/widget_llama_button"
-          android:tint="@color/widget_llama_text"
-          android:contentDescription="@string/action_jump_forward"
-          android:src="@drawable/exo_icon_fastforward" />
-      </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-      android:id="@+id/widgetCorner"
-      android:layout_width="33dp"
-      android:layout_height="match_parent"
-      android:orientation="vertical">
-
-      <ImageView
-        android:id="@+id/tinyCornerIcon"
-        android:layout_width="16dp"
-        android:layout_height="16dp"
-        android:layout_margin="4dp"
-        android:adjustViewBounds="true"
-        android:tint="@color/widget_llama_text_muted"
-        android:contentDescription="@null"
-        android:src="@drawable/icon_monochrome" />
+          android:id="@+id/tinyCornerIcon"
+          android:layout_width="16dp"
+          android:layout_height="16dp"
+          android:layout_gravity="end|center_vertical"
+          android:layout_marginEnd="8.5dp"
+          android:adjustViewBounds="true"
+          android:tint="@color/widget_llama_text_muted"
+          android:contentDescription="@null"
+          android:src="@drawable/icon_monochrome" />
+      </FrameLayout>
     </LinearLayout>
   </LinearLayout>
 </LinearLayout>

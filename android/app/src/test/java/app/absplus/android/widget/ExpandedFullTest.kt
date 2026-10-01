@@ -169,8 +169,8 @@ class ExpandedFullTest {
     // which leaves 22dp above the cover, more than the 18dp the floating icon reaches into the content
     val fit = FullArtwork.LARGE_VERTICAL_CHROME_DP + FullArtwork.EXPANDED_READOUT_GAP_DP + FullArtwork.readoutHeightDp(titleLines = 2, large = true) - 2 * FullArtwork.CONTENT_PADDING_DP
     assertEquals(237.04f, fit, 0.01f)
-    assertEquals(18f, FullArtwork.LARGE_ICON_REACH_DP, 0.01f)
-    assertTrue(FullArtwork.LARGE_MIN_EXTRA_HEIGHT_DP - fit > FullArtwork.LARGE_ICON_REACH_DP)
+    assertEquals(18f, FullArtwork.FLOATING_ICON_REACH_DP, 0.01f)
+    assertTrue(FullArtwork.LARGE_MIN_EXTRA_HEIGHT_DP - fit > FullArtwork.FLOATING_ICON_REACH_DP)
     for (w in 250..900 step 5) {
       var large = false
       for (h in 150..3000 step 5) {
@@ -178,7 +178,7 @@ class ExpandedFullTest {
         if (p.presentation == LARGE) {
           // LARGE never costs the cover anything: still the full content width with a two-line title
           // ...and the spare height above it clears the floating icon
-          assertTrue("${w}x$h", FullArtwork.largeSpareDp(w.toFloat(), h.toFloat()) > FullArtwork.LARGE_ICON_REACH_DP)
+          assertTrue("${w}x$h", FullArtwork.largeSpareDp(w.toFloat(), h.toFloat()) > FullArtwork.FLOATING_ICON_REACH_DP)
           assertEquals("${w}x$h", w - 2 * FullArtwork.CONTENT_PADDING_DP, p.bounds.maxWidthDp, 0.01f)
           assertTrue("${w}x$h", p.bounds.maxHeightDp >= p.bounds.maxWidthDp)
         }
@@ -207,6 +207,6 @@ class ExpandedFullTest {
     assertEquals(LARGE, plan(360, 620).presentation)
     assertEquals(EXPANDED, FullArtwork.plan(360f, 620f, 1.3f)!!.presentation)
     // with a larger font LARGE still keeps the cover full width and clears the icon
-    for (h in 600..1400 step 2) if (FullArtwork.plan(360f, h.toFloat(), 1.3f)!!.presentation == LARGE) assertTrue("$h", FullArtwork.largeSpareDp(360f, h.toFloat(), 1.3f) > FullArtwork.LARGE_ICON_REACH_DP)
+    for (h in 600..1400 step 2) if (FullArtwork.plan(360f, h.toFloat(), 1.3f)!!.presentation == LARGE) assertTrue("$h", FullArtwork.largeSpareDp(360f, h.toFloat(), 1.3f) > FullArtwork.FLOATING_ICON_REACH_DP)
   }
 }

@@ -1,4 +1,4 @@
-<!-- Large expanded full (very tall sizes): the expanded layout with larger readout text and controls, a full-width readout and a floating brand icon; same ids and actions. -->
+<!-- Large expanded full (very tall sizes): media_player_widget_full_expanded.xml with larger readout text and controls; same structure, ids and actions. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:tools="http://schemas.android.com/tools"
   android:id="@+id/widgetBackground"
@@ -8,8 +8,8 @@
   android:theme="@style/AppTheme.AppWidgetContainer"
   style="@style/Widget.Android.AppWidget.Container">
 
-  <!-- Content plus a floating brand icon: the icon sits over the spare space above the cover (LARGE only starts where
-       that space is tall enough, see FullArtwork), so it takes no width or height from the content -->
+  <!-- Content plus the floating brand icon (it takes no width or height from the content; the renderer shows it
+       only where it clears the cover and the text, see FullArtwork) -->
   <FrameLayout
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -46,7 +46,7 @@
           android:src="@drawable/icon" />
       </LinearLayout>
 
-      <!-- Readout below the cover, across the full content width (the corner icon floats above, outside this flow) -->
+      <!-- Readout below the cover, across the full content width (the brand icon floats above, outside this flow) -->
       <LinearLayout
         android:id="@+id/widgetReadout"
         android:layout_width="match_parent"
@@ -82,7 +82,7 @@
           android:id="@+id/widgetTimeRow"
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
-          android:layout_marginTop="8dp"
+        android:layout_marginTop="8dp"
           android:orientation="horizontal">
 
           <TextView
@@ -167,8 +167,8 @@
       android:layout_width="16dp"
       android:layout_height="16dp"
       android:layout_gravity="top|end"
-      android:layout_marginTop="@dimen/widget_large_icon_inset"
-      android:layout_marginEnd="@dimen/widget_large_icon_inset"
+      android:layout_marginTop="@dimen/widget_floating_icon_inset"
+      android:layout_marginEnd="@dimen/widget_floating_icon_inset"
       android:adjustViewBounds="true"
       android:contentDescription="@null"
       android:src="@drawable/icon_monochrome" />
