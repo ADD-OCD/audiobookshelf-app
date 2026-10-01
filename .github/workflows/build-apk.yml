@@ -26,9 +26,14 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 21
+          cache: 'gradle'
 
       - name: install dependencies
         run: npm ci --omit=optional
+
+      # Glob form on purpose: `node --test tests/` fails on Node 22+
+      - name: run JS tests
+        run: node --test tests/*.test.mjs
 
       - name: build Nuxt project
         run: npm run generate
@@ -38,6 +43,19 @@ jobs:
 
       - name: build Android app
         run: ./android/gradlew assembleDebug -p android --no-daemon
+
+      - name: run Kotlin unit tests (JVM + Robolectric)
+        run: ./android/gradlew testDebugUnitTest -p android --no-daemon
+
+      - name: upload unit test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/test-results/
+          if-no-files-found: ignore
 
       - name: rename apk
         working-directory: android/app/build/outputs/apk/debug/
