@@ -89,6 +89,10 @@ const SELECTED_KEY = Object.freeze({
   'box-shadow': `inset 0 0 0 1px rgb(var(--color-accent) / 0.9), ${PRESSED_BEVEL}, inset 0 2px 5px rgb(0 0 0 / 0.45)`
 })
 
+// Current playback entry in a list (Up Next, bookmarks): a 2px amber edge along the left inside the row, the
+// same played-progress amber and width as Chapters' current-chapter marker, without adding an element
+const CURRENT_MARKER = 'inset 2px 0 0 rgb(var(--color-track-cursor))'
+
 const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
 
 const EQUIPMENT_RULES = [
@@ -124,6 +128,32 @@ const EQUIPMENT_RULES = [
   ['.modal .chapters-panel li.bg-primary', { 'background-color': 'rgb(var(--color-bg))' }],
   // Current-chapter marker: the same played-progress amber as the seek bar (same element, size and position)
   ['.modal .chapters-panel li > .bg-yellow-400', { 'background-color': 'rgb(var(--color-track-cursor))' }],
+
+  // --- Player-adjacent overlays (Gate C): Up Next, playback speed, sleep timer, bookmarks ---
+  // Hierarchy: raised chassis panel (the existing dialog rule) > recessed list well > engraved row seams >
+  // current/selected state. Rows stay flat display entries, never a stack of keys.
+  // Up Next: the Now Playing block is the lit current entry, matching Chapters' current row (lit + amber
+  // left marker), pressed in so it reads by shape as well as color; its divider becomes an engraved seam
+  ['.modal .queue-panel .queue-current', { 'background-color': 'rgb(var(--color-bg))', 'border-color': 'rgb(var(--color-edge-dark))', 'box-shadow': `${CURRENT_MARKER}, ${PRESSED_BEVEL}, inset 0 -1px 0 rgb(var(--color-edge-light) / 0.12)` }],
+  ['.modal .queue-panel .queue-row:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  // Speed and sleep option lists: a recessed well inside the chassis panel, seamed rows, and the selected
+  // speed as a selected equipment key (pressed in, accent ring) on a lit row instead of a flat wash
+  ['.modal .playback-option-panel ul[role=listbox]', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+  ['.modal .playback-option-panel li[role=option]:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  ['.modal .playback-option-panel li[role=option].option-selected', { 'background-color': 'rgb(var(--color-bg))', ...SELECTED_KEY }],
+  // Speed stepper strip: a raised chassis strip under the well; its steppers are equipment keys
+  ['.modal .playback-option-panel .option-panel-footer', { 'background-image': CHASSIS_SHEEN, 'border-color': 'rgb(var(--color-edge-dark))', 'box-shadow': RAISED_BEVEL }],
+  ['.modal .playback-option-panel .icon-num-btn:not(:disabled)', KEY_CAP],
+  ['.modal .playback-option-panel .icon-num-btn:not(:disabled):active', KEY_CAP_PRESSED],
+  // Live readouts in these overlays: the current speed and the running sleep countdown
+  ['.modal .speed-readout', { color: 'rgb(var(--color-accent))' }],
+  ['.modal .sleep-readout', { color: 'rgb(var(--color-accent))' }],
+  // Bookmarks: recessed list with seamed rows; the bookmark at the current position is a lit, pressed entry
+  // with the amber position marker, and its icon is amber (current position), not success green
+  ['.modal .bookmarks-list', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
+  ['.modal .bookmark-row:not(:last-child)', { 'box-shadow': ENGRAVED_SEPARATOR }],
+  ['.modal .bookmark-row.bookmark-current', { 'background-color': 'rgb(var(--color-bg))', 'box-shadow': `${CURRENT_MARKER}, ${PRESSED_BEVEL}` }],
+  ['.modal .bookmark-current .bookmark-icon', { color: 'rgb(var(--color-track-cursor))' }],
 
   // Side drawer: chassis edge facing the page
   ['.layout-wrapper .w-64.bg-bg', { 'background-image': CHASSIS_SHEEN, 'box-shadow': 'inset 1px 0 0 rgb(var(--color-edge-light) / 0.45), -2px 0 8px rgb(0 0 0 / 0.5)' }],

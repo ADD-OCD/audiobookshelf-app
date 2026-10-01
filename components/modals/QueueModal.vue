@@ -7,7 +7,7 @@
     </template>
     <div class="w-full h-full overflow-hidden absolute top-0 left-0 flex items-center justify-center" @click="show = false">
       <div class="queue-panel w-full rounded-lg bg-primary border border-border overflow-y-auto overflow-x-hidden relative mt-16" style="max-height: 80vh" @click.stop.prevent>
-        <div v-if="nowPlayingDisplay" class="px-3 py-3 border-b border-fg/10">
+        <div v-if="nowPlayingDisplay" class="queue-current px-3 py-3 border-b border-fg/10">
           <p class="text-fg-muted text-xs uppercase tracking-wide mb-2">Now Playing</p>
           <div class="flex items-center">
             <covers-book-cover :library-item="nowPlayingDisplay.libraryItemForCover" :width="40" />
@@ -23,7 +23,7 @@
           <p class="text-lg text-fg-muted">Nothing queued up next</p>
         </div>
         <draggable v-else v-model="upcomingLocal" tag="ul" handle=".drag-handle" @end="onDragEnd">
-          <li v-for="item in upcomingLocal" :key="itemKey(item)" class="flex items-center px-3 py-2 select-none">
+          <li v-for="item in upcomingLocal" :key="itemKey(item)" class="queue-row flex items-center px-3 py-2 select-none">
             <span class="material-symbols drag-handle text-fg-muted cursor-grab text-xl mr-1">drag_indicator</span>
             <covers-book-cover :library-item="itemDisplay(item).libraryItemForCover" :width="40" />
             <div class="flex-grow px-3 overflow-hidden">

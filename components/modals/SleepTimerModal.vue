@@ -7,7 +7,7 @@
     </template>
 
     <div class="w-full h-full overflow-hidden absolute top-0 left-0 flex items-center justify-center" @click="show = false">
-      <div class="w-full overflow-x-hidden overflow-y-auto bg-primary rounded-lg border border-border" style="max-height: 75%" @click.stop>
+      <div class="playback-option-panel w-full overflow-x-hidden overflow-y-auto bg-primary rounded-lg border border-border" style="max-height: 75%" @click.stop>
         <div v-if="manualTimerModal" class="p-4">
           <div class="flex mb-4" @click="manualTimerModal = false">
             <span class="material-symbols text-3xl">arrow_back</span>
@@ -41,7 +41,7 @@
         <div v-else class="p-4">
           <div class="flex my-2 justify-between">
             <ui-btn @click="decreaseSleepTime" class="w-9 h-9" :padding-x="0" small style="max-width: 36px"><span class="material-symbols text-lg">remove</span></ui-btn>
-            <p class="text-2xl font-mono text-center">{{ timeRemainingPretty }}</p>
+            <p class="sleep-readout text-2xl font-mono text-center">{{ timeRemainingPretty }}</p>
             <ui-btn @click="increaseSleepTime" class="w-9 h-9" :padding-x="0" small style="max-width: 36px"><span class="material-symbols text-lg">add</span></ui-btn>
           </div>
 

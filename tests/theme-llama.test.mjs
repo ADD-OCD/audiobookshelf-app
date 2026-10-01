@@ -465,3 +465,105 @@ test('Gate B.1 the round play button uses the stronger primary steel; every othe
   assert.ok(contrast([255, 255, 255], brightest) >= 3, `glyph contrast ${contrast([255, 255, 255], brightest)}`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
+
+// --- Phase 2C Gate C: Up Next and player-adjacent overlays (paint only) ---
+
+const GATE_C_HOOKS = {
+  '../components/modals/QueueModal.vue': [/class="queue-panel /, /<div v-if="nowPlayingDisplay" class="queue-current /, /<li v-for="item in upcomingLocal" :key="itemKey\(item\)" class="queue-row /],
+  '../components/modals/PlaybackSpeedModal.vue': [/class="playback-option-panel /, /:class="rate === selected \? 'bg-bg-hover\/50 option-selected' : ''"/, /class="option-panel-footer /, /<p class="speed-readout text-xl">/],
+  '../components/modals/SleepTimerModal.vue': [/class="playback-option-panel /, /<p class="sleep-readout text-2xl font-mono text-center">\{\{ timeRemainingPretty \}\}<\/p>/],
+  '../components/modals/BookmarksModal.vue': [/<div class="bookmarks-list w-full h-full" v-else>/],
+  '../components/modals/bookmarks/BookmarkItem.vue': [/class="bookmark-row /, /:class="highlight \? 'bg-bg bg-opacity-60 bookmark-current' : ' bg-opacity-20'"/, /<i class="bookmark-icon material-symbols/]
+}
+
+test('Gate C semantic hooks are present in the player-adjacent overlay templates; behavior hooks are untouched', async () => {
+  for (const [file, patterns] of Object.entries(GATE_C_HOOKS)) {
+    const source = await read(file)
+    for (const pattern of patterns) assert.match(source, pattern, `${file}: ${pattern}`)
+  }
+  // Drag/reorder and removal wiring stay exactly as they were
+  const queue = await read('../components/modals/QueueModal.vue')
+  assert.match(queue, /<draggable v-else v-model="upcomingLocal" tag="ul" handle="\.drag-handle" @end="onDragEnd">/)
+  assert.match(queue, /<span class="material-symbols drag-handle text-fg-muted cursor-grab text-xl mr-1">drag_indicator<\/span>/)
+  assert.match(queue, /@click\.stop="\$emit\('remove', item\)"/)
+  // The overlays carrying these hooks are only used by the player container (scoped, not app-wide)
+  const container = await read('../components/app/AudioPlayerContainer.vue')
+  for (const tag of ['modals-queue-modal', 'modals-playback-speed-modal', 'modals-sleep-timer-modal', 'modals-bookmarks-modal']) assert.match(container, new RegExp(`<${tag} `), tag)
+})
+
+test('Gate C rules: paint only, built from the shared primitives, under the LLAMA root', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const rule = (s) => rules[`${root} ${s}`]
+  const gateC = Object.entries(rules).filter(([s]) => /queue-current|queue-row|playback-option-panel|speed-readout|\.modal \.sleep-readout|bookmark/.test(s))
+  assert.ok(gateC.length >= 14, `${gateC.length} rules`)
+  for (const [selector, declarations] of gateC) {
+    assert.ok(selector.startsWith(`${root} .modal `), selector)
+    for (const [property, value] of Object.entries(declarations)) {
+      assert.match(property, /^(background-color|background-image|box-shadow|border-radius|border-color|color)$/, `${selector}: ${property}`)
+      assert.match(value, SAFE_VALUE, `${selector}: ${value}`)
+    }
+  }
+  // Recessed list wells inside the chassis panels
+  for (const s of ['.modal .playback-option-panel ul[role=listbox]', '.modal .bookmarks-list']) assert.deepEqual(rule(s), { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': P.RECESSED_WELL }, s)
+  // Engraved seams between rows (never after the last row)
+  for (const s of ['.modal .queue-panel .queue-row:not(:last-child)', '.modal .playback-option-panel li[role=option]:not(:last-child)', '.modal .bookmark-row:not(:last-child)']) assert.deepEqual(rule(s), { 'box-shadow': P.ENGRAVED_SEPARATOR }, s)
+  // Selected speed: a selected equipment key (pressed + accent ring) on a lit row
+  assert.deepEqual(rule('.modal .playback-option-panel li[role=option].option-selected'), { 'background-color': 'rgb(var(--color-bg))', ...P.SELECTED_KEY })
+  // Speed steppers are equipment keys on a raised chassis strip
+  assert.deepEqual(rule('.modal .playback-option-panel .icon-num-btn:not(:disabled)'), { ...P.KEY_CAP })
+  assert.deepEqual(rule('.modal .playback-option-panel .icon-num-btn:not(:disabled):active'), { ...P.KEY_CAP_PRESSED })
+  assert.equal(rule('.modal .playback-option-panel .option-panel-footer')['background-image'], P.CHASSIS_SHEEN)
+  assert.equal(rule('.modal .playback-option-panel .option-panel-footer')['box-shadow'], P.RAISED_BEVEL)
+})
+
+test('Gate C current entries: lit, pressed in and marked with the played-progress amber like Chapters', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const marker = 'inset 2px 0 0 rgb(var(--color-track-cursor))'
+  for (const s of ['.modal .queue-panel .queue-current', '.modal .bookmark-row.bookmark-current']) {
+    const r = rules[`${root} ${s}`]
+    assert.equal(r['background-color'], 'rgb(var(--color-bg))', s) // the same lit surface as Chapters' current row
+    assert.ok(r['box-shadow'].startsWith(`${marker}, ${P.PRESSED_BEVEL}`), s) // amber marker + pressed: not color alone
+  }
+  // Chapters' marker is the same amber, 2px wide (w-0.5)
+  assert.deepEqual(rules[`${root} .modal .chapters-panel li > .bg-yellow-400`], { 'background-color': 'rgb(var(--color-track-cursor))' })
+  // The bookmark at the current position is amber (position), not success green; live readouts are accent green
+  assert.deepEqual(rules[`${root} .modal .bookmark-current .bookmark-icon`], { color: 'rgb(var(--color-track-cursor))' })
+  for (const s of ['.modal .speed-readout', '.modal .sleep-readout']) assert.deepEqual(rules[`${root} ${s}`], { color: 'rgb(var(--color-accent))' }, s)
+})
+
+test('Gate C cascade: state rules outrank the row seams they share an element with', () => {
+  const root = engine.themeSelector('llama')
+  const order = Object.keys(presets.presentationRules([llama()]))
+  // [ids, classes/attributes/pseudo-classes, elements] for the simple selectors used by the recipe
+  const specificity = (selector) => {
+    const s = selector.replace(/:not\(([^)]*)\)/g, ' $1')
+    return [(s.match(/#[\w-]+/g) || []).length, (s.match(/\.[\w-]+|\[[^\]]+\]|:(?!not)[\w-]+/g) || []).length, (s.match(/(^|[\s>+~])[a-z]+/g) || []).length]
+  }
+  const wins = (a, b) => {
+    const [x, y] = [specificity(a), specificity(b)]
+    for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]
+    return order.indexOf(a) > order.indexOf(b)
+  }
+  const pairs = [
+    ['.modal .playback-option-panel li[role=option].option-selected', '.modal .playback-option-panel li[role=option]:not(:last-child)'],
+    ['.modal .bookmark-row.bookmark-current', '.modal .bookmark-row:not(:last-child)']
+  ]
+  for (const [state, seam] of pairs) assert.ok(wins(`${root} ${state}`, `${root} ${seam}`), `${state} must win over ${seam}`)
+})
+
+test('Gate C rules compile through Tailwind; Dark, Black and Light still get no presentation rules', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const root = "html[data-theme='llama']"
+  for (const s of ['.modal .queue-panel .queue-current', '.modal .playback-option-panel li[role=option].option-selected', '.modal .playback-option-panel ul[role=listbox]', '.modal .bookmark-current .bookmark-icon', '.modal .speed-readout']) assert.ok(css.includes(`${root} ${s} {`), s)
+  for (const hook of ['queue-current', 'queue-row', 'playback-option-panel', 'option-selected', 'bookmark-row', 'bookmark-current', 'bookmarks-list', 'speed-readout']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})

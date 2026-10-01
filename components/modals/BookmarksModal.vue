@@ -22,7 +22,7 @@
             <ui-btn color="success" class="w-full" @click.stop="submitBookmark">{{ selectedBookmark ? 'Update' : 'Create' }}</ui-btn>
           </div>
         </div>
-        <div class="w-full h-full" v-else>
+        <div class="bookmarks-list w-full h-full" v-else>
           <template v-for="bookmark in bookmarks">
             <modals-bookmarks-bookmark-item :key="bookmark.id" :highlight="currentTime === bookmark.time" :bookmark="bookmark" :playback-rate="_playbackRate" @click="clickBookmark" @edit="editBookmark" @delete="deleteBookmark" />
           </template>

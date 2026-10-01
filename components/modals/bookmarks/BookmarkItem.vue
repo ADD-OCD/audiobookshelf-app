@@ -1,8 +1,8 @@
 <template>
-  <div :key="bookmark.time" :id="`bookmark-row-${bookmark.time}`" class="flex items-center px-1 py-4 justify-start relative" :class="highlight ? 'bg-bg bg-opacity-60' : ' bg-opacity-20'" @click="click">
+  <div :key="bookmark.time" :id="`bookmark-row-${bookmark.time}`" class="bookmark-row flex items-center px-1 py-4 justify-start relative" :class="highlight ? 'bg-bg bg-opacity-60 bookmark-current' : ' bg-opacity-20'" @click="click">
     <div class="flex-grow overflow-hidden px-2">
       <div class="flex items-center mb-0.5">
-        <i class="material-symbols text-lg pr-1 -mb-1" :class="{ 'text-success fill': highlight, 'text-fg-muted': !highlight }">bookmark</i>
+        <i class="bookmark-icon material-symbols text-lg pr-1 -mb-1" :class="{ 'text-success fill': highlight, 'text-fg-muted': !highlight }">bookmark</i>
         <p class="truncate text-sm">
           {{ bookmark.title }}
         </p>
