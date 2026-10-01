@@ -67,7 +67,8 @@
             android:id="@+id/widgetReadout"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="8dp"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
             android:background="@drawable/widget_llama_readout"
             android:gravity="center_vertical"
             android:orientation="vertical">
@@ -77,6 +78,7 @@
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
               android:ellipsize="end"
+              android:includeFontPadding="false"
               android:maxLines="2"
               android:textColor="@color/widget_llama_text"
               android:textSize="16sp"
@@ -87,8 +89,9 @@
               android:id="@+id/widgetArtistText"
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
-              android:layout_marginTop="2dp"
+              android:layout_marginTop="0dp"
               android:ellipsize="end"
+              android:includeFontPadding="false"
               android:maxLines="1"
               android:textColor="@color/widget_llama_text_muted"
               android:textSize="13sp"
@@ -98,7 +101,7 @@
               android:id="@+id/widgetTimeRow"
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
-              android:layout_marginTop="8dp"
+              android:layout_marginTop="4dp"
               android:orientation="horizontal">
 
               <TextView
@@ -107,8 +110,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="monospace"
+                android:includeFontPadding="false"
                 android:maxLines="1"
-                android:textColor="@color/widget_llama_text"
+                android:textColor="@color/widget_llama_accent"
                 android:textSize="13sp"
                 tools:text="0:00" />
 
@@ -119,8 +123,9 @@
                 android:layout_weight="1"
                 android:fontFamily="monospace"
                 android:gravity="end"
+                android:includeFontPadding="false"
                 android:maxLines="1"
-                android:textColor="@color/widget_llama_text_muted"
+                android:textColor="@color/widget_llama_accent"
                 android:textSize="13sp"
                 tools:text="-0:00" />
             </LinearLayout>
@@ -178,7 +183,7 @@
           android:layout_margin="4dp"
           android:padding="10dp"
           android:background="@drawable/widget_llama_button"
-          android:tint="@color/widget_llama_accent"
+          android:tint="@color/widget_llama_text"
           android:contentDescription="@string/widget_play_pause"
           android:src="@drawable/ic_media_play_dark" />
 

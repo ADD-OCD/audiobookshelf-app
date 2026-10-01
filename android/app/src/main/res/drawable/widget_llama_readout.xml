@@ -3,19 +3,19 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
   <item>
     <shape android:shape="rectangle">
-      <corners android:radius="6dp" />
+      <corners android:radius="4dp" />
       <solid android:color="@color/widget_llama_edge_light_25" />
     </shape>
   </item>
   <item android:bottom="1dp" android:right="1dp">
     <shape android:shape="rectangle">
-      <corners android:radius="6dp" />
+      <corners android:radius="4dp" />
       <solid android:color="@color/widget_llama_edge_dark" />
     </shape>
   </item>
   <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
     <shape android:shape="rectangle">
-      <corners android:radius="6dp" />
+      <corners android:radius="4dp" />
       <solid android:color="@color/widget_llama_recessed" />
     </shape>
   </item>

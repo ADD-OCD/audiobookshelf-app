@@ -97,7 +97,7 @@
             android:layout_weight="1"
             android:fontFamily="monospace"
             android:maxLines="1"
-            android:textColor="@color/widget_llama_text"
+            android:textColor="@color/widget_llama_accent"
             android:textSize="18sp"
             tools:text="0:00" />
 
@@ -109,7 +109,7 @@
             android:fontFamily="monospace"
             android:gravity="end"
             android:maxLines="1"
-            android:textColor="@color/widget_llama_text_muted"
+            android:textColor="@color/widget_llama_accent"
             android:textSize="18sp"
             tools:text="-0:00" />
         </LinearLayout>
@@ -152,7 +152,7 @@
           android:layout_margin="4dp"
           android:padding="16dp"
           android:background="@drawable/widget_llama_button"
-          android:tint="@color/widget_llama_accent"
+          android:tint="@color/widget_llama_text"
           android:contentDescription="@string/widget_play_pause"
           android:src="@drawable/ic_media_play_dark" />
 

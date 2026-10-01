@@ -135,7 +135,11 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
     assert.ok(attrs(xml, 'widgetMediaTitle').includes('android:maxLines="2"'), 'title wraps to at most two lines')
     assert.ok(attrs(xml, 'widgetArtistText').includes('android:maxLines="1"') && attrs(xml, 'widgetArtistText').includes('android:ellipsize="end"'), 'author: one line, ellipsized')
     assert.equal(dp(xml, 'widgetArtistText', 'textSize'), k(isLarge ? 'LARGE_TIME_TEXT_SP' : 'TIME_TEXT_SP'))
-    assert.equal(dp(xml, 'widgetArtistText', 'layout_marginTop') + dp(xml, 'widgetTimeRow', 'layout_marginTop'), k('READOUT_LINE_GAPS_DP'))
+    // The constants are a reserve: a layout may use less than they model, never more. Only LLAMA NORMAL uses less
+    // (Phase 2C Gate F: tighter vertical spacing so a two-line title, author and time fit its readout)
+    const gaps = dp(xml, 'widgetArtistText', 'layout_marginTop') + dp(xml, 'widgetTimeRow', 'layout_marginTop')
+    if (xml === llama) assert.ok(gaps <= k('READOUT_LINE_GAPS_DP'), `LLAMA NORMAL gaps ${gaps}dp within the reserve`)
+    else assert.equal(gaps, k('READOUT_LINE_GAPS_DP'))
     assert.equal(dp(xml, 'widgetButtonContainer', 'layout_marginTop') + dp(xml, 'widgetButtonContainer', 'layout_height'), k(isLarge ? 'LARGE_CONTROLS_DP' : 'CONTROLS_DP'))
     for (const id of ['widgetElapsedText', 'widgetRemainingText']) {
       assert.equal(dp(xml, id, 'textSize'), k(isLarge ? 'LARGE_TIME_TEXT_SP' : 'TIME_TEXT_SP'))
@@ -144,8 +148,15 @@ test('FullArtwork constants match the FULL layouts they reserve space for', asyn
   }
   // Width reserve uses the larger readout padding; height backstop the smaller progress bar (the layout limits height anyway)
   const all = [std, llama, ...expanded, ...large]
-  assert.equal(Math.max(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_DP'))
-  assert.equal(Math.min(...all.map((xml) => dp(xml, 'widgetReadout', 'padding'))), k('READOUT_PADDING_MIN_DP'))
+  const padding = (xml, axis) => {
+    const a = attrs(xml, 'widgetReadout')
+    const m = a.match(new RegExp(`android:padding${axis}="(\\d+)dp"`)) || a.match(/android:padding="(\d+)dp"/)
+    return Number(m[1])
+  }
+  assert.equal(Math.max(...all.map((xml) => padding(xml, 'Horizontal'))), k('READOUT_PADDING_DP'))
+  assert.equal(Math.min(...all.filter((xml) => xml !== llama).map((xml) => padding(xml, 'Vertical'))), k('READOUT_PADDING_MIN_DP'))
+  assert.equal(padding(llama, 'Horizontal'), k('READOUT_PADDING_DP'), 'LLAMA NORMAL keeps the width reserve exactly')
+  assert.ok(padding(llama, 'Vertical') <= k('READOUT_PADDING_DP'), 'LLAMA NORMAL vertical padding within the height reserve')
   const progress = (xml) => dp(xml, 'widgetProgress', 'layout_marginTop') + dp(xml, 'widgetProgress', 'layout_height')
   assert.equal(Math.min(...all.map(progress)), k('PROGRESS_DP'))
 })
@@ -342,4 +353,84 @@ test('the native allow-list names only real built-in theme ids that have a gener
     assert.ok(palettes.includes(id), `${id} has a generated palette`)
   }
   assert.match(allowList, /else -> STANDARD/)
+})
+
+// --- Phase 2C Gate F: LLAMA widget presentation (text containment, readout and control paint) ---
+
+const { createHash } = require('node:crypto')
+const sha256 = async (path) =>
+  createHash('sha256')
+    .update((await read(path)).replace(/\r\n/g, '\n'))
+    .digest('hex')
+const RES = '../android/app/src/main/res/'
+const WIDGET_SRC = '../android/app/src/main/java/app/absplus/android/'
+
+test('Gate F freeze: standard widget layouts, sizing, artwork planning, provider and renderer are unchanged', async () => {
+  // Gate F is LLAMA-only. These hashes pin the files it was not authorized to change (line endings normalized);
+  // a deliberate future change updates them together with the reason.
+  const frozen = {
+    'layout/media_player_widget.xml': '5b54df0e36b38c40c26ab34b9d52c6b772f9c4b82c27bbf6fb0d401e8b9dd399',
+    'layout/media_player_widget_wide.xml': '45bb68e7bd899fa4d5b36c2dde590180d111fe004c7f2d7d7b389ad2eced62cf',
+    'layout/media_player_widget_full.xml': '34c8f9fc8756cd2bef2b743f8d665fd8ef462f8863a741ed0264163b3f36030b',
+    'layout/media_player_widget_full_expanded.xml': 'f33a537436ee09a53142d616db19272ed3f245fad59ff98cd0564a220ede9b9c',
+    'layout/media_player_widget_full_expanded_large.xml': 'c84e33a140c6413bb4bbb397458296f80bacb2fdb85bac00c4e80f57a7e5b549',
+    'drawable/widget_button_bg.xml': '81b7dc37b6f89994fbf022dcc2f59d18aab9af84dac6197b9053d081e9458d55',
+    'drawable/widget_progress_default.xml': '290753fd4695f61acfea9c5c4906413cfd108bebb8e54a992e448f2ab53ea9ba',
+    'drawable-v21/app_widget_background.xml': '8f7ccb90ee0370347bcbdfe0bc174fad9bbf08a57b168edea6096b8f18c6fd72',
+    'drawable-v21/app_widget_inner_view_background.xml': 'fc3ea836e38b56903f98aad2e2561dd541654c6d3d360a97c35f35708819c448',
+    'xml/media_player_widget_info.xml': '944832659a039ad724946788ac38c06daf5b2b1c0a1b4f9ef11de8deb614b650'
+  }
+  for (const [file, hash] of Object.entries(frozen)) assert.equal(await sha256(RES + file), hash, `${file} changed`)
+  const code = {
+    'widget/FullArtwork.kt': '676422c235694a9e2f893a8fe95788950ed66ddab3e59e2a53aab8097e3c7d55',
+    'widget/WidgetSize.kt': '8ebc256cdc9c8aa65fb407070f3700c1fce9667c0416b3b6fff27a75827d946f',
+    'widget/WidgetRenderer.kt': '1e4ea33a6c8e2e5dfe4e93e58769f8c2f99667c6fee1f13c86833ababd8a9215',
+    'MediaPlayerWidget.kt': '95e635491a752cb9fa734a052fdca99784cd183a9d20da503c845f3974917341'
+  }
+  for (const [file, hash] of Object.entries(code)) assert.equal(await sha256(WIDGET_SRC + file), hash, `${file} changed`)
+})
+
+test('Gate F LLAMA text containment: smaller COMPACT text, no font padding, tighter FULL NORMAL readout spacing', async () => {
+  const compact = await read(LAYOUTS + 'media_player_widget_llama.xml')
+  assert.match(attrs(compact, 'widgetMediaTitle'), /android:includeFontPadding="false"[\s\S]*android:textSize="13sp"/)
+  assert.match(attrs(compact, 'widgetArtistText'), /android:includeFontPadding="false"[\s\S]*android:textSize="12sp"/)
+  const wide = await read(LAYOUTS + 'media_player_widget_wide_llama.xml')
+  for (const id of ['widgetMediaTitle', 'widgetArtistText']) assert.match(attrs(wide, id), /android:includeFontPadding="false"/, `WIDE ${id}`)
+  const normal = await read(LAYOUTS + 'media_player_widget_full_llama.xml')
+  assert.match(attrs(normal, 'widgetReadout'), /android:paddingHorizontal="8dp"\s+android:paddingVertical="4dp"/)
+  assert.match(attrs(normal, 'widgetArtistText'), /android:layout_marginTop="0dp"/)
+  assert.match(attrs(normal, 'widgetTimeRow'), /android:layout_marginTop="4dp"/)
+  for (const id of ['widgetMediaTitle', 'widgetArtistText', 'widgetElapsedText', 'widgetRemainingText']) assert.match(attrs(normal, id), /android:includeFontPadding="false"/, `NORMAL ${id}`)
+  // Text sizes and line limits are the shared ones (readable, never shrunk to force a fit)
+  assert.match(attrs(normal, 'widgetMediaTitle'), /android:maxLines="2"[\s\S]*android:textSize="16sp"/)
+  // EXPANDED and LARGE never clipped, so their spacing is untouched
+  for (const file of ['media_player_widget_full_expanded_llama.xml', 'media_player_widget_full_expanded_large_llama.xml']) {
+    const xml = await read(LAYOUTS + file)
+    assert.doesNotMatch(xml, /includeFontPadding/, file)
+    assert.match(attrs(xml, 'widgetReadout'), /android:padding="8dp"/, file)
+  }
+})
+
+test('Gate F LLAMA readout and controls: accent time readouts, neutral play glyph, 4dp keys and readout', async () => {
+  const llamaLayouts = VARIANTS.map(([, llama]) => llama)
+  for (const file of llamaLayouts) {
+    const xml = await read(LAYOUTS + file)
+    // The play glyph is neutral like the jump glyphs (shape shows play/pause); the accent is reserved for readouts
+    assert.match(attrs(xml, 'widgetPlayPauseButton'), /android:tint="@color\/widget_llama_text"/, file)
+    for (const id of ['widgetRewindButton', 'widgetFastForwardButton']) assert.match(attrs(xml, id), /android:tint="@color\/widget_llama_text"/, `${file} ${id}`)
+    if (xml.includes('android:id="@+id/widgetElapsedText"')) {
+      for (const id of ['widgetElapsedText', 'widgetRemainingText']) assert.match(attrs(xml, id), /android:textColor="@color\/widget_llama_accent"/, `${file} ${id}`)
+    }
+    // Titles stay neutral and authors muted
+    assert.match(attrs(xml, 'widgetMediaTitle'), /android:textColor="@color\/widget_llama_text"/, file)
+    assert.match(attrs(xml, 'widgetArtistText'), /android:textColor="@color\/widget_llama_text_muted"/, file)
+  }
+  const button = await read(RES + 'drawable/widget_llama_button.xml')
+  assert.equal((button.match(/<corners android:radius="4dp" \/>/g) || []).length, 6)
+  assert.doesNotMatch(button, /radius="(?!4dp)/)
+  const readout = await read(RES + 'drawable/widget_llama_readout.xml')
+  assert.equal((readout.match(/<corners android:radius="4dp" \/>/g) || []).length, 3)
+  // The chassis still follows the launcher's widget radius; the artwork frame stays square
+  assert.match(await read(RES + 'drawable/widget_llama_chassis.xml'), /\?attr\/appWidgetRadius/)
+  assert.doesNotMatch(await read(RES + 'drawable/widget_llama_artwork_frame.xml'), /corners/)
 })

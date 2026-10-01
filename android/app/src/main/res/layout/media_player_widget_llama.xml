@@ -54,8 +54,10 @@
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
           android:ellipsize="end"
+          android:includeFontPadding="false"
           android:maxLines="1"
           android:textColor="@color/widget_llama_text_muted"
+          android:textSize="12sp"
           tools:text="Artist" />
 
         <TextView
@@ -63,8 +65,10 @@
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
           android:ellipsize="end"
+          android:includeFontPadding="false"
           android:maxLines="1"
           android:textColor="@color/widget_llama_text"
+          android:textSize="13sp"
           tools:text="Title" />
       </LinearLayout>
 
@@ -101,7 +105,7 @@
             android:layout_margin="3dp"
             android:padding="7dp"
             android:background="@drawable/widget_llama_button"
-            android:tint="@color/widget_llama_accent"
+            android:tint="@color/widget_llama_text"
             android:contentDescription="@string/widget_play_pause"
             android:src="@drawable/ic_media_play_dark" />
 
