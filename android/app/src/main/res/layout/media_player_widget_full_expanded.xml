@@ -17,12 +17,13 @@
     android:orientation="vertical"
     android:padding="8dp">
 
-    <!-- Flexible area: the cover, centered; it grows into this space within the bounds the renderer sets (FullArtwork) -->
+    <!-- Flexible area: the cover grows into this space within the bounds the renderer sets (FullArtwork); once it
+         stops growing, it sits on its readout and any spare height goes above it -->
     <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="0dp"
       android:layout_weight="1"
-      android:gravity="center"
+      android:gravity="bottom|center_horizontal"
       android:orientation="vertical">
 
       <!-- Expanded artwork: as large as the space allows, at the cover's own aspect (no crop) -->

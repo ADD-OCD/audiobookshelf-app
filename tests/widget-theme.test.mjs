@@ -151,9 +151,10 @@ test('EXPANDED FULL stacks cover, readout, progress and controls without overlap
     // One vertical column inside widgetContent, in this order: cover area, readout row, progress, controls
     assert.ok(attrs(xml, 'widgetContent').includes('android:orientation="vertical"'), file)
     assert.ok(at('widgetAlbumArt') < at('widgetReadout') && at('widgetReadout') < at('widgetProgress') && at('widgetProgress') < at('widgetButtonContainer'), `${file}: order`)
-    // The cover alone fills the flexible area (weight 1, centered); readout, progress and controls keep their own height
+    // The cover alone fills the flexible area (weight 1); once it stops growing it sits on the readout and spare height
+    // goes above it (S26 polish), so cover, readout, progress and controls stay one block at the bottom
     const area = xml.slice(xml.lastIndexOf('<LinearLayout', at('widgetAlbumArt')), at('widgetAlbumArt'))
-    for (const a of ['android:layout_height="0dp"', 'android:layout_weight="1"', 'android:gravity="center"']) assert.ok(area.includes(a), `${file}: cover area ${a}`)
+    for (const a of ['android:layout_height="0dp"', 'android:layout_weight="1"', 'android:gravity="bottom|center_horizontal"']) assert.ok(area.includes(a), `${file}: cover area ${a}`)
     assert.ok(attrs(xml, 'widgetAlbumArt').includes('android:layout_gravity="center_horizontal"'), `${file}: cover centered`)
     assert.ok(attrs(xml, 'widgetReadout').includes('android:layout_height="wrap_content"'), `${file}: readout keeps its height`)
     assert.equal(xml.slice(at('widgetAlbumArt'), at('widgetReadout')).match(/<\/LinearLayout>/g).length, 1, `${file}: the readout is outside the cover area`)
