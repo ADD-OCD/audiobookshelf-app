@@ -1122,6 +1122,18 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     return currentPlaybackSession?.totalDurationMs ?: 0L
   }
 
+  /**
+   * Keeps the widget's last-known position current: this session's currentTime (read once the player
+   * is gone in this process) and the persisted last session (read after a process restart). Called
+   * with the position the progress syncer samples (sync ticks, pause, stop). Display only.
+   */
+  fun rememberPlaybackPosition(sessionId: String?, currentTime: Double) {
+    val session = currentPlaybackSession ?: return
+    if (sessionId == null || session.id != sessionId) return
+    session.currentTime = currentTime
+    DeviceManager.updateLastPlaybackPosition(sessionId, currentTime)
+  }
+
   fun getCurrentPlaybackSessionCopy(): PlaybackSession? {
     return currentPlaybackSession?.clone()
   }

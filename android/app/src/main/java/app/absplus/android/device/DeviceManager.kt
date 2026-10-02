@@ -183,6 +183,19 @@ object DeviceManager {
   }
 
   /**
+   * Saves the latest known position of the last playback session, which the widget shows once no
+   * player is live. Display only: restoration takes its position from server/local progress.
+   * @return false (nothing saved) when the last session is a different one
+   */
+  fun updateLastPlaybackPosition(sessionId: String, currentTime: Double): Boolean {
+    val last = deviceData.lastPlaybackSession ?: return false
+    if (last.id != sessionId) return false
+    last.currentTime = currentTime
+    dbManager.saveDeviceData(deviceData)
+    return true
+  }
+
+  /**
    * Initializes the widget updater.
    * @param context The context to use for initializing the widget updater.
    */

@@ -256,6 +256,9 @@ class MediaProgressSyncer(
       return cb(null)
     }
 
+    // Same sampled position, kept as the widget's last-known display position
+    playerNotificationService.rememberPlaybackPosition(currentPlaybackSession?.id, currentTime)
+
     val hasNetworkConnection = DeviceManager.checkConnectivity(playerNotificationService)
 
     // Save playback session to db (server linked sessions only)
