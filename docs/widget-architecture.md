@@ -15,7 +15,7 @@ One responsive widget on the existing provider (Gate 3, option A). Placed widget
 | `res/layout/media_player_widget{,_wide,_full,_full_expanded,_full_expanded_large}.xml`       | Standard layouts. COMPACT is the pre-existing layout (only view ids added). `_full_expanded` is FULL stacked (cover on top); `_full_expanded_large` is the same with larger readout text and controls. Same views throughout.  |
 | `res/layout/media_player_widget{,_wide,_full,_full_expanded,_full_expanded_large}_llama.xml` | LLAMA variants with exactly the same view ids and actions; paint only.                                                                                                                                                         |
 | `res/values/widget_theme_colors.xml`                                                         | **Generated** by `scripts/generate-widget-theme.js` from `theme/builtins.js` (equipment-finish themes only). Do not edit by hand.                                                                                              |
-| `res/drawable/widget_llama_*.xml`, `res/color/widget_llama_edge_light_*`                     | Original XML resources: chassis bevel, recessed readout, steel button (bevel inverts when pressed), artwork frame, amber progress. Bevel opacities match the app's bevels.                                                     |
+| `res/drawable/widget_llama_*.xml`, `res/color/widget_llama_edge_light_*`                     | Original XML resources: chassis bevel, recessed readout, dark secondary key and lighter primary key (bevel inverts when pressed), artwork frame, amber progress. Bevel opacities match the app's bevels.                       |
 | `res/xml/media_player_widget_info.xml`                                                       | Only change: `resizeMode` gained `vertical` (now horizontal and vertical). Size, target cells, preview and the Samsung `sub_screen` metadata are unchanged.                                                                    |
 
 ## Rendering
@@ -140,6 +140,20 @@ On the emulator's Pixel launcher, all of these fit: one row (360×104dp, WIDE), 
   Known-limit sizes are documented, not asserted. A mutation run against the pre-Gate-F layouts fails the containment tests and passes the geometry ones.
 
 - It needs `testOptions.unitTests.includeAndroidResources = true` to inflate app layouts. That is a unit-test-only option: debug and release APKs built with and without it are identical entry for entry.
+
+## LLAMA control-finish parity (Phase 4D)
+
+Resource-level paint only, LLAMA only. The accepted Phase 4B player has dark secondary keys with amber playback legends and a lighter silver Play/Pause. The widget keeps the same hierarchy:
+
+- **Secondary keys (rewind, fast-forward):** `widget_llama_button` is now a dark key. Its face is deeper than the chassis (`surface.recessed` at 85% over `surface.base`, the collapsed player's depth), with a soft sheen (lit top, shaded bottom), the same lit top/left and dark bottom/right edges as before, and a cut-in face while pressed (the bevel inverts and the shade falls from the top). The legend tint is `widget_llama_played`, the playback amber.
+- **Primary key (Play/Pause):** `widget_llama_button_primary` is the earlier lighter steel key, byte-for-byte except its comment, and its glyph stays near-white. It is still the lightest key, as the silver Play/Pause is in the app. The renderer is unchanged: it still only swaps the play/pause glyph resource, so no key paint is set from Kotlin.
+- **Generated colors:** the face, lit top, shaded bottom and pressed shade are `widget_llama_key_face`, `_key_lit`, `_key_shade` and `_key_pressed_shade`. They come from `scripts/generate-widget-theme.js` (`keyColors`) with fixed blend factors, so they trace to the theme tokens like every other widget color, and the stale-file test covers them.
+- **Geometry:** both key drawables have identical items, offsets and 4dp corners, and the layouts changed only the `android:background` of Play/Pause and the `android:tint` of rewind and fast-forward (three attribute lines per layout). Across 19 Robolectric cases (COMPACT, WIDE, FULL, EXPANDED, LARGE, font scale 1.3, Standard) every bound and text-fit field is identical before and after, every LLAMA pixel change lies inside the three key boxes, and the Standard renders are pixel-identical.
+- **Unavailable state:** the widget has none. The three keys are always enabled, and the renderer hides the controls as a whole when there is nothing to control, so there is no disabled paint to maintain.
+
+Measured contrast (generated colors, confirmed on rendered pixels): amber on the resting key 9.8–11.5:1, on the pressed key 11.1–11.8:1; the near-white Play/Pause glyph 6.4:1 on its key (9.7:1 pressed); the secondary key face against the chassis 1.04:1 at the lit top and 1.19:1 at the face; the primary face against the secondary face 2.4:1. `tests/widget-theme.test.mjs` keeps the contract: generated colors, the legend split, the drawable structure, frozen key geometry attributes, and untouched Standard resources.
+
+A held touch on a launcher widget starts the launcher's own long-press (drag) mode, so the pressed state is verified from the Robolectric pressed renders, not the emulator launcher.
 
 ## Galaxy S26 Ultra findings (One UI, first real-device pass)
 
