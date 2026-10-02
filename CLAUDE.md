@@ -8,6 +8,8 @@ Audiobookshelf mobile app built with **NuxtJS 2** (SSR disabled, static target) 
 
 This repo (`plus` branch) is an unofficial fork that is **Android-only** — the iOS project is not maintained here. Don't spend effort on iOS builds, native iOS code, or iOS-specific testing unless explicitly asked.
 
+Branding: production-facing Audiobookshelf+ material (app UI, widgets and their empty states, screenshots, mockups and documentation imagery of the finished UI) must never contain Audible branding — no Audible logo, name or prompts. Empty states say Audiobookshelf+. An Audible screenshot may exist only as an explicitly labeled INTERNAL DESIGN REFERENCE. See `docs/app-identity.md`.
+
 ## Development Commands
 
 ```bash

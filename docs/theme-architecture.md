@@ -26,20 +26,20 @@ Theme identity (`id`, `labelKey`, `colorScheme`), the semantic tokens, how they 
 
 ## Token model
 
-There are 28 tokens in 10 groups (25 from Phase 1 plus `surface.recessed` and the two `presentation.*` policies from Phase 2; see [Presentation policies](#presentation-policies-phase-2)). Each token names a _purpose_. Its `cssVar` is the CSS custom property the existing Tailwind classes and component styles already use, so no component had to change.
+There are 29 tokens in 10 groups (25 from Phase 1, plus `surface.recessed` and the two `presentation.*` policies from Phase 2 — see [Presentation policies](#presentation-policies-phase-2) — and `state.success-action` from Phase 2C Gate H). Each token names a _purpose_. Its `cssVar` is the CSS custom property the existing Tailwind classes and component styles already use, so no component had to change.
 
-| Group        | Tokens                                                  | CSS variable                                                                                  |
-| ------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| surface      | `base`, `content`, `raised`, `hover`, `recessed`        | `--color-primary`, `--color-bg`, `--color-secondary`, `--color-bg-hover`, `--color-recessed`  |
-| text         | `default`, `primary`, `muted`                           | `--color-text-default` (the root `color`), `--color-fg`, `--color-fg-muted`                   |
-| border       | `default`                                               | `--color-border`                                                                              |
-| control      | `toggle`, `toggle-selected`                             | `--color-bg-toggle`, `--color-bg-toggle-selected`                                             |
-| progress     | `track`, `buffered`, `played`                           | `--color-track`, `--color-track-buffered`, `--color-track-cursor`                             |
-| overlay      | `item-header`, `player`, `mini-player`                  | `--gradient-item-page`, `--gradient-audio-player`, `--gradient-minimized-audio-player`        |
-| accent       | `primary`                                               | `--color-accent`                                                                              |
-| state        | `success`, `success-strong`, `warning`, `error`, `info` | `--color-success`, `--color-success-dark`, `--color-warning`, `--color-error`, `--color-info` |
-| system       | `bar-icons`, `status-bar`, `navigation-bar`             | (applied by the service or natively, not CSS)                                                 |
-| presentation | `finish`, `cover-color`                                 | (validated policies; never CSS)                                                               |
+| Group        | Tokens                                                                    | CSS variable                                                                                                            |
+| ------------ | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| surface      | `base`, `content`, `raised`, `hover`, `recessed`                          | `--color-primary`, `--color-bg`, `--color-secondary`, `--color-bg-hover`, `--color-recessed`                            |
+| text         | `default`, `primary`, `muted`                                             | `--color-text-default` (the root `color`), `--color-fg`, `--color-fg-muted`                                             |
+| border       | `default`                                                                 | `--color-border`                                                                                                        |
+| control      | `toggle`, `toggle-selected`                                               | `--color-bg-toggle`, `--color-bg-toggle-selected`                                                                       |
+| progress     | `track`, `buffered`, `played`                                             | `--color-track`, `--color-track-buffered`, `--color-track-cursor`                                                       |
+| overlay      | `item-header`, `player`, `mini-player`                                    | `--gradient-item-page`, `--gradient-audio-player`, `--gradient-minimized-audio-player`                                  |
+| accent       | `primary`                                                                 | `--color-accent`                                                                                                        |
+| state        | `success`, `success-strong`, `success-action`, `warning`, `error`, `info` | `--color-success`, `--color-success-dark`, `--color-success-action`, `--color-warning`, `--color-error`, `--color-info` |
+| system       | `bar-icons`, `status-bar`, `navigation-bar`                               | (applied by the service or natively, not CSS)                                                                           |
+| presentation | `finish`, `cover-color`                                                   | (validated policies; never CSS)                                                                                         |
 
 The legacy variable names (`--color-bg` means _content_ surface, `--color-primary` means _base_ surface) are kept so that upstream components merge cleanly. The semantic names are the vocabulary for theme data and future work.
 
@@ -51,7 +51,7 @@ Value types:
 
 ## Built-in themes
 
-`dark` (the default and the fallback), `black` and `light` are plain objects in `theme/builtins.js`. Their values reproduce the pre-token CSS exactly. That includes the status colors, which were previously fixed hex values in `tailwind.config.js` and are now variables with the same values in every theme.
+`dark` (the default and the fallback), `black` and `light` are plain objects in `theme/builtins.js`. Their values reproduce the pre-token CSS exactly. That includes the status colors, which were previously fixed hex values in `tailwind.config.js` and are now variables with the same values in every theme. The one later addition, `state.success-action` (Gate H), has no pre-token value; it is shared by every theme too.
 
 The Tailwind plugin emits:
 
@@ -280,7 +280,7 @@ Sizes, behavior, validation, native inputs, ARIA roles, focus handling and dismi
   - `FullscreenModal`: the reader's sheet follows the independent reader theme;
   - unused `DropdownMenu` and `Menu`.
 
-Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2):
+Palette (accepted as the LLAMA palette through Phase 2C Gates A–H):
 
 | Token                                              | RGB                               | Role                                                                                                              |
 | -------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -296,6 +296,7 @@ Palette (approved provisionally at Gate 1; to be judged in combination at Gate 2
 | `progress.track` / `buffered` / `played`           | 40 46 56 / 86 98 116 / 245 190 40 | recessed channel, lighter buffered, yellow-amber played                                                           |
 | `accent.primary`                                   | 96 232 104                        | phosphor-green readout/accent                                                                                     |
 | `state.*`                                          | shared                            | success, warning, error and info keep their semantic values, so warning orange stays distinct from amber progress |
+| `state.success-action`                             | 46 125 50 (shared)                | fill of actionable success controls with white labels (Gate H)                                                    |
 | derived `--color-edge-light` / `--color-edge-dark` | 153 160 170 / 11 14 18            | bevel edges, fixed blends of `surface.raised` / `surface.base`                                                    |
 | `system.*`                                         | 35 35 35, light icons             | the actual native window background; runtime system-bar theming is out of scope                                   |
 
@@ -334,7 +335,7 @@ Phase 1 status:
 
 - `system.bar-icons`, `system.status-bar` and `system.navigation-bar` are recorded per theme with the current values (`light`, `#232323`, `#232323`). A test keeps them equal to `colors.xml`.
 - The `$theme` service applies the icon style from the token, which is the same light-icon style as before, so nothing changes on screen.
-- **Deferred (native work):** applying the bar colors at runtime needs a small native method. It would set the activity root/decor background, set `WindowInsetsControllerCompat` light/dark bar appearance, and persist the last colors natively so the next cold start doesn't flash. That would let Light use light bars with dark icons. It changes Light's appearance, so it belongs to a later phase, with S22 Ultra testing across Android versions. Layout and inset handling must not change when it is added.
+- **Deferred (native work):** applying the bar colors at runtime needs a small native method. It would set the activity root/decor background, set `WindowInsetsControllerCompat` light/dark bar appearance, and persist the last colors natively so the next cold start doesn't flash. That would let Light use light bars with dark icons. It changes Light's appearance, so it belongs to a later phase, with physical-device testing (the Galaxy S26 Ultra is the current test device) across Android versions. Layout and inset handling must not change when it is added.
 
 ## Typography findings
 
@@ -403,6 +404,42 @@ The experiment is not proof of zero geometry risk. Not covered: WebView font sca
 The home-screen widget is **not** affected. It renders with native RemoteViews typography (system sans-serif and `fontFamily="monospace"`) and never consumes the WebView `@font-face` rules. Gate G does not reopen Gate F.
 
 **Phase 2C typography policy:** for the rest of Phase 2C, the inherited WebView font-loading behavior is not repaired as part of LLAMA. LLAMA keeps the same effective typography as the other themes and does not get its own font family unless a later typography or customization phase authorizes it. This keeps the baseline under which Gates A–F were designed and accepted.
+
+## Accessibility and hardening (Phase 2C Gate H)
+
+Gate H was the final Phase 2C hardening gate: an audit, then bounded fixes. It did not redesign LLAMA and changed no geometry. The 22-role comparison stayed at 22 roles and 0 Dark-vs-LLAMA differences, identical to Gate F, with the 120px mini-player.
+
+Method: on the Pixel emulator (API 35, WebView 124), contrast was measured on the rendered WebView. The foreground is the computed color times its alpha and ancestor opacity. The background is sampled from a DevTools screenshot under each text or icon element, inside its border and bevel, so the steel sheen, overlays and translucency are included; the worst sample counts. Thresholds are WCAG 2.2 AA: 4.5:1 for text, 3:1 for large text and for icons and state indicators; disabled controls are exempt. 13 surfaces were measured in LLAMA and Dark, plus Black and Light for the success and button surfaces. Suspicious results were checked against crops and direct pixel samples.
+
+Fixes:
+
+- **Actionable success (all themes).** White on `state.success` (`#4CAF50`) is 2.78:1, below 4.5:1, in every theme. The new shared token `state.success-action` (`#2E7D32`) is the fill of success buttons (`ui/Btn` with `color="success"`: item Play/Stream, playlist and collection Play, bookmark and playlist Create/Update, and the other success actions) and of the Bookmarks "Create Bookmark" row, which also drops its 80% text opacity.
+
+  | Element                         | Before                  | After                       |
+  | ------------------------------- | ----------------------- | --------------------------- |
+  | Success button text, plain fill | 2.78:1                  | 5.13:1 (Dark, Black, Light) |
+  | Success button text, LLAMA      | 2.79–2.80:1 (sheen top) | 4.68–4.84:1 (sheen top)     |
+  | Item Play/Stream icon           | 2.78–2.79:1             | 4.81:1 (LLAMA), 5.13:1      |
+  | Bookmarks "Create Bookmark" row | 2.30:1 (text and icon)  | 5.13:1                      |
+  | Disabled success button         | 4.18:1                  | 7.16:1 (exempt either way)  |
+
+  `state.success` itself is unchanged, and so is everything else that uses it: finished progress bars, toggle-switch on, `text-success`, and (outside LLAMA, which uses the accent there) the filter and membership markers and the Dialog selection wash. `bg-success`, `text-success` and the toggle-on fill resolve to `rgb(76 175 80)` in every theme (verified at runtime).
+
+- **LLAMA destructive icon keys.** LLAMA's near-white glyph on the sheened error fill was 2.80:1, below the 3:1 non-text minimum. One paint rule makes the glyph on bordered `bg-error` icon keys pure white: 3.25:1. The error fill is unchanged.
+- **CI.** The Build APK workflow now runs the JS suite (`node --test tests/*.test.mjs`) after `npm ci` and the Kotlin JVM/Robolectric suite (`testDebugUnitTest`) after `assembleDebug`, and uploads the test reports when it fails. Before Gate H no workflow ran either suite.
+
+Audit results that needed no change:
+
+- LLAMA text passes on every audited surface, including muted text (the Checkpoint F margins), toggle segments (5.51:1 unselected), selected rows, readouts on recessed wells, steel keys (6.6–7.3:1 for the player key glyphs), dialogs and the theme picker.
+- Non-text: the focus outline (accent, 7.6–12.3:1), played vs track (7.98:1), checkbox edge and check, toggle-on fill vs content (4.32:1) and the accent markers pass. Buffered vs track (2.21:1) is supplementary, and input wells are identified by fill and bevel, not the 2.35:1 border alone; both are accepted Gate A–E designs.
+- Keyboard: every reached control shows the 2px accent `:focus-visible` outline.
+- Semantics are consistent: amber for playback position; the accent for readouts, active filters, membership, checked state, focus and selection; success for finished state and positive actions. `ToggleSwitch` on keeps the success color, as accepted at Checkpoint F; its state also reads from thumb position.
+- Font scale: Android's font scale reaches the WebView live (the root font size goes from 16px to 20.8px at 1.3). Nothing is lost at 1.3, but two shared geometry effects remain (see `docs/future-work.md`).
+- Widget: the generated LLAMA widget palette pairs pass (text 4.6–13:1, readouts on the recessed well 12.3:1).
+
+Validation at the end of Gate H: JS 127/127, Kotlin/Robolectric 109/109, `lintDebug` 0 errors and 143 warnings (the same warning set as Gate F), the widget palette check, generate and `assembleDebug`, and a CI run that executed and passed both test steps.
+
+Shared issues found and deferred (each in `docs/future-work.md`): Dialog keyboard support, font-scale 1.3 geometry, error-button text contrast, Dark muted-text and item-header contrast, and the success toast colors.
 
 ## Content-derived color (intentionally not tokens)
 

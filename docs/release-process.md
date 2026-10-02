@@ -84,7 +84,7 @@ Milestones on `plus` that weren't distributed builds, so they have no `versionCo
 - The five stale queue tests left over from the download-only design were repaired to match the intentional "stream past download gaps" behavior. Coverage was expanded.
 - Automated results: JS tests 28/28, Kotlin unit tests 42/42. Debug build, release Kotlin compile, `lintDebug` (0 errors / 122 warnings), `lintVitalRelease` and Android CI all passed.
 - Emulator regression validation passed on an AOSP API 35 emulator against a local test server. The results are in `docs/device-regression-checklist.md`.
-- **Physical-device validation is still pending.** It will be run on the Samsung Galaxy S22 Ultra test device using `docs/device-regression-checklist.md`.
+- **Physical-device validation was pending at the time of this entry.** It was planned for a Samsung Galaxy S22 Ultra; that is historical. The current physical test device is the Galaxy S26 Ultra (`docs/device-regression-checklist.md`).
 - The emulator found a **pre-existing** issue: with no player service running, `KEYCODE_MEDIA_PLAY` and `KEYCODE_HEADSETHOOK` don't restore the last session, while `KEYCODE_MEDIA_PLAY_PAUSE` (the widget) does. It is recorded in `docs/device-regression-checklist.md` (section 3, item 6). It must be verified on physical hardware before any change is made.
 
 ## Announcements

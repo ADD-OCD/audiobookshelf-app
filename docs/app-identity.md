@@ -69,3 +69,20 @@ When merging future upstream changes, watch for:
 - New hardcoded `com.audiobookshelf.app` string literals introduced upstream (new Cast/Auto/intent-action constants) — these need the same manual fix as the ones above; a plain search-and-replace of the package name is not sufficient (see the reasoning in this doc).
 - Upstream PRs that touch `AndroidManifest.xml`, `build.gradle`, or `capacitor.config.json` will likely conflict on the `applicationId`/`namespace`/`appId` lines — always keep the fork's `app.absplus.android` value, not upstream's.
 - Any new Kotlin files added upstream will need their `package`/`import` lines translated from `com.audiobookshelf.app*` to `app.absplus.android*` when brought into this fork's already-renamed directory tree.
+
+## Branding: no Audible material
+
+Production-facing Audiobookshelf+ material must not contain Audible branding. This is a project requirement, added in Phase 2C Gate H.
+
+It covers:
+
+- the app UI;
+- widgets, including widget empty states;
+- LLAMA screenshots;
+- mockups that represent finished Audiobookshelf+ UI;
+- documentation imagery that represents the finished or current Audiobookshelf+ UI;
+- presentation or comparison composites meant to show the finished Audiobookshelf+ implementation.
+
+Real Audiobookshelf+ empty states identify **Audiobookshelf+** (AUDIOBOOKSHELF+), never Audible. Do not use the Audible logo, the Audible name, prompts such as "Tap here for Audible", or any other Audible-specific branding.
+
+An external Audible screenshot may be kept only as a deliberately retained reference that is explicitly labeled **INTERNAL DESIGN REFERENCE**. It must never be presented so that it looks like part of the finished Audiobookshelf+ implementation.

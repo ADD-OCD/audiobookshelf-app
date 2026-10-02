@@ -145,7 +145,9 @@ On the emulator's Pixel launcher, all of these fit: one row (360×104dp, WIDE), 
 
 The CI-signed debug build installed alongside production. Player, item page, mini-player, Up Next and normal widget sizes were accepted. Two corrections followed (Phase 2C): the FULL widget's artwork at very tall resizes (above; first a fixed cap, then responsive bounds after the S26 retest preferred the large cover), and a LLAMA-only recessed treatment for the Chapters list. Extreme resizes are only approximated on the emulator; the S26 retest is the real check.
 
-## Galaxy S22 Ultra checklist (One UI; not yet verified)
+## One UI widget checklist (run on the Galaxy S26 Ultra)
+
+This checklist was first written for a Galaxy S22 Ultra, which is no longer the test device; run it on the S26 Ultra, the current device.
 
 1. Install the current `plus` build and place the widget at its default size. Install this branch's build over it: the widget must stay, keep its size and show the last book without opening the app.
 2. Resize through the One UI grid: 3×1 or narrowest allowed (COMPACT), 4×1 (WIDE), 4×2 (FULL). Check text isn't clipped at each size.
@@ -156,4 +158,4 @@ The CI-signed debug build installed alongside production. Player, item page, min
 7. FULL while playing: time and bar stay at the snapshot (expected), and update on pause/play.
 8. Lock-screen / keyguard behavior, if One UI offers the widget there.
 9. Battery: no new wakeups attributable to the widget over a listening session.
-10. Z Flip cover screen: not testable on an S22.
+10. Z Flip cover screen: not testable on the S26 Ultra.

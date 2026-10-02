@@ -1,6 +1,6 @@
 # Physical-device regression checklist
 
-For the permanent ADB-connected test device (Samsung Galaxy S22 Ultra, One UI). Run it against the release-package build of whatever is about to be distributed, installed in place over the previous build. Capture `adb logcat` and a Diagnostics export (level Debug) for every run.
+For the current physical test device, the Samsung Galaxy S26 Ultra (One UI). Earlier rounds named a Galaxy S22 Ultra; that is historical. Run it against the release-package build of whatever is about to be distributed, installed in place over the previous build. Capture `adb logcat` and a Diagnostics export (level Debug) for every run.
 
 Items marked **emulator-covered** already pass on an AOSP API 35 emulator (see the note below). They still need hardware confirmation, because Samsung's power management, media stack and Bluetooth behave differently. Record results in `docs/release-process.md` next to the build's versionCode.
 
