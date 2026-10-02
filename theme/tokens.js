@@ -45,7 +45,7 @@ const TOKENS = [
 
   // Accent and states
   { name: 'accent.primary', type: 'rgb', cssVar: '--color-accent', purpose: 'Accent highlights' },
-  { name: 'state.success', type: 'rgb', cssVar: '--color-success', purpose: 'Success, finished, primary positive actions' },
+  { name: 'state.success', type: 'rgb', cssVar: '--color-success', purpose: 'Success state: finished/completed items and positive status indicators (actionable success controls use state.success-action)' },
   { name: 'state.success-strong', type: 'rgb', cssVar: '--color-success-dark', purpose: 'Darker success variant' },
   { name: 'state.success-action', type: 'rgb', cssVar: '--color-success-action', purpose: 'Fill of actionable success controls that carry white text or icons (success buttons); indicators keep state.success' },
   { name: 'state.warning', type: 'rgb', cssVar: '--color-warning', purpose: 'Warnings' },

@@ -55,7 +55,7 @@ The FULL widget's progress and time are a snapshot from the last widget update (
 
 ## Widget session mismatch after restart
 
-After a process restart the widget shows `deviceData.lastPlaybackSession`, while widget Play resumes the session chosen by the restoration store. On the emulator these were different books. This is pre-existing (the baseline build shows the same session) and lives in playback/restoration, so it was not changed in Phase 2B.
+After a process restart the widget shows `deviceData.lastPlaybackSession`, while widget Play resumes the session chosen by the restoration store. On the emulator these were different books. This is pre-existing (the baseline build shows the same session) and lives in playback/restoration, so it was not changed in Phase 2B. The related S26 observations from the Phase 2C final acceptance are recorded separately below ("Widget controls after a book finishes or the player closes" and "Stale widget snapshot without controls").
 
 ## Widget responsive-layout text containment
 
@@ -88,12 +88,12 @@ Touch and pointer use are unaffected; TalkBack was not tested. Fixing this chang
 
 ## Font scale 1.3 geometry
 
-Found in Phase 2C Gate H. Android's font scale reaches the WebView (the root font size is 20.8px at 1.3), and icon glyph sizes follow it. Nothing becomes unusable, but two shared geometry effects appear in every theme (LLAMA's seams make them more visible):
+Found in Phase 2C Gate H and re-measured during the Phase 2C final acceptance. Android's font scale reaches the WebView (the root font size is 20.8px at 1.3), and icon glyph sizes follow it. Nothing becomes unusable. Dark and LLAMA have identical geometry, so this is shared, pre-existing geometry rather than a LLAMA regression (LLAMA's seams only make it more visible). On the tested emulator (412 CSS px viewport) at 1.3:
 
-- **Mini-player:** the controls group stays a fixed 128px wide while its icon keys grow, so the jump-forward key ends at about 416px in a 412px viewport (about 4px clipped; still tappable) and the play button shifts 9px. The 120px height is unchanged.
-- **Full player:** the jump keys and their "10s" labels grow and cross the seam below the control row.
+- **Mini-player:** the controls group stays a fixed 128px wide while its icon keys grow from 30 to 39px, so the jump-forward key frame extends about 4.2 CSS px beyond the right viewport edge. The glyph stays visible, the key stays tappable, no controls overlap, the play button stays 40×40 (shifted 9px), and the 120px height is unchanged.
+- **Full player:** the jump keys grow to about 39×57 and approach the LLAMA seam below the control row, but stop about 2px short of it. The key's drop shadow visually meets the seam; the key and its "10s" label do not cross it. Nothing overlaps the bottom row.
 
-Any fix is geometry-affecting, so it needs its own authorization and a font-scale pass on the S26 Ultra's One UI font-size steps.
+Any fix is geometry-affecting responsive/accessibility work, so it needs its own authorization and a font-scale pass on the S26 Ultra's One UI font-size steps.
 
 ## Error-button text contrast
 
@@ -109,4 +109,34 @@ Found while implementing Gate H. Toasts use vue-toastification's own stylesheet,
 
 ## onPlaybackSession listener after a cold launch
 
-Observed once during the Gate H audit on the emulator, not investigated. After a cold launch from the launcher, native prepared a session but logged "No listeners found for event onPlaybackSession", so the WebView did not see the session until the page was reloaded. It may be specific to that launch path. Reproduce it before treating it as a bug.
+Observed once during the Gate H audit on the emulator, not investigated. After a cold launch from the launcher, native prepared a session but logged "No listeners found for event onPlaybackSession", so the WebView did not see the session until the page was reloaded. It may be specific to that launch path. Reproduce it before treating it as a bug. The Galaxy S26 Ultra cold launch during the Phase 2C final acceptance did not reproduce it (no session was restored until Play was pressed, as designed).
+
+## Seek handle touch target
+
+Found on the Galaxy S26 Ultra during the Phase 2C final acceptance; inherited and the same in every theme (not introduced by LLAMA). Relatively **high priority** accessibility/usability work.
+
+The full player's seek handle is hard to grab. Dragging works, but the 28×28 handle (`trackCursor`) sits inside the 6px track, whose `overflow-hidden` clips it, so the effective touch target is about 28×6 CSS px. Its height is well below the 24×24 CSS px minimum (WCAG 2.2, 2.5.8).
+
+Preferred direction: keep the thin visual seek treatment, and give the handle a larger invisible touch target centered on the current position. That changes hit testing and likely geometry, so it was deliberately not changed during Phase 2C acceptance.
+
+## Widget controls after a book finishes or the player closes
+
+Observed on the Galaxy S26 Ultra during the Phase 2C final acceptance. **Product/UX decision required** before any implementation.
+
+When a book finishes or the playback session is closed, the widget can lose its controls: the restore/session model (from `plus`, `0dbfac4e`, before Phase 2C) clears the "resumable" flag, and the widget shows controls only for a live or resumable session. It still shows the last book's metadata.
+
+Decide what the widget should represent when playback has completed, when playback was closed, when there is no resumable session, and while metadata is still available. Do not change the behavior until that is decided.
+
+## Stale widget snapshot without controls
+
+Observed once on the Galaxy S26 Ultra during the Phase 2C final acceptance. The widget showed an old position (an earlier snapshot) and no controls while the app had a paused playback session. A force-stop and relaunch restored the expected widget. Dark showed the same state, so it is not LLAMA-specific.
+
+The cause is undetermined: no device logs were captured at the time. It belongs with the playback/session/widget restoration work (see "Widget session mismatch after restart"). Capture `adb logcat` and a Diagnostics export when it recurs before treating any cause as known.
+
+## Connect-screen title branding
+
+Inherited Audiobookshelf+ identity debt (not Audible-related). The server-connect screen still shows the upstream title "audiobookshelf" under the logo instead of "Audiobookshelf+". Its footer already identifies Audiobookshelf+ correctly. Part of the Audiobookshelf+ branding cleanup (see `docs/app-identity.md`).
+
+## Store-listing branding
+
+Inherited Audiobookshelf+ identity debt (not Audible-related). The fastlane store-listing imagery (`fastlane/metadata/android/en-US/images/`: feature graphic and phone screenshots) still carries upstream "audiobookshelf" branding. Replace it before any public Audiobookshelf+ store or release material is prepared. It must also follow the no-Audible rule in `docs/app-identity.md`.

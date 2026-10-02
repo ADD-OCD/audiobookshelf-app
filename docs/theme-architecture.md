@@ -433,13 +433,39 @@ Audit results that needed no change:
 - LLAMA text passes on every audited surface, including muted text (the Checkpoint F margins), toggle segments (5.51:1 unselected), selected rows, readouts on recessed wells, steel keys (6.6–7.3:1 for the player key glyphs), dialogs and the theme picker.
 - Non-text: the focus outline (accent, 7.6–12.3:1), played vs track (7.98:1), checkbox edge and check, toggle-on fill vs content (4.32:1) and the accent markers pass. Buffered vs track (2.21:1) is supplementary, and input wells are identified by fill and bevel, not the 2.35:1 border alone; both are accepted Gate A–E designs.
 - Keyboard: every reached control shows the 2px accent `:focus-visible` outline.
-- Semantics are consistent: amber for playback position; the accent for readouts, active filters, membership, checked state, focus and selection; success for finished state and positive actions. `ToggleSwitch` on keeps the success color, as accepted at Checkpoint F; its state also reads from thumb position.
+- Semantics are consistent: amber for playback position; the accent for readouts, active filters, membership, checked state, focus and selection; success for finished state and positive actions (`state.success` for state, the darker `state.success-action` fill for actionable controls). `ToggleSwitch` on keeps the success color, as accepted at Checkpoint F; its state also reads from thumb position.
 - Font scale: Android's font scale reaches the WebView live (the root font size goes from 16px to 20.8px at 1.3). Nothing is lost at 1.3, but two shared geometry effects remain (see `docs/future-work.md`).
 - Widget: the generated LLAMA widget palette pairs pass (text 4.6–13:1, readouts on the recessed well 12.3:1).
 
 Validation at the end of Gate H: JS 127/127, Kotlin/Robolectric 109/109, `lintDebug` 0 errors and 143 warnings (the same warning set as Gate F), the widget palette check, generate and `assembleDebug`, and a CI run that executed and passed both test steps.
 
 Shared issues found and deferred (each in `docs/future-work.md`): Dialog keyboard support, font-scale 1.3 geometry, error-button text contrast, Dark muted-text and item-header contrast, and the success toast colors.
+
+## Phase 2C closure
+
+**Phase 2C — LLAMA theme implementation and hardening — is COMPLETE.** The accepted candidate baseline is `2d48b307` on `feature/llama-theme`. A documentation-only closure commit follows it (find it in the Git history of this file); it changes no runtime behavior.
+
+Phase 2C delivered and validated the LLAMA theme architecture and presentation: Gates A–F (recipe foundation, player, overlays, browsing, forms and dialogs, widget), Gate G (typography audit and deferral) and Gate H (accessibility and hardening). It does not claim to solve every inherited Audiobookshelf+ accessibility, branding, playback-session or responsive-layout issue. Those were deliberately kept out of scope because they are inherited, shared across themes, architectural, product decisions, or outside Phase 2C. The future-work list (`docs/future-work.md`) is not evidence that Phase 2C failed.
+
+Final accepted validation of `2d48b307`:
+
+| Check                                     | Result                                  |
+| ----------------------------------------- | --------------------------------------- |
+| JS suite                                  | 127/127                                 |
+| Kotlin/Robolectric unit tests             | 109/109                                 |
+| `lintDebug`                               | 0 errors / 143 warnings (unchanged set) |
+| 22-role Dark-vs-LLAMA geometry            | 0 differences                           |
+| Mini-player height                        | 120px                                   |
+| Full-player / mini-player play control    | 65×65 / 40×40                           |
+| Gate E geometry regression                | 0 changes                               |
+| Widget freeze and containment validation  | pass                                    |
+| CI (Build APK with both test steps, i18n) | green on `2d48b307`                     |
+| Galaxy S26 Ultra physical app validation  | pass                                    |
+| Galaxy S26 Ultra physical LLAMA widget    | pass                                    |
+
+The S26 validation used the persistent-key Debug Test APK built from exactly `2d48b307`. The version stayed `0.14.2-beta` / versionCode 129, versionCode 130 stayed unused, and no merge, tag or release happened during the Phase 2C acceptance.
+
+Findings from the final acceptance, recorded as future work rather than blockers: the seek handle touch target (relatively high priority), widget controls after a book finishes or the player closes (a product/UX decision), a stale widget snapshot seen once, the connect-screen title and store-listing branding, and the corrected font-scale 1.3 measurements. Library cover art that carries Audible branding is user content, not an app defect; public Audiobookshelf+ imagery must avoid it (`docs/app-identity.md`).
 
 ## Content-derived color (intentionally not tokens)
 
