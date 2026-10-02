@@ -12,4 +12,8 @@
   <color name="widget_llama_track">#282E38</color>
   <color name="widget_llama_edge_light">#99A0AA</color>
   <color name="widget_llama_edge_dark">#0B0E12</color>
+  <color name="widget_llama_key_face">#0D1016</color>
+  <color name="widget_llama_key_lit">#1B1E25</color>
+  <color name="widget_llama_key_shade">#090B0F</color>
+  <color name="widget_llama_key_pressed_shade">#06070A</color>
 </resources>

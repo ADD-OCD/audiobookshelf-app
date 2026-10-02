@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- LLAMA widget secondary key (rewind, fast-forward): a face deeper than the chassis, lit from the upper left, the
-     widget counterpart of the app's dark player keys. The structure is the earlier key's exactly (same 4dp radius and 1dp
-     bevel items), so view bounds cannot change; only the fills differ. Resting: lit top/left edge, dark bottom/right edge,
-     and a soft sheen (lit top, shaded bottom) over the face. Pressed: the bevel inverts and the face is cut in, with its
-     shade falling from the top. The primary Play/Pause key keeps widget_llama_button_primary. All colors are generated. -->
+<!-- LLAMA widget primary key (Play/Pause): the lighter steel face with a raised bevel; the bevel inverts while pressed. Unchanged by the secondary-key finish, so Play/Pause stays the lightest key, like the app's silver Play/Pause. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
   <item android:state_pressed="true">
     <layer-list>
@@ -22,10 +18,7 @@
       <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
-          <gradient
-            android:angle="270"
-            android:endColor="@color/widget_llama_key_face"
-            android:startColor="@color/widget_llama_key_pressed_shade" />
+          <solid android:color="@color/widget_llama_content" />
         </shape>
       </item>
     </layer-list>
@@ -47,11 +40,7 @@
       <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
-          <gradient
-            android:angle="270"
-            android:centerColor="@color/widget_llama_key_face"
-            android:endColor="@color/widget_llama_key_shade"
-            android:startColor="@color/widget_llama_key_lit" />
+          <solid android:color="@color/widget_llama_raised" />
         </shape>
       </item>
     </layer-list>

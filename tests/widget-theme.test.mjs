@@ -26,7 +26,8 @@ test('native widget colors equal the LLAMA tokens and derived bevel edges', asyn
   const derived = presets.equipmentDerivedDeclarations(t)
   assert.deepEqual(colors.widget_llama_edge_light, derived['--color-edge-light'].split(' ').map(Number))
   assert.deepEqual(colors.widget_llama_edge_dark, derived['--color-edge-dark'].split(' ').map(Number))
-  assert.equal(Object.keys(colors).length, generator.TOKEN_COLORS.length + 2)
+  // Token colors, the two bevel edges, and the derived secondary-key colors (Phase 4D)
+  assert.equal(Object.keys(colors).length, generator.TOKEN_COLORS.length + 2 + generator.keyColors(t).length)
 })
 
 test('only equipment-finish built-ins get a native widget palette; standard themes keep the existing look', () => {
@@ -415,9 +416,10 @@ test('Gate F LLAMA readout and controls: accent time readouts, neutral play glyp
   const llamaLayouts = VARIANTS.map(([, llama]) => llama)
   for (const file of llamaLayouts) {
     const xml = await read(LAYOUTS + file)
-    // The play glyph is neutral like the jump glyphs (shape shows play/pause); the accent is reserved for readouts
+    // The play glyph stays neutral (shape shows play/pause) and the accent is reserved for readouts; the jump glyphs
+    // are the playback amber since Phase 4D
     assert.match(attrs(xml, 'widgetPlayPauseButton'), /android:tint="@color\/widget_llama_text"/, file)
-    for (const id of ['widgetRewindButton', 'widgetFastForwardButton']) assert.match(attrs(xml, id), /android:tint="@color\/widget_llama_text"/, `${file} ${id}`)
+    for (const id of ['widgetRewindButton', 'widgetFastForwardButton']) assert.match(attrs(xml, id), /android:tint="@color\/widget_llama_played"/, `${file} ${id}`)
     if (xml.includes('android:id="@+id/widgetElapsedText"')) {
       for (const id of ['widgetElapsedText', 'widgetRemainingText']) assert.match(attrs(xml, id), /android:textColor="@color\/widget_llama_accent"/, `${file} ${id}`)
     }
@@ -433,4 +435,134 @@ test('Gate F LLAMA readout and controls: accent time readouts, neutral play glyp
   // The chassis still follows the launcher's widget radius; the artwork frame stays square
   assert.match(await read(RES + 'drawable/widget_llama_chassis.xml'), /\?attr\/appWidgetRadius/)
   assert.doesNotMatch(await read(RES + 'drawable/widget_llama_artwork_frame.xml'), /corners/)
+})
+
+// --- Phase 4D: LLAMA widget control-finish parity (resource-level paint only) ---
+
+const KEY_IDS = ['widgetRewindButton', 'widgetPlayPauseButton', 'widgetFastForwardButton']
+const LLAMA_FILES = VARIANTS.map(([, llama]) => llama)
+const norm = (text) => text.replace(/\r\n/g, '\n')
+const generatedColors = async () => {
+  const xml = await read(RES + 'values/widget_theme_colors.xml')
+  return Object.fromEntries([...xml.matchAll(/<color name="widget_llama_([a-z_]+)">#([0-9A-F]{6})<\/color>/g)].map(([, n, h]) => [n, [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16))]))
+}
+const luminance = ([r, g, b]) => {
+  const lin = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+test('Phase 4D secondary-key colors are generated from the LLAMA tokens with fixed blend factors', async () => {
+  const t = engine.getTheme('llama').tokens
+  const colors = await generatedColors()
+  const derived = generator.keyColors(t)
+  assert.deepEqual(
+    derived.map(([name]) => name),
+    ['key_face', 'key_lit', 'key_shade', 'key_pressed_shade']
+  )
+  for (const [name, rgb] of derived) assert.deepEqual(colors[name], rgb, name)
+  // Only the generator may introduce them: the resource file is checked byte-for-byte against render() elsewhere
+  const standardRes = norm(await read(RES + 'values/colors.xml'))
+  assert.doesNotMatch(standardRes, /key_face|key_lit|key_shade/)
+})
+
+test('Phase 4D the key face is deeper than the chassis and the legends clear contrast with margin', async () => {
+  const c = await generatedColors()
+  const { face, lit, shade, key_pressed_shade: pressed } = { face: c.key_face, lit: c.key_lit, shade: c.key_shade, key_pressed_shade: c.key_pressed_shade }
+  // Polarity: every point of the resting face is no lighter than the chassis it sits on; the face is clearly darker
+  assert.ok(luminance(face) < luminance(c.base), 'face darker than the chassis')
+  assert.ok(luminance(lit) <= luminance(c.base), 'even the lit top is no lighter than the chassis')
+  const step = contrast(face, c.base)
+  assert.ok(step >= 1.1 && step <= 2, `key face vs chassis ${step.toFixed(2)}:1 stays a visible, restrained step`)
+  // Sheen order: lit top > face > shaded bottom; pressed is the deepest
+  assert.ok(luminance(lit) > luminance(face) && luminance(face) > luminance(shade) && luminance(shade) > luminance(pressed))
+  // The playback amber on every resting and pressed face (worst case = the lightest face behind the glyph)
+  for (const [label, face_] of [
+    ['lit', lit],
+    ['face', face],
+    ['shade', shade],
+    ['pressed shade', pressed]
+  ])
+    assert.ok(contrast(c.played, face_) >= 4.5, `amber on ${label}`)
+  // Primary Play/Pause: near-white on the lighter steel key (resting and pressed), and clearly lighter than the secondary keys
+  assert.ok(contrast(c.text, c.raised) >= 4.5, 'near-white glyph on the primary key')
+  assert.ok(contrast(c.text, c.content) >= 4.5, 'near-white glyph on the pressed primary key')
+  assert.ok(luminance(c.raised) > luminance(lit) && contrast(c.raised, face) >= 2, 'the primary key stays the lighter key')
+})
+
+test('Phase 4D rewind and fast-forward are dark keys with amber legends; Play/Pause keeps the lighter key and near-white glyph', async () => {
+  for (const file of LLAMA_FILES) {
+    const xml = await read(LAYOUTS + file)
+    for (const id of ['widgetRewindButton', 'widgetFastForwardButton']) {
+      const a = attrs(xml, id)
+      assert.match(a, /android:background="@drawable\/widget_llama_button"/, `${file} ${id}`)
+      assert.match(a, /android:tint="@color\/widget_llama_played"/, `${file} ${id}`)
+    }
+    const play = attrs(xml, 'widgetPlayPauseButton')
+    assert.match(play, /android:background="@drawable\/widget_llama_button_primary"/, file)
+    assert.match(play, /android:tint="@color\/widget_llama_text"/, file)
+    // Amber stays a playback color: it is on exactly the two jump keys in each layout, never on text, artwork or the brand icon
+    assert.equal((xml.match(/widget_llama_played/g) || []).length, 2, `${file} amber is on exactly the two jump keys`)
+  }
+})
+
+test('Phase 4D key drawables: dark gradient face for the secondary key, the earlier steel key kept as the primary, same structure', async () => {
+  const secondary = norm(await read(RES + 'drawable/widget_llama_button.xml'))
+  const primary = norm(await read(RES + 'drawable/widget_llama_button_primary.xml'))
+  // Secondary: the generated key colors, a sheen gradient at rest, a cut-in gradient while pressed, no steel fill
+  for (const name of ['widget_llama_key_lit', 'widget_llama_key_face', 'widget_llama_key_shade', 'widget_llama_key_pressed_shade']) assert.match(secondary, new RegExp(name), name)
+  assert.doesNotMatch(secondary, /widget_llama_raised|widget_llama_content/)
+  assert.match(secondary, /android:state_pressed="true"/)
+  assert.equal((secondary.match(/<gradient/g) || []).length, 2, 'one gradient face per state')
+  // Primary: the earlier lighter steel key (raised face at rest, content face pressed), unchanged in structure
+  assert.match(primary, /widget_llama_raised/)
+  assert.match(primary, /widget_llama_content/)
+  assert.doesNotMatch(primary, /key_face|key_lit|key_shade|gradient/)
+  assert.match(primary, /android:state_pressed="true"/)
+  // Same geometry on both: identical item offsets and 4dp corners, so a key's bounds can never depend on which drawable it uses
+  const shape = (xml) => ({
+    items: [...xml.matchAll(/<item([^>]*)>/g)].map((m) => m[1].trim()),
+    corners: [...xml.matchAll(/<corners android:radius="([^"]+)"/g)].map((m) => m[1])
+  })
+  assert.deepEqual(shape(secondary), shape(primary))
+  assert.ok(shape(secondary).corners.every((r) => r === '4dp'))
+  // Every color the key drawables use is a generated LLAMA color
+  for (const xml of [secondary, primary]) for (const [, ref] of xml.matchAll(/"@color\/([a-z_0-9]+)"/g)) assert.match(ref, /^widget_llama_/, ref)
+  assert.doesNotMatch(secondary + primary, /#[0-9A-Fa-f]{6,8}/, 'no hard-coded colors')
+})
+
+test('Phase 4D key geometry attributes are frozen in every LLAMA layout', async () => {
+  // layout -> [padding dp, margin dp]: the values before Phase 4D. The three keys share width 0dp (weighted) and full height
+  const expected = {
+    'media_player_widget_llama.xml': [7, 3],
+    'media_player_widget_wide_llama.xml': [6, 2],
+    'media_player_widget_full_llama.xml': [10, 4],
+    'media_player_widget_full_expanded_llama.xml': [10, 4],
+    'media_player_widget_full_expanded_large_llama.xml': [16, 4]
+  }
+  for (const file of LLAMA_FILES) {
+    const xml = await read(LAYOUTS + file)
+    for (const id of KEY_IDS) {
+      const a = attrs(xml, id)
+      assert.match(a, new RegExp(`android:padding="${expected[file][0]}dp"`), `${file} ${id} padding`)
+      assert.match(a, new RegExp(`android:layout_margin="${expected[file][1]}dp"`), `${file} ${id} margin`)
+      assert.match(a, /android:layout_width="0dp"/, `${file} ${id} width`)
+      assert.match(a, /android:layout_height="match_parent"/, `${file} ${id} height`)
+    }
+  }
+})
+
+test('Phase 4D standard widget layouts and drawables are untouched by the LLAMA key finish', async () => {
+  for (const [standard] of VARIANTS) {
+    const xml = await read(LAYOUTS + standard)
+    assert.doesNotMatch(xml, /llama|key_face/, standard)
+    for (const id of KEY_IDS) assert.match(attrs(xml, id), /android:background="@drawable\/widget_button_bg"/, `${standard} ${id}`)
+  }
+  assert.doesNotMatch(norm(await read(RES + 'drawable/widget_button_bg.xml')), /llama|key_face/)
+  // The protected widget architecture is not touched by this finish: no key color or drawable is set from Kotlin
+  const renderer = await read('../android/app/src/main/java/app/absplus/android/widget/WidgetRenderer.kt')
+  assert.doesNotMatch(renderer, /R\.(drawable|color)\.widget_llama|key_face|setColorFilter|setBackgroundResource/)
 })

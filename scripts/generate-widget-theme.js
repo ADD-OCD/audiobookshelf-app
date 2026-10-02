@@ -28,8 +28,32 @@ const TOKEN_COLORS = [
   ['track', 'progress.track']
 ]
 
+// Secondary-key finish (Phase 4D). Fixed, repository-owned blend factors (theme data cannot influence them) that
+// translate the app's PLAYER_KEY recipe (theme/presets.js) to native drawables. The widget chassis is surface.base,
+// the same deck as the collapsed player, so the face uses the collapsed player's depth (recessed at 85%). The sheen
+// is a soft lit top and a shaded bottom around that face; the pressed key is cut in, with its shade falling from the top
+const KEY_FACE_TOWARD_RECESSED = 0.85
+const KEY_LIT_TOWARD_EDGE_LIGHT = 0.1
+const KEY_SHADE_TOWARD_BLACK = 0.3
+const KEY_PRESSED_SHADE_TOWARD_BLACK = 0.55
+
+const BLACK = [0, 0, 0]
+const mix = (from, to, t) => from.map((channel, i) => Math.round(channel + (to[i] - channel) * t))
+
 const hex = (rgb) => '#' + rgb.map((c) => c.toString(16).padStart(2, '0').toUpperCase()).join('')
 const channelsToRgb = (value) => value.split(' ').map(Number)
+
+/** Derived native key colors for a theme's tokens: [name suffix, rgb]. All come from validated tokens and the fixed factors above. */
+function keyColors(tokens) {
+  const edgeLight = presets.equipmentDerivedDeclarations(tokens)['--color-edge-light'].split(' ').map(Number)
+  const face = mix(tokens['surface.base'], tokens['surface.recessed'], KEY_FACE_TOWARD_RECESSED)
+  return [
+    ['key_face', face],
+    ['key_lit', mix(face, edgeLight, KEY_LIT_TOWARD_EDGE_LIGHT)],
+    ['key_shade', mix(face, BLACK, KEY_SHADE_TOWARD_BLACK)],
+    ['key_pressed_shade', mix(face, BLACK, KEY_PRESSED_SHADE_TOWARD_BLACK)]
+  ]
+}
 
 function widgetThemes() {
   return engine.THEMES.filter((t) => t.tokens['presentation.finish'] === 'equipment')
@@ -43,12 +67,13 @@ function render() {
     const derived = presets.equipmentDerivedDeclarations(theme.tokens)
     lines.push(`  <color name="${prefix}_edge_light">${hex(channelsToRgb(derived['--color-edge-light']))}</color>`)
     lines.push(`  <color name="${prefix}_edge_dark">${hex(channelsToRgb(derived['--color-edge-dark']))}</color>`)
+    for (const [name, rgb] of keyColors(theme.tokens)) lines.push(`  <color name="${prefix}_${name}">${hex(rgb)}</color>`)
   }
   lines.push('</resources>', '')
   return lines.join('\n')
 }
 
-module.exports = { render, OUTPUT, TOKEN_COLORS, widgetThemes }
+module.exports = { render, OUTPUT, TOKEN_COLORS, widgetThemes, keyColors }
 
 if (require.main === module) {
   const expected = render()
