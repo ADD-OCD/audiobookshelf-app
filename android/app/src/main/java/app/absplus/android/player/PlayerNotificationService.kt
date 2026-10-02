@@ -29,6 +29,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.utils.MediaConstants
@@ -203,6 +204,11 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     isStarted = true
     DLog.d(tag, "onStartCommand $startId action=${intent?.action}")
 
+    if (StickyRestart.isEmptyRestart(intent, currentPlaybackSession != null, isRestoringPlayback)) {
+      stopEmptyStickyRestart()
+      return START_NOT_STICKY
+    }
+
     if (intent?.action == Intent.ACTION_MEDIA_BUTTON) {
       // MediaButtonReceiver started us with startForegroundService, so we must be foreground
       // promptly even if nothing is prepared yet (e.g. widget Play after the service was destroyed)
@@ -213,6 +219,17 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     }
 
     return START_STICKY
+  }
+
+  // System restart after process death with nothing prepared (see StickyRestart): remove the dead
+  // notification and stop. Resumable state is untouched; onDestroy redraws the widget as not playing.
+  private fun stopEmptyStickyRestart() {
+    DLog.i(RESTORE_TAG, "Sticky restart with no prepared session - removing stale notification and stopping | resumable=${PlaybackRestoreStore.isResumable(this)}")
+    stopForeground(Service.STOP_FOREGROUND_REMOVE)
+    NotificationManagerCompat.from(this).cancel(notificationId)
+    PlayerNotificationListener.isForegroundService = false
+    isStarted = false
+    stopSelf()
   }
 
   private fun startMediaButtonPlaceholderForeground() {
