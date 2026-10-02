@@ -122,7 +122,7 @@ A test compiles the real content with Tailwind and fails if any recipe selector 
 - **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `PRIMARY_STEEL` / `PRIMARY_STEEL_PRESSED` (the round play button only, Gate B.1), `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
 - **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Gate B applies it to the player (transport vs secondary row); queue, chapter, table and dialog rows are later gates. `ENGRAVED_SEPARATOR_TOP` is the same seam on a top edge, and `RECESSED_FACE` is a recessed-display bevel as a background layer (both Gate B).
 - **Control states** (complete declaration sets):
-  - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Gate B applies it to the player keys.
+  - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Gate B applied it to the player keys; Phase 4B moved those to their own `PLAYER_KEY` recipe (see below), so `KEY_CAP` now serves only the other keys (library selector, dropdown triggers, steppers, row play buttons).
   - `SELECTED_KEY`: pressed in (inset bevel plus inner shade) with an accent ring inside the edge. Selection reads as a physical state, not only a color. Not applied yet; Gates C and E consume it.
 
 Semantic hooks: artwork framing targets the generic `card-artwork` class instead of the `book-card-*` id prefix. `LazyBookCard` (whose root is the cover) and the cover box of `LazyListBookCard` carry it. The old id-prefix selector also matched the list card's whole row, so list view used to frame every row. A test checks both templates.
@@ -147,7 +147,7 @@ Paint only. Every player box, control position, size, order and touch target is 
   - transport: chapter start/end and both jumps (the jumps are also the mini-player's);
   - secondary row: queue, bookmark, sleep and chapters.
 
-  They get `KEY_CAP` on their own box, and `KEY_CAP_PRESSED` while pressed. A key that is currently unavailable (loading, no next chapter, no chapters) also carries `key-disabled`, next to its existing dimmed glyph. It then has no cap, so it reads flat by shape as well as color. Readouts (speed, sleep countdown) don't fit a cap inside their boxes and stay bare. The invisible podcast bookmark placeholder isn't a key. The play button stays round.
+  They get `PLAYER_KEY` on their own box (a dark-faced key since Phase 4B; it was `KEY_CAP` in Gate B), and `PLAYER_KEY_PRESSED` while pressed. A key that is currently unavailable (loading, no next chapter, no chapters) also carries `key-disabled`, next to its existing dimmed glyph. It then has no cap, so it reads flat by shape as well as color. Readouts (speed, sleep countdown) don't fit a cap inside their boxes and stay bare. The invisible podcast bookmark placeholder isn't a key. The play button stays round.
 
 - **Play button:** `coverPresentation` now also returns `controlWash`, which decides whether the button keeps its translucent white wash:
 
@@ -466,6 +466,35 @@ Final accepted validation of `2d48b307`:
 The S26 validation used the persistent-key Debug Test APK built from exactly `2d48b307`. The version stayed `0.14.2-beta` / versionCode 129, versionCode 130 stayed unused, and no merge, tag or release happened during the Phase 2C acceptance.
 
 Findings from the final acceptance, recorded as future work rather than blockers: the seek handle touch target (relatively high priority), widget controls after a book finishes or the player closes (a product/UX decision), a stale widget snapshot seen once, the connect-screen title and store-listing branding, and the corrected font-scale 1.3 measurements. Library cover art that carries Audible branding is user content, not an app defect; public Audiobookshelf+ imagery must avoid it (`docs/app-identity.md`).
+
+## LLAMA secondary control finish (Phase 4B)
+
+Paint only, LLAMA only. Phase 4A measured that the player keys were not short of contrast (key against deck was 1.20:1, the reference about 1.24:1). What differed was polarity (the keys were lighter than the deck, the reference's are darker), the legend (75% near-white outline glyphs), and a shallow edge. Phase 4B changes exactly those on the keys that already carry the `player-key` hook. Every box, size, position, hit area, text style, and the silver play button are unchanged.
+
+- **Dark key face:** `PLAYER_KEY` fills the key with a translucent `surface.recessed` (50%), so it follows the deck's own gradient and stays darker than whatever it sits on. The collapsed player's deck is already close to that color, so `PLAYER_KEY_FACE_MINI` (85%) keeps the same step there.
+- **Edge depth:** a lit upper-left inner edge with a faint second highlight line, a dark lower-right inner edge, a dark outer ring (the channel the key sits in), a short drop shadow and the existing soft sheen. All of it is background or shadow paint on the key's existing box.
+- **Pressed:** `PLAYER_KEY_PRESSED` drops the sheen and the drop shadow, inverts the inner bevel and cuts in an inner shade, keeping the ring. It reads as engaged without moving anything.
+- **Unavailable:** unchanged. A `key-disabled` key matches none of these rules, so it has no face, ring or legend color, only its dimmed glyph. That keeps it distinct from resting, pressed and available.
+- **Amber is playback only:** the two jump keys and chapter start/end (`jump-icon`, `next-icon`) take `PLAYBACK_LEGEND`, the played-progress amber, for the glyph and the "10s" label. The utility keys (queue, bookmark, sleep, chapters) keep their neutral glyphs. The round play button is not a player key and is untouched: amber on its silver face measures about 2.9:1 on the lower-lit and 1.8:1 on the upper-lit region, so it would fail the 3:1 icon minimum.
+- **Heavier legends:** the bundled Material Symbols font has only a `FILL` axis (no `wght`). `FILL` leaves the stroke-based transport glyphs unchanged and would make the bookmark solid, which already means "has bookmarks". So the transport glyphs get `PLAYBACK_GLYPH_WEIGHT`, a 0.5px `-webkit-text-stroke` in their own color. It adds ink only, and the utility keys stay at regular weight, which keeps the transport legends the heavier tier. If a device renders the stroke poorly, removing that one primitive restores the regular weight.
+
+Rendered contrast, measured from emulator pixels (emulator, Book A paused):
+
+| Pair                                                    | Ratio                             |
+| ------------------------------------------------------- | --------------------------------- |
+| Amber legend on the full-player key face                | 8.7:1                             |
+| Amber legend on the mini-player key face                | 10.5:1                            |
+| Neutral glyph (bookmark, sleep) on its face             | 5.6–5.7:1                         |
+| Chapters glyph (75% primary) on its face                | 7.3:1                             |
+| Key face against deck: transport / secondary row / mini | 1.22–1.23 / 1.09–1.13 / 1.11–1.12 |
+
+`tests/theme-llama.test.mjs` keeps the contract: LLAMA-only scoping, no geometry properties, amber limited to the transport keys, the unavailable state excluded, and the contrast of the new faces computed from the theme tokens.
+
+Deferred (not part of this change):
+
+- **Top-bar controls:** the collapse, cast and overflow glyphs are bare `span`s in the fullscreen overlay, which sits outside `#playerContent`. Framing them needs a hook class and a new scope, and their boxes are glyph-sized (touch-target and geometry questions).
+- **Heavier icons beyond the stroke:** a true weight axis needs a different icon font file, which is global.
+- **Title and author readout, typography, and the widget finish** are separate, later work.
 
 ## Content-derived color (intentionally not tokens)
 
