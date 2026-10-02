@@ -384,6 +384,21 @@ test('Gate B pending seek stays the played-progress amber but segmented, distinc
   assert.match(player, /this\.\$refs\.playedTrack\.classList\.remove\('bg-yellow-300'\)\s*this\.\$refs\.playedTrack\.classList\.add\('bg-gray-200'\)/)
 })
 
+test('Phase 3A: a drag started while a seek is still pending keeps the played line solid amber', async () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const dragging = rules[`${root} #playerTrack .seek-dragging > .bg-track-cursor.bg-yellow-300`]
+  assert.deepEqual(dragging, { 'background-color': 'rgb(var(--color-track-cursor))', 'background-image': 'none' })
+  // The pending (segmented) rule is unchanged for the not-dragging case
+  assert.match(rules[`${root} #playerTrack .bg-track-cursor.bg-yellow-300`]['background-image'], /^repeating-linear-gradient/)
+  // The hook is bound to the drag state on the seek rail itself (the played bar's parent)
+  const player = await read('../components/app/AudioPlayer.vue')
+  assert.match(player, /ref="track"[^>]*:class="\{[^}]*'seek-dragging': isDraggingCursor[^}]*\}"/)
+  assert.match(player, /<div ref="track"[^>]*>\s*<div ref="readyTrack"[\s\S]*?<div ref="playedTrack"/)
+  // The standard finish has no such rule: Dark/Black/Light are untouched
+  for (const id of ['dark', 'black', 'light']) assert.ok(!Object.keys(presets.presentationRules([engine.getTheme(id)])).some((s) => s.includes('seek-dragging')), id)
+})
+
 test('Gate B semantic hooks: player keys, unavailable state and sleep readout are marked in the player template', async () => {
   const player = await read('../components/app/AudioPlayer.vue')
   const template = player.slice(0, player.indexOf('</template>'))
@@ -427,6 +442,7 @@ test('Gate B rules compile through Tailwind under the LLAMA root only', async ()
   assert.match(block(`${root} #playerContent .player-key:not(.key-disabled)`), /border-radius: 4px;[\s\S]*background-image: linear-gradient/)
   assert.match(block(`${root} #playerContent .sleep-readout`), /color: rgb\(var\(--color-accent\)\)/)
   assert.match(block(`${root} #playerTrack .bg-track-cursor.bg-yellow-300`), /background-image: repeating-linear-gradient/)
+  assert.match(block(`${root} #playerTrack .seek-dragging > .bg-track-cursor.bg-yellow-300`), /background-image: none/)
   assert.match(block(`${root} .fullscreen #playerContent`), /background-color: rgb\(var\(--color-bg\)\)/)
   assert.match(block(`${root} .cover-wrapper`), /border-radius: 2px/)
   for (const hook of ['player-key', 'key-disabled', 'sleep-readout']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}`).test(css), `no unscoped ${hook} rule`)

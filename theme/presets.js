@@ -201,6 +201,8 @@ const EQUIPMENT_RULES = [
   // Pending seek (the seek code's bg-yellow-300 state until playback confirms the position): the same amber,
   // broken into segments, so it reads as not-yet-settled by pattern rather than by a near-identical yellow
   ['#playerTrack .bg-track-cursor.bg-yellow-300', { 'background-color': 'transparent', 'background-image': 'repeating-linear-gradient(90deg, rgb(var(--color-track-cursor)) 0 4px, rgb(var(--color-track-cursor) / 0.3) 4px 7px)' }],
+  // ...but a drag started before that seek settles (seek-dragging hook) keeps the line solid under the finger
+  ['#playerTrack .seek-dragging > .bg-track-cursor.bg-yellow-300', { 'background-color': 'rgb(var(--color-track-cursor))', 'background-image': 'none' }],
   ['#playerTrack .pointer-events-auto > .bg-track-cursor', { 'box-shadow': '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)' }],
   // Phosphor-green readouts: timestamps, playback speed and the playback-method label (titles stay neutral)
   ['#playerTrack p.font-mono', { color: 'rgb(var(--color-accent))' }],
