@@ -11,6 +11,9 @@ const states = {
   'accent.primary': [26, 214, 145], // #1ad691
   'state.success': [76, 175, 80], // #4CAF50
   'state.success-strong': [59, 138, 62], // #3b8a3e
+  // White text on #4CAF50 is 2.78:1; success buttons use this darker fill (5.13:1, 4.58:1 under the LLAMA sheen).
+  // Not a pre-token value: added in Phase 2C Gate H. Indicators (finished bars, toggles) keep state.success.
+  'state.success-action': [46, 125, 50], // #2E7D32
   'state.warning': [251, 140, 0], // #FB8C00
   'state.error': [255, 82, 82], // #FF5252
   'state.info': [33, 150, 243] // #2196F3

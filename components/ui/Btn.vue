@@ -43,9 +43,11 @@ export default {
       var list = []
       if (this.loading) list.push('text-opacity-0')
       if (this.color === 'success') {
-        list.push('text-white')
+        // White label on the actionable success fill (state.success itself is too light for white text)
+        list.push('text-white', 'bg-success-action')
+      } else {
+        list.push(`bg-${this.color}`)
       }
-      list.push(`bg-${this.color}`)
       if (this.small) {
         list.push('text-sm')
         if (this.paddingX === undefined) list.push('px-4')

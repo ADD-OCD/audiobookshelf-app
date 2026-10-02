@@ -363,3 +363,49 @@ test('the Settings options list comes from the registry in the original order an
   const strings = JSON.parse(await read('../strings/en-us.json'))
   for (const theme of service.themes) assert.equal(typeof strings[theme.labelKey], 'string')
 })
+
+// --- Phase 2C Gate H: actionable success fill (global) ---
+
+const luminance = ([r, g, b]) => {
+  const f = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+const contrastRatio = (a, b) => {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p)
+  return (x + 0.05) / (y + 0.05)
+}
+
+test('Gate H: success buttons use state.success-action, which carries white text at AA in every theme (and under the LLAMA sheen)', async () => {
+  const presets = require('../theme/presets.js')
+  const white = [255, 255, 255]
+  for (const theme of engine.THEMES) {
+    const t = theme.tokens
+    // state.success keeps its pre-token value for indicators; the action fill is separate
+    assert.deepEqual(t['state.success'], [76, 175, 80], theme.id)
+    assert.deepEqual(t['state.success-action'], [46, 125, 50], theme.id)
+    assert.ok(contrastRatio(white, t['state.success']) < 4.5, 'state.success alone is not a white-text fill')
+    assert.ok(contrastRatio(white, t['state.success-action']) >= 4.5, `${theme.id} white on success-action`)
+    if (t['presentation.finish'] === 'equipment') {
+      // Brightest point of the steel sheen on .btn: edge-light at 18% over the fill
+      const edge = presets.equipmentDerivedDeclarations(t)['--color-edge-light'].split(' ').map(Number)
+      const top = t['state.success-action'].map((c, i) => edge[i] * 0.18 + c * 0.82)
+      assert.ok(contrastRatio(white, top) >= 4.5, `${theme.id} white on sheened success-action`)
+    }
+  }
+  const btn = await read('../components/ui/Btn.vue')
+  assert.match(btn, /if \(this\.color === 'success'\) \{\s*\/\/[^\n]*\n\s*list\.push\('text-white', 'bg-success-action'\)\s*\} else \{\s*list\.push\(`bg-\$\{this\.color\}`\)/)
+  const bookmarks = await read('../components/modals/BookmarksModal.vue')
+  assert.match(bookmarks, /bg-success-action cursor-pointer text-white sticky/)
+  assert.doesNotMatch(bookmarks, /text-opacity-80/)
+})
+
+test('Gate H: the Tailwind build emits bg-success-action from the theme variable', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = '@tailwind base;\n@tailwind utilities;'
+  const { css } = await postcss([tailwind({ ...config, content: [{ raw: '<div class="bg-success-action bg-success"></div>' }] })]).process(source, { from: undefined })
+  assert.ok(css.includes('--color-success-action: 46 125 50'))
+  assert.ok(css.includes('background-color: rgb(var(--color-success-action) / var(--tw-bg-opacity, 1))'))
+  assert.ok(css.includes('background-color: rgb(var(--color-success) / var(--tw-bg-opacity, 1))'))
+})

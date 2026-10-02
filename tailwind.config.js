@@ -33,6 +33,7 @@ module.exports = {
         info: 'rgb(var(--color-info) / <alpha-value>)',
         success: 'rgb(var(--color-success) / <alpha-value>)',
         successDark: 'rgb(var(--color-success-dark) / <alpha-value>)',
+        'success-action': 'rgb(var(--color-success-action) / <alpha-value>)',
         warning: 'rgb(var(--color-warning) / <alpha-value>)'
       },
       cursor: {
