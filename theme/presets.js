@@ -82,6 +82,33 @@ const ELEVATION = Object.freeze({
 // change, no size change); pressed inverts the bevel
 const KEY_CAP = Object.freeze({ 'border-radius': RADIUS.key, 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL })
 const KEY_CAP_PRESSED = Object.freeze({ 'background-image': 'none', 'box-shadow': PRESSED_BEVEL })
+// Player key: the player's own transport and secondary keys (never the shared KEY_CAP surfaces). The face is darker
+// than the deck it sits in: a translucent fill of the recessed token, so it follows the deck's own gradient instead
+// of a fixed color. It is lit from the upper left by a soft sheen and edged in two steps: a lit/dark inner bevel with
+// a faint second highlight line, and a dark outer ring (the channel the key sits in) with a short drop shadow. Every
+// layer is background or shadow paint on the key's existing box, so size, position and hit area cannot change.
+// Pressed: the sheen and drop shadow go, the ring stays, and the face is cut in (inverted bevel plus an inner shade)
+const PLAYER_KEY_FACE = 'rgb(var(--color-recessed) / 0.5)'
+// The collapsed player's deck is already close to the recessed color, so its face goes deeper to keep the same step
+const PLAYER_KEY_FACE_MINI = 'rgb(var(--color-recessed) / 0.85)'
+const PLAYER_KEY_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.2) 0%, rgb(var(--color-edge-light) / 0) 45%, rgb(0 0 0 / 0.22) 100%)'
+const PLAYER_KEY_RING = '0 0 0 1px rgb(var(--color-edge-dark))'
+const PLAYER_KEY = Object.freeze({
+  'border-radius': RADIUS.key,
+  'background-color': PLAYER_KEY_FACE,
+  'background-image': PLAYER_KEY_SHEEN,
+  'box-shadow': `inset 1px 1px 0 rgb(var(--color-edge-light) / 0.6), inset 2px 2px 0 rgb(var(--color-edge-light) / 0.12), inset -1px -1px 0 rgb(var(--color-edge-dark)), ${PLAYER_KEY_RING}, 0 2px 3px rgb(0 0 0 / 0.5)`
+})
+const PLAYER_KEY_PRESSED = Object.freeze({
+  'background-image': 'none',
+  'box-shadow': `inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3), inset 0 3px 6px rgb(0 0 0 / 0.55), ${PLAYER_KEY_RING}`
+})
+// Playback legend: the played-progress amber, for transport keys whose meaning is playback (jumps and chapter steps)
+const PLAYBACK_LEGEND = Object.freeze({ color: 'rgb(var(--color-track-cursor))' })
+// Heavier playback glyphs. The bundled icon font has only a FILL axis (no weight axis, and FILL leaves these stroke
+// glyphs unchanged), so the transport glyphs get a hairline stroke in their own color. It adds ink, never layout, and
+// the utility keys stay at the font's regular weight, which keeps the transport legends the heavier tier
+const PLAYBACK_GLYPH_WEIGHT = Object.freeze({ '-webkit-text-stroke': '0.5px currentColor' })
 // Selected equipment key: pressed in (inset bevel and inner shade, so it reads as a different physical state,
 // not just a color) with an accent ring inside the edge
 const SELECTED_KEY = Object.freeze({
@@ -96,7 +123,7 @@ const CURRENT_MARKER = 'inset 2px 0 0 rgb(var(--color-track-cursor))'
 const INSET_SLOT = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)'
 const THUMB_EDGE = '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)'
 
-const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY })
+const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY, PLAYER_KEY, PLAYER_KEY_PRESSED, PLAYER_KEY_FACE_MINI, PLAYBACK_LEGEND, PLAYBACK_GLYPH_WEIGHT })
 
 const EQUIPMENT_RULES = [
   // Navigation chrome: bevelled chassis strips
@@ -180,12 +207,18 @@ const EQUIPMENT_RULES = [
   ['.fullscreen #playerControls', { 'box-shadow': ENGRAVED_SEPARATOR }],
   // Mini-player: seam across the panel above the seek region
   ['#streamContainer:not(.fullscreen) #playerTrack', { 'box-shadow': ENGRAVED_SEPARATOR_TOP }],
-  // Physical keys: the transport and secondary controls marked with the player-key hook get a key cap on their
-  // own box (pressed inverts it). A control that is currently unavailable (key-disabled) has no cap at all,
-  // so it reads flat/unavailable by shape, not only by its dimmed glyph. Readouts (speed, sleep countdown)
+  // Physical keys: the transport and secondary controls marked with the player-key hook get a dark-faced player
+  // key on their own box (pressed cuts it in). A control that is currently unavailable (key-disabled) has no cap at
+  // all, so it reads flat/unavailable by shape, not only by its dimmed glyph. Readouts (speed, sleep countdown)
   // and the round play button are not player keys
-  ['#playerContent .player-key:not(.key-disabled)', KEY_CAP],
-  ['#playerContent .player-key:not(.key-disabled):active', KEY_CAP_PRESSED],
+  ['#playerContent .player-key:not(.key-disabled)', PLAYER_KEY],
+  ['#playerContent .player-key:not(.key-disabled):active', PLAYER_KEY_PRESSED],
+  ['#streamContainer:not(.fullscreen) #playerContent .player-key:not(.key-disabled)', { 'background-color': PLAYER_KEY_FACE_MINI }],
+  // Playback legends: only the transport keys (both jumps, chapter start/end) take the amber; the utility keys
+  // (queue, bookmark, sleep, chapters) keep their neutral glyphs. An unavailable key is excluded and keeps its dimmed glyph
+  ['#playerContent .jump-icon:not(.key-disabled)', PLAYBACK_LEGEND],
+  ['#playerContent .jump-icon:not(.key-disabled) > .material-symbols', PLAYBACK_GLYPH_WEIGHT],
+  ['#playerContent .next-icon:not(.key-disabled)', { ...PLAYBACK_LEGEND, ...PLAYBACK_GLYPH_WEIGHT }],
   // Live sleep countdown is a readout: phosphor green like the other readouts (state.success keeps meaning
   // finished/complete everywhere else)
   ['#playerContent .sleep-readout', { color: 'rgb(var(--color-accent))' }],

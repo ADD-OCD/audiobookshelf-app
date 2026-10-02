@@ -343,9 +343,9 @@ test('Gate B player rules are paint only, built from the shared primitives', () 
   // Seams: transport vs secondary row (fullscreen), panel vs seek region (mini)
   assert.deepEqual(rule('.fullscreen #playerControls'), { 'box-shadow': P.ENGRAVED_SEPARATOR })
   assert.deepEqual(rule('#streamContainer:not(.fullscreen) #playerTrack'), { 'box-shadow': P.ENGRAVED_SEPARATOR_TOP })
-  // Keys: exactly the key-cap primitive; pressed inverts it; unavailable keys get no cap
-  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled)'), { ...P.KEY_CAP })
-  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled):active'), { ...P.KEY_CAP_PRESSED })
+  // Keys: the player-key primitive (dark face, Phase 4B); pressed cuts it in; unavailable keys get no cap
+  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled)'), { ...P.PLAYER_KEY })
+  assert.deepEqual(rule('#playerContent .player-key:not(.key-disabled):active'), { ...P.PLAYER_KEY_PRESSED })
   // Recessed displays keep their content-box well and squared radius, now with a recessed face
   for (const s of ['.fullscreen #playerTrack', '.fullscreen .total-track']) {
     assert.equal(rule(s)['background-image'], P.RECESSED_FACE, s)
@@ -872,4 +872,179 @@ test('Gate H: the LLAMA destructive key glyph is pure white (non-text contrast),
       ) >= 3,
       String(a)
     )
+})
+
+// --- Phase 4B: LLAMA secondary control finish (player and mini-player keys) ---
+
+const PAINT_ONLY = /^(background-color|background-image|box-shadow|border-radius|color|-webkit-text-stroke)$/
+const GEOMETRY_PROPERTY = /^(width|height|min-|max-|padding|margin|border(-width|-style)?$|top|right|bottom|left|inset|position|display|flex|gap|transform|translate|scale|line-height|font|letter-spacing|text-|overflow|z-index)/
+const KEY_SELECTORS = ['#playerContent .player-key:not(.key-disabled)', '#playerContent .player-key:not(.key-disabled):active']
+const LEGEND_SELECTORS = ['#playerContent .jump-icon:not(.key-disabled)', '#playerContent .next-icon:not(.key-disabled)']
+
+test('Phase 4B player keys are a dedicated, frozen, paint-only primitive; the shared KEY_CAP is untouched', () => {
+  const P = presets.PRIMITIVES
+  for (const set of [P.PLAYER_KEY, P.PLAYER_KEY_PRESSED, P.PLAYBACK_LEGEND, P.PLAYBACK_GLYPH_WEIGHT]) {
+    assert.ok(Object.isFrozen(set))
+    for (const [property, value] of Object.entries(set)) {
+      assert.match(property, PAINT_ONLY, property)
+      assert.doesNotMatch(property, GEOMETRY_PROPERTY, property)
+      assert.match(value, SAFE_VALUE, `${property}: ${value}`)
+    }
+  }
+  // Every other surface that uses KEY_CAP (selectors, dropdowns, steppers, row play buttons, ...) keeps exactly the old key cap
+  assert.deepEqual({ ...P.KEY_CAP }, { 'border-radius': P.RADIUS.key, 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
+  assert.deepEqual({ ...P.KEY_CAP_PRESSED }, { 'background-image': 'none', 'box-shadow': P.PRESSED_BEVEL })
+  const rules = presets.presentationRules([llama()])
+  const root = engine.themeSelector('llama')
+  for (const s of ['.library-selector', '.row-play-btn', '.dropdown-button:not(:disabled)', '.modal .playback-option-panel .icon-num-btn:not(:disabled)']) assert.deepEqual(rules[`${root} ${s}`], { ...P.KEY_CAP }, s)
+  // Resting key: squared, with its own face fill (the recessed token, translucent so it follows the deck) and a sheen
+  assert.equal(P.PLAYER_KEY['border-radius'], P.RADIUS.key)
+  assert.match(P.PLAYER_KEY['background-color'], /^rgb\(var\(--color-recessed\) \/ 0\.\d+\)$/)
+  assert.match(P.PLAYER_KEY['background-image'], /^linear-gradient\(180deg, rgb\(var\(--color-edge-light\)/)
+  // Edge depth: lit and dark inner bevel, a second faint highlight line, a dark outer ring and a drop shadow (all box-shadow layers)
+  const edge = P.PLAYER_KEY['box-shadow'].split(/, (?=inset|0)/)
+  assert.ok(edge.length >= 5, P.PLAYER_KEY['box-shadow'])
+  assert.ok(
+    edge.some((l) => /^inset 1px 1px 0 rgb\(var\(--color-edge-light\)/.test(l)),
+    'lit inner edge'
+  )
+  assert.ok(
+    edge.some((l) => /^inset -1px -1px 0 rgb\(var\(--color-edge-dark\)\)/.test(l)),
+    'dark inner edge'
+  )
+  assert.ok(
+    edge.some((l) => /^0 0 0 1px rgb\(var\(--color-edge-dark\)\)/.test(l)),
+    'dark outer ring'
+  )
+  assert.ok(
+    edge.some((l) => /^0 2px 3px rgb\(0 0 0/.test(l)),
+    'drop shadow'
+  )
+  // Pressed: no sheen, no drop shadow, an inverted inner bevel and an inner shade; the ring stays
+  assert.equal(P.PLAYER_KEY_PRESSED['background-image'], 'none')
+  assert.match(P.PLAYER_KEY_PRESSED['box-shadow'], /^inset 1px 1px 0 rgb\(var\(--color-edge-dark\)\), inset -1px -1px 0 rgb\(var\(--color-edge-light\)/)
+  assert.match(P.PLAYER_KEY_PRESSED['box-shadow'], /inset 0 3px 6px rgb\(0 0 0/)
+  assert.doesNotMatch(P.PLAYER_KEY_PRESSED['box-shadow'], /(^|, )0 2px 3px/)
+  assert.notEqual(P.PLAYER_KEY['box-shadow'], P.PLAYER_KEY_PRESSED['box-shadow'])
+  // Playback legend: exactly the played-progress amber, nothing else
+  assert.deepEqual({ ...P.PLAYBACK_LEGEND }, { color: 'rgb(var(--color-track-cursor))' })
+  // Heavier playback glyphs: a hairline stroke in the glyph's own color (restrained: at most 0.6px), ink only
+  assert.deepEqual({ ...P.PLAYBACK_GLYPH_WEIGHT }, { '-webkit-text-stroke': '0.5px currentColor' })
+  assert.ok(parseFloat(P.PLAYBACK_GLYPH_WEIGHT['-webkit-text-stroke']) <= 0.6)
+})
+
+test('Phase 4B rules are LLAMA-only paint: Dark, Black and Light get nothing', () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  for (const s of [...KEY_SELECTORS, ...LEGEND_SELECTORS]) {
+    const declarations = rules[`${root} ${s}`]
+    assert.ok(declarations, s)
+    for (const property of Object.keys(declarations)) {
+      assert.match(property, PAINT_ONLY, `${s}: ${property}`)
+      assert.doesNotMatch(property, GEOMETRY_PROPERTY, `${s}: ${property}`)
+    }
+  }
+  // The collapsed player's deeper key face is one more paint-only rule on the same hook
+  assert.deepEqual(rules[`${root} #streamContainer:not(.fullscreen) #playerContent .player-key:not(.key-disabled)`], { 'background-color': presets.PRIMITIVES.PLAYER_KEY_FACE_MINI })
+  // No selector with a player hook can escape the LLAMA root (a comma list would leave a second selector unscoped)
+  for (const selector of Object.keys(rules)) {
+    if (/player-key|jump-icon|next-icon/.test(selector)) {
+      assert.ok(selector.startsWith(`${root} `), selector)
+      assert.ok(!selector.slice(root.length).includes(','), selector)
+    }
+  }
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+test('Phase 4B amber is playback only: both jumps and chapter start/end; utility keys stay neutral', async () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  assert.deepEqual(rules[`${root} ${LEGEND_SELECTORS[0]}`], { ...P.PLAYBACK_LEGEND })
+  assert.deepEqual(rules[`${root} ${LEGEND_SELECTORS[1]}`], { ...P.PLAYBACK_LEGEND, ...P.PLAYBACK_GLYPH_WEIGHT })
+  // The jump keys' glyph (not their label) takes the heavier weight; an unavailable key takes neither
+  assert.deepEqual(rules[`${root} #playerContent .jump-icon:not(.key-disabled) > .material-symbols`], { ...P.PLAYBACK_GLYPH_WEIGHT })
+  // The generic key rules paint no glyph color, so no key gets amber (or any other legend) by default
+  for (const s of KEY_SELECTORS) assert.ok(!('color' in rules[`${root} ${s}`]), s)
+  // Among the player's key and transport rules the amber token appears on exactly the two legend selectors
+  const amber = Object.entries(rules).filter(([selector, d]) => /#playerContent|#playerControls/.test(selector) && Object.values(d).some((v) => String(v).includes('--color-track-cursor')))
+  assert.deepEqual(amber.map(([selector]) => selector.slice(root.length + 1)).sort(), [...LEGEND_SELECTORS].sort())
+  // The hooks sit on the four transport keys only: queue, bookmark, sleep and chapters carry neither hook
+  const player = await read('../components/app/AudioPlayer.vue')
+  const template = player.slice(0, player.indexOf('</template>'))
+  assert.equal((template.match(/jump-icon/g) || []).length, 2)
+  assert.equal((template.match(/next-icon/g) || []).length, 2)
+  for (const utility of [/showQueueIcon" class="[^"]*"/, /class="player-key material-symbols text-3xl text-fg-muted[^"]*"/, /<svg v-if="!sleepTimerRunning"[^>]*class="[^"]*"/, /class="player-key material-symbols text-3xl text-fg cursor-pointer"/]) {
+    const m = template.match(utility)
+    assert.ok(m, String(utility))
+    assert.doesNotMatch(m[0], /jump-icon|next-icon/, m[0])
+  }
+  // The silver primary play control is not a player key and keeps its own recipe
+  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { 'background-image': P.PRIMARY_STEEL, 'box-shadow': `${P.RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` })
+  assert.deepEqual(rules[`${root} #playerControls .play-btn:active`], { 'background-image': P.PRIMARY_STEEL_PRESSED, 'box-shadow': P.PRESSED_BEVEL })
+  assert.ok(!Object.keys(rules).some((s) => /play-btn/.test(s) && /player-key/.test(s)))
+})
+
+test('Phase 4B states stay distinct: unavailable keys get no cap and no legend; pressed differs from resting', () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  // Every key and legend rule excludes the unavailable state, so a key-disabled key keeps no face, ring or amber, only its dimmed glyph
+  for (const s of [...KEY_SELECTORS, ...LEGEND_SELECTORS]) assert.ok(s.includes(':not(.key-disabled)'), s)
+  assert.ok(!Object.keys(rules).some((s) => s.includes('.key-disabled') && !s.includes(':not(.key-disabled)')), 'no rule paints a key-disabled key')
+  const resting = rules[`${root} ${KEY_SELECTORS[0]}`]
+  const pressed = rules[`${root} ${KEY_SELECTORS[1]}`]
+  assert.notEqual(resting['box-shadow'], pressed['box-shadow'])
+  assert.notEqual(resting['background-image'], pressed['background-image'])
+  assert.ok(!('background-color' in pressed), 'pressed keeps the same face fill; only the finish changes')
+})
+
+test('Phase 4B contrast: the key face is darker than its deck, the legend and glyphs clear AA on it', () => {
+  const P = presets.PRIMITIVES
+  const t = llama().tokens
+  const alphaOf = (value) => Number(value.match(/\/ (0\.\d+)\)/)[1])
+  const face = (deck, alpha) => t['surface.recessed'].map((c, i) => c * alpha + deck[i] * (1 - alpha))
+  // Decks: the fullscreen panel (surface.content, resting face) and the collapsed player (surface.base, deeper face)
+  const cases = { 'surface.content': alphaOf(P.PLAYER_KEY['background-color']), 'surface.base': alphaOf(P.PLAYER_KEY_FACE_MINI) }
+  assert.ok(cases['surface.base'] > cases['surface.content'], 'the collapsed player needs the deeper face')
+  for (const [name, alpha] of Object.entries(cases)) {
+    const deck = t[name]
+    const key = face(deck, alpha)
+    assert.ok(luminance(key) < luminance(deck), `${name}: face darker than deck`)
+    const separation = contrast(key, deck)
+    assert.ok(separation >= 1.1 && separation <= 2, `${name}: key vs deck ${separation.toFixed(2)}:1 stays a visible but restrained step`)
+    // The legend includes the 10px "10s" label, so it must clear the text threshold, not only the icon threshold
+    assert.ok(contrast(t['progress.played'], key) >= 4.5, `${name}: amber legend on key face`)
+    // Neutral utility glyphs: muted (bookmark, sleep, queue) and the 75% primary (chapters) over the face
+    assert.ok(contrast(t['text.muted'], key) >= 4.5, `${name}: muted glyph on key face`)
+    const dim = t['text.default'].map((c, i) => c * 0.75 + key[i] * 0.25)
+    assert.ok(contrast(dim, key) >= 4.5, `${name}: 75% glyph on key face`)
+  }
+  // The silver primary play face is why amber must never go on it (the reason the legend is limited to the dark keys)
+  const silver = [112, 121, 136]
+  assert.ok(contrast(t['progress.played'], silver) < 3, 'amber on the silver play face fails 3:1')
+})
+
+test('Phase 4B rules compile through Tailwind under the LLAMA root only', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const block = (selector) => {
+    const i = css.indexOf(`${selector} {`)
+    assert.ok(i >= 0, selector)
+    return css.slice(i, css.indexOf('}', i))
+  }
+  const root = "html[data-theme='llama']"
+  assert.match(block(`${root} #playerContent .player-key:not(.key-disabled)`), /background-color: rgb\(var\(--color-recessed\) \/ 0\.\d+\)/)
+  assert.match(block(`${root} #playerContent .player-key:not(.key-disabled):active`), /background-image: none/)
+  for (const s of LEGEND_SELECTORS) assert.match(block(`${root} ${s}`), /color: rgb\(var\(--color-track-cursor\)\)/, s)
+  assert.match(block(`${root} #playerContent .jump-icon:not(.key-disabled) > .material-symbols`), /-webkit-text-stroke: 0\.5px currentColor/)
+  assert.match(block(`${root} #playerContent .next-icon:not(.key-disabled)`), /-webkit-text-stroke: 0\.5px currentColor/)
+  // Every compiled rule that mentions a player hook is under the LLAMA root
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)) {
+    for (const selector of m[1].split(',')) if (/player-key|jump-icon|next-icon/.test(selector)) assert.ok(selector.trim().startsWith("html[data-theme='llama'] "), selector.trim())
+  }
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
