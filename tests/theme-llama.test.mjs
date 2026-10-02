@@ -163,8 +163,10 @@ test('LLAMA progress repaint targets only unfinished playback bars and the curre
   const selectors = Object.keys(presets.presentationRules([llama()]))
   const progress = selectors.filter((s) => s.includes('bg-yellow-400'))
   assert.deepEqual(progress, ["html[data-theme='llama'] .modal .chapters-panel li > .bg-yellow-400", "html[data-theme='llama'] .absolute.bottom-0.left-0.z-10.bg-yellow-400"])
+  // The one Gate H exception names bg-error only to whiten the glyph on it; the error fill itself is untouched
+  const errorGlyph = "html[data-theme='llama'] .icon-btn.border.bg-error:not(:disabled) > .material-symbols"
   for (const s of selectors) {
-    assert.doesNotMatch(s, /warning|bg-success|text-success|bg-error/, s)
+    if (s !== errorGlyph) assert.doesNotMatch(s, /warning|bg-success|text-success|bg-error/, s)
     if (s.includes('bg-yellow-400')) assert.ok(s.includes('.absolute.bottom-0.left-0.z-10') || s.includes('.chapters-panel li > '), s) // never bare yellow
   }
   const rules = presets.presentationRules([llama()])
@@ -289,7 +291,7 @@ test('artwork frame targets artwork via the card-artwork hook, never a whole lis
 test('only bordered icon buttons get the steel key treatment; borderless icon buttons stay bare glyphs', async () => {
   const rules = presets.presentationRules([llama()])
   const iconSelectors = Object.keys(rules).filter((s) => s.includes('icon-btn'))
-  assert.deepEqual(iconSelectors, ["html[data-theme='llama'] .icon-btn.border:not(:disabled)", "html[data-theme='llama'] .icon-btn.border:not(:disabled):active"])
+  assert.deepEqual(iconSelectors, ["html[data-theme='llama'] .icon-btn.border:not(:disabled)", "html[data-theme='llama'] .icon-btn.border:not(:disabled):active", "html[data-theme='llama'] .icon-btn.border.bg-error:not(:disabled) > .material-symbols"])
   // The components add `border` exactly when the button is not borderless
   const iconBtn = await read('../components/ui/IconBtn.vue')
   assert.match(iconBtn, /if \(!this\.borderless\) \{\s*classes\.push\(`bg-\$\{this\.bgColor\} border border-gray-600`\)/)
@@ -794,7 +796,7 @@ test('Gate E rules: paint only, primitives, and control-state semantics', () => 
   assert.ok(!gateE.some(([s]) => s.includes('icon-btn')))
   assert.deepEqual(
     Object.keys(rules).filter((s) => s.includes('icon-btn')),
-    [`${root} .icon-btn.border:not(:disabled)`, `${root} .icon-btn.border:not(:disabled):active`]
+    [`${root} .icon-btn.border:not(:disabled)`, `${root} .icon-btn.border:not(:disabled):active`, `${root} .icon-btn.border.bg-error:not(:disabled) > .material-symbols`]
   )
 })
 
@@ -835,4 +837,23 @@ test('Gate E rules compile through Tailwind (pseudo-elements and :has included);
   for (const s of ['.toggle-btn.selected', '.range-input input[type=range]::-webkit-slider-thumb', '.checkbox-box:has(input:focus-visible)', '.checkbox-box.checkbox-disabled', '.dropdown-button:not(:disabled)', '.modal .dialog-panel ul[role=listbox] > li.option-selected', '.membership-marker']) assert.ok(css.includes(`${root} ${s} {`), s)
   for (const hook of ['range-input', 'checkbox-box', 'dropdown-button', 'dropdown-menu', 'dialog-panel', 'membership-marker']) assert.ok(!new RegExp(`(^|\\n|\\})\\s*\\.${hook}\\b`).test(css), `no unscoped ${hook} rule`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+test('Gate H: the LLAMA destructive key glyph is pure white (non-text contrast), and nothing else about icon buttons changes', () => {
+  const rules = presets.presentationRules([llama()])
+  const root = "html[data-theme='llama']"
+  assert.deepEqual(rules[`${root} .icon-btn.border.bg-error:not(:disabled) > .material-symbols`], { color: 'rgb(255 255 255)' })
+  // Paint only: the glyph color, no size/spacing properties
+  for (const [selector, declarations] of Object.entries(rules)) if (selector.includes('bg-error')) assert.deepEqual(Object.keys(declarations), ['color'], selector)
+  // White on the error fill clears 3:1 at every point of the steel sheen (edge-light at 0-18% over #FF5252)
+  const t = llama().tokens
+  const edge = presets.equipmentDerivedDeclarations(t)['--color-edge-light'].split(' ').map(Number)
+  for (const a of [0, 0.09, 0.18])
+    assert.ok(
+      contrast(
+        [255, 255, 255],
+        t['state.error'].map((c, i) => edge[i] * a + c * (1 - a))
+      ) >= 3,
+      String(a)
+    )
 })

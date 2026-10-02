@@ -113,6 +113,9 @@ const EQUIPMENT_RULES = [
   // borderless icon buttons are intentionally bare glyphs and stay that way
   ['.icon-btn.border:not(:disabled)', { 'background-image': STEEL_SHEEN, 'box-shadow': RAISED_BEVEL }],
   ['.icon-btn.border:not(:disabled):active', KEY_CAP_PRESSED],
+  // Destructive key glyph: LLAMA's near-white text on the sheened error fill is 2.80:1; pure white keeps the
+  // icon above the 3:1 non-text minimum (Gate H, measured 3.2:1)
+  ['.icon-btn.border.bg-error:not(:disabled) > .material-symbols', { color: 'rgb(255 255 255)' }],
 
   // Text fields and selects: recessed display wells
   ['input:not([type=range]):not([type=checkbox]):not([type=radio])', { 'background-color': 'rgb(var(--color-recessed))', 'box-shadow': RECESSED_WELL }],
