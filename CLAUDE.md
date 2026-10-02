@@ -21,7 +21,14 @@ npx cap open ios             # open Xcode
 npm run devlive              # live reload via ionic cap run on connected device
 ```
 
-There are no automated tests in this project.
+Automated tests (both also run in the Build APK CI workflow):
+
+```bash
+node --test tests/*.test.mjs         # JS suite (theme, widget theme, playback queue); needs npm install, not generate
+cd android && ./gradlew testDebugUnitTest   # Kotlin JVM + Robolectric unit tests (diagnostics, restore store, widget)
+```
+
+Use the glob form for the JS suite: `node --test tests/` fails on Node 22+.
 
 ## Architecture
 
@@ -29,7 +36,7 @@ There are no automated tests in this project.
 
 **JS Layer (NuxtJS)** → compiled to `dist/` → synced into native shells via Capacitor.
 
-**Native Layer (Android/Kotlin)** in `android/app/src/main/java/com/audiobookshelf/app/`.
+**Native Layer (Android/Kotlin)** in `android/app/src/main/java/app/absplus/android/` (package and application ID `app.absplus.android`; debug builds add `.debug`).
 
 ### Custom Capacitor Plugins
 
@@ -68,7 +75,7 @@ The bridge between JS and native is five custom Capacitor plugins. Each has a JS
 
 ### Vuex Store
 
-- `store/index.js` — Global state: network status, current playback session, player playing/fullscreen state, cast availability, playlist queue.
+- `store/index.js` — Global state: network status, current playback session, player playing/fullscreen state, cast availability, playback queue (`playbackQueue`).
 - `store/user.js` — Auth token, server connection config, user object (permissions, media progress, bookmarks), user settings.
 - `store/libraries.js` — Library list, current library ID, filter data.
 - `store/globals.js` — Modal open state and other UI globals.
@@ -79,7 +86,7 @@ Playlist playback uses a two-layer approach so advancement works even when the s
 
 **Native layer** (`PlayerNotificationService.kt`): Holds `playlistQueue: List<PlaylistQueueItem>` and `playlistQueueIndex`. When ExoPlayer fires `STATE_ENDED`, `PlayerListener` calls `advancePlaylistQueue()` directly on the service. This calls `preparePlayer()` for the next item (local: from DB; server: via `apiHandler.playLibraryItem()`) without touching the JS layer at all.
 
-**JS layer** (`AudioPlayerContainer.vue` + `pages/playlist/_id.vue`): When a playlist starts, `AbsAudioPlayer.setPlaylistQueue(items, currentIndex)` is called to sync the native queue. When `onPlaybackEnded` fires in JS (app in foreground), it only updates the Vuex `currentIndex` for UI purposes — it does NOT trigger playback. `AbsAudioPlayer.clearPlaylistQueue()` is called when a non-playlist item is started.
+**JS layer** (`AudioPlayerContainer.vue` + `utils/playbackQueue.js`): The queue is the central Vuex `playbackQueue` (`{ sourceType, sourceId, items, currentIndex }`). Pages do not set it up themselves (`pages/playlist/_id.vue` no longer calls `setPlaylistQueue`); they emit `play-item` with a queue source, and `AudioPlayerContainer` resolves the queue for playlists, collections and series (`resolvePlaybackQueue`), syncs it with `AbsAudioPlayer.setPlaylistQueue(items, currentIndex)`, then starts playback. A request without a source clears the queue (`clearPlaylistQueue()`). When `onPlaybackEnded` fires in JS, it reads the native queue (`AbsAudioPlayer.getPlaylistQueue()`) and re-syncs the Vuex `currentIndex` from it — it does NOT trigger playback. Up Next edits go through `mutateQueue`, which resyncs instead of writing if native already advanced. See `docs/continuous-playback.md`.
 
 **`AbsAudioPlayer.kt` background suppression**: `onMetadata` events are suppressed while backgrounded (`isInForeground == false`) except for `ENDED` state. Do not remove this exemption — it allows the JS Vuex state to sync when the app returns to foreground after an episode ended.
 
