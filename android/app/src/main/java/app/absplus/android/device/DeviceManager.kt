@@ -22,6 +22,13 @@ interface WidgetEventEmitter {
    */
   fun onPlayerChanged(pns: PlayerNotificationService)
 
+  /**
+   * Called with a playback position the player already sampled (progress sync while playing, or a
+   * confirmed seek), so the widget's time and progress follow playback without polling the player.
+   * @param positionMs absolute position in the item, in milliseconds
+   */
+  fun onPlaybackPosition(pns: PlayerNotificationService, positionMs: Long)
+
   /** Called when the player is closed. */
   fun onPlayerClosed()
 }
@@ -203,17 +210,25 @@ object DeviceManager {
     DLog.d(tag, "Initializing widget updater")
     widgetUpdater =
             (object : WidgetEventEmitter {
-              override fun onPlayerChanged(pns: PlayerNotificationService) {
-                val isPlaying = pns.currentPlayer.isPlaying
+              override fun onPlayerChanged(pns: PlayerNotificationService) = render(pns, null)
 
+              override fun onPlaybackPosition(pns: PlayerNotificationService, positionMs: Long) = render(pns, positionMs)
+
+              // sampledPositionMs: a position the player already sampled; null reads the live position
+              private fun render(pns: PlayerNotificationService, sampledPositionMs: Long?) {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MediaPlayerWidget::class.java)
                 val ids = appWidgetManager.getAppWidgetIds(componentName)
+                if (sampledPositionMs != null && ids.isEmpty()) return
+
+                // A position-only redraw keeps the play state the player intends: a seek briefly buffers
+                // (isPlaying=false), which the play-state events also ignore
+                val isPlaying = if (sampledPositionMs != null) pns.currentPlayer.playWhenReady else pns.currentPlayer.isPlaying
                 val playbackSession = pns.getCurrentPlaybackSessionCopy() ?: deviceData.lastPlaybackSession
                 val hasLiveSession = pns.currentPlaybackSession != null && !PlayerNotificationService.isClosed
                 val showControls = hasLiveSession || (deviceData.lastPlaybackSession != null && PlaybackRestoreStore.isResumable(context))
                 // Progress snapshot for the widget (read only; never throws into the player)
-                val positionMs = if (hasLiveSession) runCatching { pns.getCurrentTime() }.getOrNull() else null
+                val positionMs = if (hasLiveSession) sampledPositionMs ?: runCatching { pns.getCurrentTime() }.getOrNull() else null
                 val durationMs = if (hasLiveSession) runCatching { pns.getDuration() }.getOrNull()?.takeIf { it > 0 } else null
 
                 for (widgetId in ids) {

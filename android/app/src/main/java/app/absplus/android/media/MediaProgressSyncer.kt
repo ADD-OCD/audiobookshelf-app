@@ -207,6 +207,9 @@ class MediaProgressSyncer(
       return
     }
 
+    // The widget shows the confirmed seek position right away (also while paused, e.g. its own jump keys)
+    playerNotificationService.showWidgetPosition(currentPlaybackSession?.id, currentPlaybackSession?.currentTime)
+
     MediaEventManager.seekEvent(currentPlaybackSession!!, null)
   }
 

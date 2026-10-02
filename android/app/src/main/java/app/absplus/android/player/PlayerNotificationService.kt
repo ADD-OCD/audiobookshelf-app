@@ -1132,6 +1132,16 @@ class PlayerNotificationService : MediaBrowserServiceCompat() {
     if (sessionId == null || session.id != sessionId) return
     session.currentTime = currentTime
     DeviceManager.updateLastPlaybackPosition(sessionId, currentTime)
+    // While playing, the same sample keeps the widget's time and progress moving (about every sync
+    // tick). A pause is drawn by the play-state change, so a paused clock is never redrawn.
+    if (currentPlayer.isPlaying) showWidgetPosition(sessionId, currentTime)
+  }
+
+  /** Shows an already-sampled position of this session on the widget. Presentation only. */
+  fun showWidgetPosition(sessionId: String?, currentTime: Double?) {
+    val session = currentPlaybackSession ?: return
+    if (sessionId == null || currentTime == null || session.id != sessionId) return
+    DeviceManager.widgetUpdater?.onPlaybackPosition(this, (currentTime * 1000).toLong())
   }
 
   fun getCurrentPlaybackSessionCopy(): PlaybackSession? {
