@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- LLAMA widget primary key (Play/Pause): the lighter steel face with a raised bevel; the bevel inverts while pressed. Unchanged by the secondary-key finish, so Play/Pause stays the lightest key, like the app's silver Play/Pause. -->
+<!-- LLAMA widget primary key (Play/Pause), Phase 4H: the same dark equipment face as the secondary key, made primary by
+     its central position, a stronger bezel and its solid amber glyph, the widget counterpart of the app's dark primary
+     Play/Pause key. Resting, from the outside in: a lit return ring, a dark channel, the lit top/left and dark
+     bottom/right inner edge, and the sheen face (lit top, shaded bottom). Pressed: the ring and channel stay, the inner
+     edge inverts and the face is cut in, with its shade falling from the top. Drawn inside the view's own bounds (all
+     key geometry comes from the layout's size, margin and padding), with the 4dp key corners. All colors are generated. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
   <item android:state_pressed="true">
     <layer-list>
@@ -9,16 +14,25 @@
           <solid android:color="@color/widget_llama_edge_light_35" />
         </shape>
       </item>
-      <item android:bottom="1dp" android:right="1dp">
+      <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
           <solid android:color="@color/widget_llama_edge_dark" />
         </shape>
       </item>
-      <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
+      <item android:bottom="2dp" android:left="3dp" android:right="2dp" android:top="3dp">
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
-          <solid android:color="@color/widget_llama_content" />
+          <solid android:color="@color/widget_llama_edge_light_35" />
+        </shape>
+      </item>
+      <item android:bottom="3dp" android:left="3dp" android:right="3dp" android:top="3dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="4dp" />
+          <gradient
+            android:angle="270"
+            android:endColor="@color/widget_llama_key_face"
+            android:startColor="@color/widget_llama_key_pressed_shade" />
         </shape>
       </item>
     </layer-list>
@@ -28,19 +42,29 @@
       <item>
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
-          <solid android:color="@color/widget_llama_edge_dark" />
-        </shape>
-      </item>
-      <item android:bottom="1dp" android:right="1dp">
-        <shape android:shape="rectangle">
-          <corners android:radius="4dp" />
-          <solid android:color="@color/widget_llama_edge_light_55" />
+          <solid android:color="@color/widget_llama_edge_light_35" />
         </shape>
       </item>
       <item android:bottom="1dp" android:left="1dp" android:right="1dp" android:top="1dp">
         <shape android:shape="rectangle">
           <corners android:radius="4dp" />
-          <solid android:color="@color/widget_llama_raised" />
+          <solid android:color="@color/widget_llama_edge_dark" />
+        </shape>
+      </item>
+      <item android:bottom="3dp" android:left="2dp" android:right="3dp" android:top="2dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="4dp" />
+          <solid android:color="@color/widget_llama_edge_light_55" />
+        </shape>
+      </item>
+      <item android:bottom="3dp" android:left="3dp" android:right="3dp" android:top="3dp">
+        <shape android:shape="rectangle">
+          <corners android:radius="4dp" />
+          <gradient
+            android:angle="270"
+            android:centerColor="@color/widget_llama_key_face"
+            android:endColor="@color/widget_llama_key_shade"
+            android:startColor="@color/widget_llama_key_lit" />
         </shape>
       </item>
     </layer-list>
