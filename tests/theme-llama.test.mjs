@@ -217,9 +217,9 @@ const SAFE_VALUE = /^[a-z0-9 .,%()/#-]+$/i
 test('shared equipment primitives exist as fixed, frozen, paint-only recipe values', () => {
   const P = presets.PRIMITIVES
   assert.ok(Object.isFrozen(P))
-  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'PRIMARY_STEEL', 'PRIMARY_STEEL_PRESSED', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'ENGRAVED_SEPARATOR_TOP', 'RECESSED_FACE', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
-  // Radius scale: squared frames, squared keys/wells/panels, full rounding only for circular controls
-  assert.deepEqual({ ...P.RADIUS }, { frame: '2px', key: '4px', round: '9999px' })
+  for (const name of ['RADIUS', 'ELEVATION', 'RAISED_BEVEL', 'PRESSED_BEVEL', 'RECESSED_WELL', 'STEEL_SHEEN', 'PRIMARY_KEY', 'PRIMARY_KEY_PRESSED', 'CHASSIS_SHEEN', 'ARTWORK_FRAME', 'ENGRAVED_SEPARATOR', 'ENGRAVED_SEPARATOR_TOP', 'RECESSED_FACE', 'KEY_CAP', 'KEY_CAP_PRESSED', 'SELECTED_KEY']) assert.ok(P[name], name)
+  // Radius scale: squared frames, squared keys/wells/panels (Phase 4H squared the last round control, Play/Pause)
+  assert.deepEqual({ ...P.RADIUS }, { frame: '2px', key: '4px' })
   assert.ok(Object.isFrozen(P.RADIUS) && Object.isFrozen(P.ELEVATION))
   // Three elevation levels, increasing blur, each a plain black drop shadow
   assert.deepEqual(Object.keys(P.ELEVATION), ['raised', 'panel', 'overlay'])
@@ -249,7 +249,7 @@ test('shared equipment primitives exist as fixed, frozen, paint-only recipe valu
   assert.deepEqual({ ...P.KEY_CAP }, { 'border-radius': P.RADIUS.key, 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
   assert.deepEqual({ ...P.KEY_CAP_PRESSED }, { 'background-image': 'none', 'box-shadow': P.PRESSED_BEVEL })
   // Every string primitive is a safe paint value that references only derived edge colors or the accent token
-  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.PRIMARY_STEEL, P.PRIMARY_STEEL_PRESSED, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.ENGRAVED_SEPARATOR_TOP, P.RECESSED_FACE, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
+  for (const value of [P.RAISED_BEVEL, P.PRESSED_BEVEL, P.RECESSED_WELL, P.STEEL_SHEEN, P.CHASSIS_SHEEN, P.ARTWORK_FRAME, P.ENGRAVED_SEPARATOR, P.ENGRAVED_SEPARATOR_TOP, P.RECESSED_FACE, P.SELECTED_KEY['box-shadow'], ...Object.values(P.RADIUS), ...Object.values(P.ELEVATION)]) {
     assert.match(value, SAFE_VALUE, value)
     for (const v of value.match(/--[a-z-]+/g) || []) assert.ok(['--color-edge-light', '--color-edge-dark', '--color-accent'].includes(v), v)
   }
@@ -451,36 +451,17 @@ test('Gate B rules compile through Tailwind under the LLAMA root only', async ()
 
 // --- Phase 2C Gate B.1: primary play control steel finish ---
 
-test('Gate B.1 the round play button uses the stronger primary steel; every other steel surface keeps STEEL_SHEEN', () => {
+test('Gate B.1 steel stays on the secondary steel surfaces; the play button no longer uses steel (Phase 4H)', () => {
   const P = presets.PRIMITIVES
   const root = engine.themeSelector('llama')
   const rules = presets.presentationRules([llama()])
-  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { 'background-image': P.PRIMARY_STEEL, 'box-shadow': `${P.RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` })
-  // Same pressed behavior (inset bevel on :active); the face dims and inverts instead of dropping to the bare fill
-  assert.deepEqual(rules[`${root} #playerControls .play-btn:active`], { 'background-image': P.PRIMARY_STEEL_PRESSED, 'box-shadow': P.PRESSED_BEVEL })
-  // Only the play button uses the primary steel
-  const users = Object.entries(rules)
-    .filter(([, d]) => Object.values(d).some((v) => v === P.PRIMARY_STEEL || v === P.PRIMARY_STEEL_PRESSED))
-    .map(([s]) => s)
-  assert.deepEqual(users, [`${root} #playerControls .play-btn`, `${root} #playerControls .play-btn:active`])
+  // The silver PRIMARY_STEEL face of Gate B.1 is retired: Play/Pause is the dark primary key (see Phase 4H below)
+  assert.ok(!('PRIMARY_STEEL' in P) && !('PRIMARY_STEEL_PRESSED' in P))
+  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { ...P.PRIMARY_KEY })
   // Secondary keys and the other steel surfaces are unchanged
   assert.equal(P.KEY_CAP['background-image'], P.STEEL_SHEEN)
   assert.equal(P.STEEL_SHEEN, 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)')
   for (const s of ['#bookshelf-navbar', '.btn:not(:disabled)', '.icon-btn.border:not(:disabled)', '.bookshelfDivider']) assert.equal(rules[`${root} ${s}`]['background-image'], P.STEEL_SHEEN, s)
-  // Lit from the upper left like the bevels; the falloff darkens downward, and pressed inverts and dims it
-  assert.match(P.PRIMARY_STEEL, /^radial-gradient\(circle at \d+% \d+%, rgb\(var\(--color-edge-light\) \/ 0\.\d+\) 0%, rgb\(var\(--color-edge-light\) \/ 0\) \d+%\), linear-gradient\(180deg, /)
-  const alphas = (v) => [...v.matchAll(/--color-edge-light\) \/ (0\.\d+)\)/g)].map((m) => Number(m[1]))
-  const fall = alphas(P.PRIMARY_STEEL.slice(P.PRIMARY_STEEL.indexOf('linear-gradient')))
-  assert.ok(fall.length === 3 && fall[0] > fall[1] && fall[1] > fall[2], 'top-lit falloff')
-  const pressed = alphas(P.PRIMARY_STEEL_PRESSED)
-  assert.ok(pressed.length === 2 && pressed[0] < pressed[1] && pressed[1] < fall[0], 'pressed: inverted and dimmer')
-  // The white glyph keeps at least 3:1 against the brightest face point (falloff top plus the full highlight over surface.raised)
-  const t = llama().tokens
-  const edge = presets.equipmentDerivedDeclarations(t)['--color-edge-light'].split(' ').map(Number)
-  const over = (base, a) => base.map((c, i) => c + (edge[i] - c) * a)
-  const highlight = alphas(P.PRIMARY_STEEL)[0]
-  const brightest = over(over(t['surface.raised'], fall[0]), highlight)
-  assert.ok(contrast([255, 255, 255], brightest) >= 3, `glyph contrast ${contrast([255, 255, 255], brightest)}`)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
 
@@ -693,7 +674,7 @@ test('Gate D rules: paint only, built from the shared primitives, with LLAMA col
     assert.deepEqual(rule(s), { ...P.KEY_CAP }, s)
     assert.deepEqual(rule(`${s}:active`), { ...P.KEY_CAP_PRESSED }, s)
   }
-  for (const [selector, declarations] of gateD) assert.ok(!Object.values(declarations).includes(P.PRIMARY_STEEL), `${selector}: PRIMARY_STEEL is reserved for the play button`)
+  for (const [selector, declarations] of gateD) assert.ok(!Object.values(declarations).includes(P.PRIMARY_KEY['background-image']), `${selector}: the primary key face is reserved for the play button`)
   // Selection and activity: selected key + accent, never warning orange or success green
   assert.deepEqual(rule('.modal .library-option-panel li[role=option].option-selected'), { 'background-color': 'rgb(var(--color-bg))', ...P.SELECTED_KEY })
   assert.deepEqual(rule('.modal .library-option-panel .option-marker'), { 'background-color': 'rgb(var(--color-accent))' })
@@ -784,7 +765,7 @@ test('Gate E rules: paint only, primitives, and control-state semantics', () => 
       assert.match(value, SAFE_VALUE, `${selector}: ${value}`)
       assert.doesNotMatch(value, /--color-success|--color-warning|--color-error/, `${selector}: state colors keep their meaning`)
     }
-    assert.ok(!Object.values(declarations).includes(P.PRIMARY_STEEL), `${selector}: PRIMARY_STEEL stays the play button's`)
+    assert.ok(!Object.values(declarations).includes(P.PRIMARY_KEY['background-image']), `${selector}: the primary key face stays the play button's`)
   }
   // Toggles: raised segments; selected = selected key; pressed inverts
   assert.deepEqual(rule('.toggle-btn'), { 'background-image': P.STEEL_SHEEN, 'box-shadow': P.RAISED_BEVEL })
@@ -880,6 +861,7 @@ const PAINT_ONLY = /^(background-color|background-image|box-shadow|border-radius
 const GEOMETRY_PROPERTY = /^(width|height|min-|max-|padding|margin|border(-width|-style)?$|top|right|bottom|left|inset|position|display|flex|gap|transform|translate|scale|line-height|font|letter-spacing|text-|overflow|z-index)/
 const KEY_SELECTORS = ['#playerContent .player-key:not(.key-disabled)', '#playerContent .player-key:not(.key-disabled):active']
 const LEGEND_SELECTORS = ['#playerContent .jump-icon:not(.key-disabled)', '#playerContent .next-icon:not(.key-disabled)']
+const PRIMARY_LEGEND_SELECTORS = ['#playerControls .play-btn .material-symbols', '#playerControls .play-btn .la-ball-spin-clockwise']
 
 test('Phase 4B player keys are a dedicated, frozen, paint-only primitive; the shared KEY_CAP is untouched', () => {
   const P = presets.PRIMITIVES
@@ -966,9 +948,10 @@ test('Phase 4B amber is playback only: both jumps and chapter start/end; utility
   assert.deepEqual(rules[`${root} #playerContent .jump-icon:not(.key-disabled) > .material-symbols`], { ...P.PLAYBACK_GLYPH_WEIGHT })
   // The generic key rules paint no glyph color, so no key gets amber (or any other legend) by default
   for (const s of KEY_SELECTORS) assert.ok(!('color' in rules[`${root} ${s}`]), s)
-  // Among the player's key and transport rules the amber token appears on exactly the two legend selectors
+  // Among the player's key and transport rules the amber token appears on exactly the two legend selectors, plus the
+  // primary Play/Pause legend and its loading spinner (Phase 4H)
   const amber = Object.entries(rules).filter(([selector, d]) => /#playerContent|#playerControls/.test(selector) && Object.values(d).some((v) => String(v).includes('--color-track-cursor')))
-  assert.deepEqual(amber.map(([selector]) => selector.slice(root.length + 1)).sort(), [...LEGEND_SELECTORS].sort())
+  assert.deepEqual(amber.map(([selector]) => selector.slice(root.length + 1)).sort(), [...LEGEND_SELECTORS, ...PRIMARY_LEGEND_SELECTORS].sort())
   // The hooks sit on the four transport keys only: queue, bookmark, sleep and chapters carry neither hook
   const player = await read('../components/app/AudioPlayer.vue')
   const template = player.slice(0, player.indexOf('</template>'))
@@ -979,9 +962,9 @@ test('Phase 4B amber is playback only: both jumps and chapter start/end; utility
     assert.ok(m, String(utility))
     assert.doesNotMatch(m[0], /jump-icon|next-icon/, m[0])
   }
-  // The silver primary play control is not a player key and keeps its own recipe
-  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { 'background-image': P.PRIMARY_STEEL, 'box-shadow': `${P.RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` })
-  assert.deepEqual(rules[`${root} #playerControls .play-btn:active`], { 'background-image': P.PRIMARY_STEEL_PRESSED, 'box-shadow': P.PRESSED_BEVEL })
+  // The primary play control is not a player key and keeps its own recipe (Phase 4H)
+  assert.deepEqual(rules[`${root} #playerControls .play-btn`], { ...P.PRIMARY_KEY })
+  assert.deepEqual(rules[`${root} #playerControls .play-btn:active`], { ...P.PRIMARY_KEY_PRESSED })
   assert.ok(!Object.keys(rules).some((s) => /play-btn/.test(s) && /player-key/.test(s)))
 })
 
@@ -1053,7 +1036,10 @@ test('Phase 4B rules compile through Tailwind under the LLAMA root only', async 
 
 const READOUT = '.fullscreen .title-author-texts'
 const READOUT_ABOVE_TOTAL_TRACK = '.fullscreen .total-track ~ .title-author-texts'
-const READOUT_LAYOUT_PROPERTIES = { [READOUT]: ['left', 'width', 'padding', 'bottom'], [READOUT_ABOVE_TOTAL_TRACK]: ['bottom'] }
+// Phase 4H adds the primary glyph size (inside the unchanged Play/Pause box) as the recipe's only other geometry
+const PRIMARY_GLYPH_FULL = '.fullscreen #playerControls .play-btn .material-symbols'
+const PRIMARY_GLYPH_MINI = '#streamContainer:not(.fullscreen) #playerControls .play-btn .material-symbols'
+const READOUT_LAYOUT_PROPERTIES = { [READOUT]: ['left', 'width', 'padding', 'bottom'], [READOUT_ABOVE_TOTAL_TRACK]: ['bottom'], [PRIMARY_GLYPH_FULL]: ['font-size'], [PRIMARY_GLYPH_MINI]: ['font-size'] }
 
 test('Phase 4E readout is a recessed well in a bezel plate: frozen, paint-only, from the shared primitives', () => {
   const P = presets.PRIMITIVES
@@ -1078,7 +1064,7 @@ test('Phase 4E readout is a recessed well in a bezel plate: frozen, paint-only, 
   assert.notDeepEqual(rules[`${root} .fullscreen #playerTrack`], rules[`${root} ${READOUT}`])
 })
 
-test('Phase 4E geometry is the only geometry in the recipe, limited to the full-player readout and named properties', () => {
+test('Phase 4E geometry is the only geometry in the recipe besides the 4H glyph size, limited to named selectors and properties', () => {
   const root = engine.themeSelector('llama')
   const rules = presets.presentationRules([llama()])
   const P = presets.PRIMITIVES
@@ -1292,4 +1278,132 @@ test('Phase 4H: a pending seek spins only the play glyph; the play button face n
   assert.match(glyph, /:class="\{[^}]*'animate-spin': seekLoading[^}]*\}"/)
   assert.match(glyph, />\{\{ seekLoading \? 'autorenew' : !isPlaying \? 'play_arrow' : 'pause' \}\}</)
   assert.equal((template.match(/'animate-spin': seekLoading/g) || []).length, 1)
+})
+
+const PRIMARY_RULES = {
+  rest: '#playerControls .play-btn',
+  pressed: '#playerControls .play-btn:active',
+  restMini: '#streamContainer:not(.fullscreen) #playerControls .play-btn',
+  pressedMini: '#streamContainer:not(.fullscreen) #playerControls .play-btn:active'
+}
+
+test('Phase 4H primary key: squared on RADIUS.key, dark face, primary bezel; frozen paint only', () => {
+  const P = presets.PRIMITIVES
+  for (const set of [P.PRIMARY_KEY, P.PRIMARY_KEY_MINI, P.PRIMARY_KEY_PRESSED, P.PRIMARY_KEY_PRESSED_MINI]) {
+    assert.ok(Object.isFrozen(set))
+    for (const [property, value] of Object.entries(set)) {
+      assert.match(property, PAINT_ONLY, property)
+      assert.doesNotMatch(property, GEOMETRY_PROPERTY, property)
+      assert.match(value, SAFE_VALUE, `${property}: ${value}`)
+    }
+  }
+  // Squared on the existing key radius (no new radius); no round radius is left in the recipe
+  assert.equal(P.PRIMARY_KEY['border-radius'], P.RADIUS.key)
+  assert.ok(!Object.values(P.RADIUS).includes('9999px'))
+  // Dark face: the recessed token at 0.72 (0.85 collapsed) over the player's own fill, under the player-key sheen
+  // (background-image only, because the player sets the fill inline)
+  const sheen = P.PLAYER_KEY['background-image']
+  assert.equal(P.PRIMARY_KEY['background-image'], `${sheen}, linear-gradient(rgb(var(--color-recessed) / 0.72), rgb(var(--color-recessed) / 0.72))`)
+  assert.deepEqual({ ...P.PRIMARY_KEY_MINI }, { 'background-image': `${sheen}, linear-gradient(rgb(var(--color-recessed) / 0.85), rgb(var(--color-recessed) / 0.85))` })
+  assert.ok(!('background-color' in P.PRIMARY_KEY), 'the inline fill stays the base')
+  // Primary bezel, in order: lit inner edge, faint second highlight, dark inner edge, 1px dark channel, lit return ring, deeper drop
+  assert.deepEqual(P.PRIMARY_KEY['box-shadow'].split(/, (?=inset|0)/), ['inset 1px 1px 0 rgb(var(--color-edge-light) / 0.6)', 'inset 2px 2px 0 rgb(var(--color-edge-light) / 0.12)', 'inset -1px -1px 0 rgb(var(--color-edge-dark))', '0 0 0 1px rgb(var(--color-edge-dark))', '0 0 0 2px rgb(var(--color-edge-light) / 0.3)', '0 3px 5px rgb(0 0 0 / 0.55)'])
+  // Stronger than a secondary player key: the same inner bevel and channel, plus a return ring and a deeper drop
+  assert.ok(P.PRIMARY_KEY['box-shadow'].startsWith(P.PLAYER_KEY['box-shadow'].replace(/, 0 2px 3px rgb\(0 0 0 \/ 0\.5\)$/, '')))
+  assert.match(P.PLAYER_KEY['box-shadow'], /0 2px 3px rgb\(0 0 0 \/ 0\.5\)$/)
+  // No decoration: no texture, gloss, glass or radial highlight
+  assert.doesNotMatch(P.PRIMARY_KEY['background-image'], /radial|url|repeating/)
+})
+
+test('Phase 4H pressed: mechanically depressed in place (no movement), bezel ring retained', () => {
+  const P = presets.PRIMITIVES
+  const pressed = P.PRIMARY_KEY_PRESSED
+  assert.deepEqual(Object.keys(pressed).sort(), ['background-image', 'box-shadow'])
+  // Sheen removed, face deepened (0.86; 0.94 collapsed)
+  assert.equal(pressed['background-image'], 'linear-gradient(rgb(var(--color-recessed) / 0.86), rgb(var(--color-recessed) / 0.86))')
+  assert.deepEqual({ ...P.PRIMARY_KEY_PRESSED_MINI }, { 'background-image': 'linear-gradient(rgb(var(--color-recessed) / 0.94), rgb(var(--color-recessed) / 0.94))' })
+  // Inverted bevel, inner shade, channel and return ring kept, no drop shadow
+  assert.deepEqual(pressed['box-shadow'].split(/, (?=inset|0)/), ['inset 1px 1px 0 rgb(var(--color-edge-dark))', 'inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)', 'inset 0 3px 6px rgb(0 0 0 / 0.6)', '0 0 0 1px rgb(var(--color-edge-dark))', '0 0 0 2px rgb(var(--color-edge-light) / 0.3)'])
+  assert.doesNotMatch(pressed['box-shadow'], /(^|, )0 3px 5px/)
+  // Nothing in any primary state moves or resizes the key
+  const rules = presets.presentationRules([llama()])
+  const root = engine.themeSelector('llama')
+  for (const s of Object.values(PRIMARY_RULES)) for (const p of Object.keys(rules[`${root} ${s}`])) assert.doesNotMatch(p, /transform|translate|scale|top|left|margin|width|height/, `${s}: ${p}`)
+})
+
+test('Phase 4H rules: LLAMA-only primary key, amber Play/Pause, seek-pending and spinner, large glyph sizes', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const rule = (s) => rules[`${root} ${s}`]
+  assert.deepEqual(rule(PRIMARY_RULES.rest), { ...P.PRIMARY_KEY })
+  assert.deepEqual(rule(PRIMARY_RULES.pressed), { ...P.PRIMARY_KEY_PRESSED })
+  assert.deepEqual(rule(PRIMARY_RULES.restMini), { ...P.PRIMARY_KEY_MINI })
+  assert.deepEqual(rule(PRIMARY_RULES.pressedMini), { ...P.PRIMARY_KEY_PRESSED_MINI })
+  // One playback legend color for every glyph the key shows (play_arrow, pause, autorenew) and for its loading spinner
+  for (const s of PRIMARY_LEGEND_SELECTORS) assert.deepEqual(rule(s), { color: 'rgb(var(--color-track-cursor))' }, s)
+  assert.ok(!Object.entries(rules).some(([s, d]) => /play-btn/.test(s) && Object.values(d).some((v) => /--color-accent|--color-success/.test(v))), 'never green')
+  // Option E: large solid glyph, 2.8rem full (44.8px) and 1.875rem collapsed (30px); the boxes stay 65px / 40px
+  assert.deepEqual(rule(PRIMARY_GLYPH_FULL), { 'font-size': '2.8rem' })
+  assert.deepEqual(rule(PRIMARY_GLYPH_MINI), { 'font-size': '1.875rem' })
+  assert.ok(2.8 * 16 < 65 && 1.875 * 16 < 40)
+  // Every play-btn selector stays under the LLAMA root, with no comma list
+  const own = Object.keys(rules).filter((s) => s.includes('play-btn') && !s.includes('row-play-btn'))
+  assert.equal(own.length, 8)
+  for (const s of own) assert.ok(s.startsWith(`${root} `) && !s.slice(root.length).includes(','), s)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+test('Phase 4H contrast: the amber legend keeps at least 7:1 wherever the glyph can sit, in every face state', () => {
+  const t = llama().tokens
+  const edge = presets.equipmentDerivedDeclarations(t)['--color-edge-light'].split(' ').map(Number)
+  const over = (base, top, a) => base.map((c, i) => c + (top[i] - c) * a)
+  const amber = t['progress.played']
+  const base = t['surface.raised'] // the player's inline fill under the face
+  // The player-key sheen falls from edge-light 0.2 at the top to 0 at 45%. The brightest face point any glyph ink can
+  // reach is the top of the glyph's own (centered, square) box: 10.1px down a 65px key, 5px down a 40px key
+  assert.match(presets.PRIMITIVES.PLAYER_KEY['background-image'], /^linear-gradient\(180deg, rgb\(var\(--color-edge-light\) \/ 0\.2\) 0%, rgb\(var\(--color-edge-light\) \/ 0\) 45%/)
+  const sheenAt = (box, glyph) => 0.2 * (1 - (box - glyph) / 2 / box / 0.45)
+  for (const [label, face, sheen] of [
+    ['full rest', 0.72, sheenAt(65, 44.8)],
+    ['mini rest', 0.85, sheenAt(40, 30)],
+    ['full pressed', 0.86, 0],
+    ['mini pressed', 0.94, 0]
+  ]) {
+    const brightest = over(over(base, t['surface.recessed'], face), edge, sheen)
+    const ratio = contrast(amber, brightest)
+    assert.ok(ratio >= 7, `${label}: ${ratio.toFixed(2)}`)
+  }
+})
+
+test('Phase 4H CSS: the LLAMA glyph size and amber outrank the player rules; standard sizes and boxes unchanged', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const block = (selector) => {
+    const i = css.indexOf(`${selector} {`)
+    assert.ok(i >= 0, selector)
+    return css.slice(i, css.indexOf('}', i))
+  }
+  const root = "html[data-theme='llama']"
+  assert.match(block(`${root} #playerControls .play-btn`), /border-radius: 4px;[\s\S]*background-image: linear-gradient/)
+  assert.match(block(`${root} ${PRIMARY_GLYPH_FULL}`), /font-size: 2\.8rem/)
+  assert.match(block(`${root} ${PRIMARY_GLYPH_MINI}`), /font-size: 1\.875rem/)
+  assert.match(block(`${root} #playerControls .play-btn .la-ball-spin-clockwise`), /color: rgb\(var\(--color-track-cursor\)\)/)
+  assert.ok(!/(^|\n|\})\s*#playerControls \.play-btn \.la-ball-spin-clockwise/.test(css), 'no unscoped spinner rule')
+  // The player's own (standard) rules: glyph 2.1rem full / 1.5rem collapsed, boxes 65px / 40px, round face. The LLAMA
+  // selectors carry the theme root and one more class or id than these, so they win without !important
+  const player = await read('../components/app/AudioPlayer.vue')
+  const style = player.slice(player.indexOf('<style>'))
+  assert.match(style, /\n#playerControls \.play-btn \.material-symbols \{[^}]*font-size: 1\.5rem;/)
+  assert.match(style, /\.fullscreen #playerControls \.play-btn \.material-symbols \{\s*font-size: 2\.1rem;/)
+  assert.match(style, /#playerControls \.play-btn \{[^}]*height: 40px;\s*width: 40px;/)
+  assert.match(style, /\.fullscreen #playerControls \.play-btn \{\s*height: 65px;\s*width: 65px;/)
+  assert.match(player, /<div class="play-btn cursor-pointer shadow-sm flex items-center justify-center rounded-full text-primary mx-4 relative overflow-hidden" :style="\{ backgroundColor: coverChrome\.control \}"/)
+  // The spinner the rule targets is the player's loading spinner component
+  assert.match(player, /<widgets-spinner-icon v-else class="h-8 w-8" \/>/)
+  assert.match(await read('../components/widgets/SpinnerIcon.vue'), /<div class="la-ball-spin-clockwise la-dark la-sm">/)
 })

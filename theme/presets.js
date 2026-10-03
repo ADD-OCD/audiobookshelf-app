@@ -41,11 +41,10 @@ function equipmentDerivedDeclarations(tokens) {
 // light upper/left edges, dark lower/right edges, drop shadows falling down. Later gates compose rules from
 // these instead of adding one-off values. All are fixed repository values; theme data cannot supply any.
 
-// Radius scale: squared, restrained geometry. Circular playback controls keep their own full rounding.
+// Radius scale: squared, restrained geometry. Every key, the primary Play/Pause key included, uses `key`.
 const RADIUS = Object.freeze({
   frame: '2px', // artwork frames and fine detail
-  key: '4px', // wells, panels and equipment keys
-  round: '9999px' // circular controls only (e.g. the play button)
+  key: '4px' // wells, panels and equipment keys
 })
 
 // Edge treatments
@@ -53,12 +52,6 @@ const RAISED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-light) / 0.55), inset
 const PRESSED_BEVEL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.35)'
 const RECESSED_WELL = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.25), inset 0 2px 6px rgb(0 0 0 / 0.45)'
 const STEEL_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.18) 0%, rgb(var(--color-edge-light) / 0) 55%, rgb(0 0 0 / 0.18) 100%)'
-// Primary playback control (the round play/pause button): a stronger, near-opaque brushed-steel face so it reads
-// as silver-gray metal against the blue-gray chassis. It composes over the control's own fill: an upper-left
-// specular highlight (same light source as the bevels) over a top-to-bottom falloff. Secondary keys keep the
-// subtler STEEL_SHEEN. Pressed: the face dims and its falloff inverts (lit from below while pushed in)
-const PRIMARY_STEEL = 'radial-gradient(circle at 35% 25%, rgb(var(--color-edge-light) / 0.4) 0%, rgb(var(--color-edge-light) / 0) 55%), linear-gradient(180deg, rgb(var(--color-edge-light) / 0.72) 0%, rgb(var(--color-edge-light) / 0.5) 50%, rgb(var(--color-edge-light) / 0.28) 100%)'
-const PRIMARY_STEEL_PRESSED = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.3) 0%, rgb(var(--color-edge-light) / 0.45) 100%)'
 const CHASSIS_SHEEN = 'linear-gradient(180deg, rgb(var(--color-edge-light) / 0.1) 0%, rgb(var(--color-edge-light) / 0) 40%, rgb(0 0 0 / 0.2) 100%)'
 const ARTWORK_FRAME = '0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 2px rgb(var(--color-edge-light) / 0.45)'
 // A seam cut into the bottom of an element: dark inset line with a faint light return line below it.
@@ -103,6 +96,31 @@ const PLAYER_KEY_PRESSED = Object.freeze({
   'background-image': 'none',
   'box-shadow': `inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3), inset 0 3px 6px rgb(0 0 0 / 0.55), ${PLAYER_KEY_RING}`
 })
+// Primary Play/Pause key (Phase 4H): the same dark equipment key as the player keys, made primary by its size and
+// central position (the player's own 65px / 40px box), a stronger bezel and a deeper drop, not by a lighter face. The
+// player sets the button's fill inline (surface.raised), so the darker face is a translucent recessed layer over that
+// fill under the player-key sheen; the collapsed player's deck is already dark, so its face goes deeper. Bezel: the
+// player key's lit/dark inner bevel with its faint second highlight, a 1px dark channel, a lit return ring outside it
+// and a 0 3px 5px drop (player keys: 0 2px 3px). Squared on the key radius. Paint only, on the existing box.
+// Pressed: sheen and drop shadow go, the face deepens, the bevel inverts with an inner shade; channel and ring stay
+const PRIMARY_KEY_FACE = 'linear-gradient(rgb(var(--color-recessed) / 0.72), rgb(var(--color-recessed) / 0.72))'
+const PRIMARY_KEY_FACE_MINI = 'linear-gradient(rgb(var(--color-recessed) / 0.85), rgb(var(--color-recessed) / 0.85))'
+const PRIMARY_KEY_RING = `${PLAYER_KEY_RING}, 0 0 0 2px rgb(var(--color-edge-light) / 0.3)`
+const PRIMARY_KEY = Object.freeze({
+  'border-radius': RADIUS.key,
+  'background-image': `${PLAYER_KEY_SHEEN}, ${PRIMARY_KEY_FACE}`,
+  'box-shadow': `inset 1px 1px 0 rgb(var(--color-edge-light) / 0.6), inset 2px 2px 0 rgb(var(--color-edge-light) / 0.12), inset -1px -1px 0 rgb(var(--color-edge-dark)), ${PRIMARY_KEY_RING}, 0 3px 5px rgb(0 0 0 / 0.55)`
+})
+const PRIMARY_KEY_MINI = Object.freeze({ 'background-image': `${PLAYER_KEY_SHEEN}, ${PRIMARY_KEY_FACE_MINI}` })
+const PRIMARY_KEY_PRESSED = Object.freeze({
+  'background-image': 'linear-gradient(rgb(var(--color-recessed) / 0.86), rgb(var(--color-recessed) / 0.86))',
+  'box-shadow': `inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3), inset 0 3px 6px rgb(0 0 0 / 0.6), ${PRIMARY_KEY_RING}`
+})
+const PRIMARY_KEY_PRESSED_MINI = Object.freeze({ 'background-image': 'linear-gradient(rgb(var(--color-recessed) / 0.94), rgb(var(--color-recessed) / 0.94))' })
+// Its legend (Play, Pause, the seek-pending glyph and the loading spinner alike) is the playback amber, solid and large:
+// 2.8rem in the full player (from 2.1rem) and 1.875rem collapsed (from 1.5rem, the jump glyphs' size). The glyph size is
+// the recipe's second authorized geometry (Phase 4H): it sizes the glyph inside the unchanged 65px / 40px box only
+const PRIMARY_GLYPH_SIZE = Object.freeze({ full: Object.freeze({ 'font-size': '2.8rem' }), mini: Object.freeze({ 'font-size': '1.875rem' }) })
 // Playback legend: the played-progress amber, for transport keys whose meaning is playback (jumps and chapter steps)
 const PLAYBACK_LEGEND = Object.freeze({ color: 'rgb(var(--color-track-cursor))' })
 // Heavier playback glyphs. The bundled icon font has only a FILL axis (no weight axis, and FILL leaves these stroke
@@ -186,8 +204,6 @@ const PRIMITIVES = Object.freeze({
   PRESSED_BEVEL,
   RECESSED_WELL,
   STEEL_SHEEN,
-  PRIMARY_STEEL,
-  PRIMARY_STEEL_PRESSED,
   CHASSIS_SHEEN,
   ARTWORK_FRAME,
   ENGRAVED_SEPARATOR,
@@ -198,6 +214,11 @@ const PRIMITIVES = Object.freeze({
   SELECTED_KEY,
   PLAYER_KEY,
   PLAYER_KEY_PRESSED,
+  PRIMARY_KEY,
+  PRIMARY_KEY_MINI,
+  PRIMARY_KEY_PRESSED,
+  PRIMARY_KEY_PRESSED_MINI,
+  PRIMARY_GLYPH_SIZE,
   PLAYER_KEY_FACE_MINI,
   PLAYBACK_LEGEND,
   PLAYBACK_GLYPH_WEIGHT,
@@ -329,9 +350,16 @@ const EQUIPMENT_RULES = [
   // metadata-only layout. The collapsed player's block (no .fullscreen) is untouched
   ['.fullscreen .title-author-texts', { ...METADATA_READOUT, ...METADATA_READOUT_LAYOUT }],
   ['.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_ABOVE_TOTAL_TRACK],
-  // Transport: steel play button, raised; pressed = inset (other transport glyphs keep their look)
-  ['#playerControls .play-btn', { 'background-image': PRIMARY_STEEL, 'box-shadow': `${RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` }],
-  ['#playerControls .play-btn:active', { 'background-image': PRIMARY_STEEL_PRESSED, 'box-shadow': PRESSED_BEVEL }],
+  // Transport: the primary Play/Pause key (Phase 4H), squared dark key with the primary bezel; pressed cuts it in.
+  // Its glyph, seek-pending glyph and loading spinner share the playback amber; the glyph is sized up in its box
+  ['#playerControls .play-btn', PRIMARY_KEY],
+  ['#playerControls .play-btn:active', PRIMARY_KEY_PRESSED],
+  ['#streamContainer:not(.fullscreen) #playerControls .play-btn', PRIMARY_KEY_MINI],
+  ['#streamContainer:not(.fullscreen) #playerControls .play-btn:active', PRIMARY_KEY_PRESSED_MINI],
+  ['#playerControls .play-btn .material-symbols', PLAYBACK_LEGEND],
+  ['#playerControls .play-btn .la-ball-spin-clockwise', PLAYBACK_LEGEND],
+  ['.fullscreen #playerControls .play-btn .material-symbols', PRIMARY_GLYPH_SIZE.full],
+  ['#streamContainer:not(.fullscreen) #playerControls .play-btn .material-symbols', PRIMARY_GLYPH_SIZE.mini],
   // Collapsed mini-player: chassis top edge (same footprint)
   ['#streamContainer:not(.fullscreen) #playerContent', { 'box-shadow': 'inset 0 1px 0 rgb(var(--color-edge-light) / 0.45), 0 -8px 8px rgb(0 0 0 / 0.33)' }],
 
