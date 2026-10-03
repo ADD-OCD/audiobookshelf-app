@@ -86,9 +86,9 @@ Policies are ordinary enum tokens: invalid values fall back to `standard` / `leg
 LLAMA is an original Audiobookshelf+ theme inspired by the material language of late-1990s blue-gray audio equipment: a steel chassis, recessed black displays, phosphor-green readouts and amber progress. It uses no third-party skin assets, fonts or pixel values.
 
 - It is a built-in like the others (`id: 'llama'`, label `LabelThemeLlama`, `colorScheme: 'dark'`, `equipment` + `theme`). It appears last in Settings through the registry.
-- It styles the existing UI only. Layout, geometry, controls and behavior are unchanged.
+- It styles the existing UI only. Layout, geometry, controls and behavior are unchanged, with one authorized exception: the full player's metadata readout (Phase 4E, below).
 
-The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. It covers:
+The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. The single exception is the full-player metadata readout's own box (`left`, `width`, `padding`, `bottom` on `.fullscreen .title-author-texts`, and `bottom` with the total-track display shown); a test allows geometry properties on exactly those two selectors and nowhere else. It covers:
 
 - bevelled chassis on the app bar, bookshelf navigation, dialogs/menus and the drawer, with the selected tab shown as a pressed key plus an accent underline;
 - steel buttons over their semantic colors (pressed = inset), bordered icon buttons as steel keys (borderless icon buttons stay bare glyphs), and a steel play button;
@@ -495,6 +495,40 @@ Deferred (not part of this change):
 - **Top-bar controls:** the collapse, cast and overflow glyphs are bare `span`s in the fullscreen overlay, which sits outside `#playerContent`. Framing them needs a hook class and a new scope, and their boxes are glyph-sized (touch-target and geometry questions).
 - **Heavier icons beyond the stroke:** a true weight axis needs a different icon font file, which is global.
 - **Title and author readout, typography, and the widget finish** are separate, later work.
+
+## LLAMA full-player metadata readout (Phase 4E)
+
+LLAMA only, full player only. After Phase 4B the full player's title/chapter and author floated on the flat chassis between the mounted artwork and the deck, with about 75px of unused chassis below them (412×842 CSS px). Phase 4E makes that block a recessed information display mounted in the chassis. It is the one place where the recipe changes geometry, and only the block's own box.
+
+- **No template change.** The existing block (`.title-author-texts`, with its marquee wrapper, `title-text` and `author-text`) is the readout. The rules apply only under `.fullscreen`, so the collapsed player's block is untouched.
+- **Display (`METADATA_READOUT`, paint):** the `surface.recessed` face with the shared `RECESSED_WELL` edges on the key radius, mounted in a bezel plate drawn with outer shadows: a dark seam, a 2px plate in the deck color (`--color-bg`), a lit upper-left lip, a dark lower-right lip and a soft drop. Shadows add no layout. The seek well has no plate, so the two displays share depth and edge language but stay distinct: the readout is an information module and the seek well a playback-position module.
+- **Layout (`METADATA_READOUT_LAYOUT`, the authorized geometry):** `left: 24px` and `width: calc(100% - 48px)` put the readout in the seek wells' column, `padding: 6px 12px` is its inner inset, and `bottom` moves its anchor 22px lower (`+ 28px` instead of `+ 50px` in the player's own cover-relative formula). The block stays bottom-anchored, so it grows upward with the font scale like the original, and the expand/collapse transition (which animates `bottom`) is kept. `max(…, 210px)` keeps the plate clear of the 200px deck. Portrait never reaches it, but landscape does: there the block sits beside the artwork, right on the deck, and would otherwise cover the seek timestamps.
+- **Total-track display:** when "use chapter track" and "use total track" are both on, the total-track display sits just above the deck. A sibling rule (`.fullscreen .total-track ~ .title-author-texts`) raises the floor to 249px: the display's 215px offset, its height at the default font scale (19.2px line + 4px channel) and 10px for the plate and chassis. It has to be a px value: the system font scale zooms text in the WebView, but `rem`/`em` lengths stay at 16px, so CSS cannot follow the line's growth.
+- **Text is unchanged and neutral:** no LLAMA rule colors the title or author, and no amber or phosphor green goes on the readout. The title can be the live current chapter or the static book title (fallback), and the author is static, so one color rule would mean different things at different times. The enclosure carries the equipment character. Fonts, sizes, line heights, the chapter/book-title selection, the marquee and the author truncation are untouched.
+
+Measured on the emulator (412×842 CSS px, Book A paused; the before values are `733b34f8`):
+
+| Font scale | Readout (x, y, w × h)     | Artwork bottom → readout        | Readout → deck | With the total-track display: readout → its top |
+| ---------- | ------------------------- | ------------------------------- | -------------- | ----------------------------------------------- |
+| 1.0 before | 41.2, 516.8, 329.8 × 50.4 | 19.7                            | 75.2           | 37.0                                            |
+| 1.0 after  | 24, 526.8, 364.2 × 62.4   | 29.7 (23.7 past plate and ring) | 53.2           | 15.0 (11 past the plate)                        |
+| 1.3 before | 41.2, 501.6, 329.8 × 65.5 | 4.5                             | 75.2           | 31.2                                            |
+| 1.3 after  | 24, 511.6, 364.2 × 77.5   | 14.5 (8.5 past plate and ring)  | 53.2           | 9.2 (5.2 past the plate)                        |
+
+- Every role outside the block is unchanged before and after: artwork, deck, seek and total-track wells, controls, play (65×65), jump and chapter keys, the seek touch target's size and row, the top-bar chevron and playback-method label. The 22-role Dark-vs-LLAMA geometry check stays at 0 differences, and the mini-player stays 120px with its metadata block identical across all four themes. Dark, Black and Light are identical to `733b34f8` at both font scales.
+- Long chapter titles and long book titles (fallback) scroll in the marquee inside the 340px content box. The marquee's fade mask stays inside the well. Long authors keep their ellipsis. With an empty author the readout holds the title only. Arabic, Hebrew, Japanese and Thai fit inside the readout with no clipped marks at both scales. Tapping the readout still opens the item page.
+- Rendered contrast rises because the face is darker than the chassis: title 16.7:1 (13.7:1 before), author 9.0:1 (7.9:1 before), at both font scales.
+
+Known limit: on portrait screens shorter than about 842 CSS px, with the total-track display on and an enlarged font scale, there isn't room between the artwork and the total-track display for the readout and its plate. At 412×731 and font scale 1.3 the readout covers the artwork's bottom edge by about 12px. The text stays fully readable, and the total-track display and deck are not covered. At font scale 1.0 the same screen fits (about 3px of chassis on each side). The original block already had only 4.7px there. In landscape the player's own `!important` rule keeps the block at the right half's full width, so the readout runs to the screen's right edge. It stays clear of the deck.
+
+`tests/theme-llama.test.mjs` keeps the contract:
+
+- the readout primitive is paint-only and built from the shared well;
+- geometry properties appear only on the two readout selectors, and only the named ones, with exact values;
+- the player's own geometry it rests on is unchanged;
+- the title and author are never colored, amber or phosphor;
+- text contrast holds on the face;
+- the rules compile under the LLAMA root only.
 
 ## Content-derived color (intentionally not tokens)
 
