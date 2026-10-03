@@ -110,16 +110,16 @@ A test compiles the real content with Tailwind and fails if any recipe selector 
 `theme/presets.js` exports `PRIMITIVES`. Rules are composed from these instead of new one-off values. They are fixed repository values: theme data can't supply or adjust any of them, and they only reference the derived edge colors and the accent token.
 
 - **Light source:** light upper/left edges, dark lower/right edges, drop shadows falling down.
-- **Radius scale (`RADIUS`):** `frame` 2px (artwork frames and fine detail), `key` 4px (wells, panels and equipment keys), `round` (circular playback controls only). Every `border-radius` in the recipe must come from this scale; a test enforces it.
+- **Radius scale (`RADIUS`):** `frame` 2px (artwork frames and fine detail), `key` 4px (wells, panels and equipment keys, the primary Play/Pause key included). `round` (9999px, for the circular play button) was retired in Phase 4H, when Play/Pause became a squared key. Every `border-radius` in the recipe must come from this scale; a test enforces it.
 - **Elevation (`ELEVATION`):** the only drop shadows rules should use.
 
   - `raised` (buttons);
   - `panel` (cards and framed artwork);
   - `overlay` (dialogs and menus).
 
-  Each level equals a value existing rules already used, so adopting them changed nothing on screen. A few older shadows (the play button, the Chapters header, the drawer edge, the mini-player and shelf ledge, which mirror their components' own shadows) keep their values until the gate that restyles those surfaces.
+  Each level equals a value existing rules already used, so adopting them changed nothing on screen. A few older shadows (the Chapters header, the drawer edge, the mini-player and shelf ledge, which mirror their components' own shadows) keep their values until the gate that restyles those surfaces.
 
-- **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `PRIMARY_STEEL` / `PRIMARY_STEEL_PRESSED` (the round play button only, Gate B.1), `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
+- **Edges:** `RAISED_BEVEL`, `PRESSED_BEVEL`, `RECESSED_WELL`, `STEEL_SHEEN`, `CHASSIS_SHEEN`, `ARTWORK_FRAME`.
 - **`ENGRAVED_SEPARATOR`:** a seam cut into an element's bottom edge, a dark inset line with a faint light return below it. It's drawn inside the element's own box, so row sizes never change. Gate B applies it to the player (transport vs secondary row); queue, chapter, table and dialog rows are later gates. `ENGRAVED_SEPARATOR_TOP` is the same seam on a top edge, and `RECESSED_FACE` is a recessed-display bevel as a background layer (both Gate B).
 - **Control states** (complete declaration sets):
   - `KEY_CAP` / `KEY_CAP_PRESSED`: a subtle squared steel face on an existing bare-glyph control's own box, inverted while pressed. It never changes size, placement or touch target. Gate B applied it to the player keys; Phase 4B moved those to their own `PLAYER_KEY` recipe (see below), so `KEY_CAP` now serves only the other keys (library selector, dropdown triggers, steppers, row play buttons).
@@ -156,7 +156,7 @@ Paint only. Every player box, control position, size, order and touch target is 
 
   The wash sat above the steel sheen and inset bevel and flattened both. The template binds only to the projection; there are no theme-id checks in the player.
 
-  Without the wash, the subtle `STEEL_SHEEN` over the `surface.raised` fill read as dark slate, the same blue-gray as the chassis. Gate B.1 gives the play button (mini and fullscreen) its own stronger primitive, `PRIMARY_STEEL`:
+  Without the wash, the subtle `STEEL_SHEEN` over the `surface.raised` fill read as dark slate, the same blue-gray as the chassis. Gate B.1 gave the play button (mini and fullscreen) its own stronger primitive, `PRIMARY_STEEL` (retired in Phase 4H; see "LLAMA primary Play/Pause key" below):
 
   - an upper-left highlight (same light source as the bevels);
   - a near-opaque top-to-bottom steel falloff composed over the fill.
@@ -552,6 +552,54 @@ Measured on the emulator (412×842 CSS px, Book A paused; the before values are 
 - the rules compile under the LLAMA root only;
 - the short-screen variant is a LLAMA-only media rule with exact values that changes only the vertical extent;
 - the landscape variant is a LLAMA-only media rule with exact values that changes only the horizontal extent.
+
+## LLAMA primary Play/Pause key (Phase 4H)
+
+LLAMA only, except for one theme-neutral fix. Phase 4F chose a dark face with an amber legend for Play/Pause, and Phase 4G chose a squared 4px equipment key with a larger glyph (the user's option E). Phase 4H implements both, in the full player, the mini-player and the widget (see `docs/widget-architecture.md`). The real app stays authoritative for geometry: the 65×65 and 40×40 boxes, their positions and the transport deck are unchanged. Only the painted shape and the glyph size inside the box change.
+
+**Seek-loading spin (theme-neutral, its own commit).** While a seek was pending, `animate-spin` sat on the outer `.play-btn`, so the whole face turned with the autorenew glyph. In LLAMA the steel highlight and shadow orbited, and the button's hit-test box grew while it turned (65 → up to 86 CSS px across themes). The class now sits on the glyph span, so only the glyph spins and the face stays still. `seekLoading`, seek and playback behavior, click handling and the boxes are unchanged. In Dark, Black and Light, rest, pressed and loading are identical to `5a18d5d2`. The only visible change is that the face no longer turns.
+
+- **Face (`PRIMARY_KEY`):** the dark player-key face. It is a translucent `surface.recessed` layer (72%; 85% collapsed, `PRIMARY_KEY_MINI`) over the player's own inline fill (`surface.raised`), under the player-key sheen. It is a background layer because the player sets the fill inline. It sits in the same family as the jump and chapter keys.
+- **Shape:** squared on `RADIUS.key` (4px). No new radius.
+- **Primary bezel:** the player key's lit upper-left and dark lower-right inner edges with the faint second highlight, a 1px dark channel, a lit return ring outside it (`0 0 0 2px`, edge-light at 30%) and a `0 3px 5px` drop (player keys use `0 2px 3px`). No screws, texture, gloss, glass or LEDs.
+- **Pressed (`PRIMARY_KEY_PRESSED`):** the sheen and drop go, the face deepens (86%; 94% collapsed), the inner edge inverts with an inner shade, and the channel and ring stay. Nothing moves or resizes.
+- **Legend:** Play, Pause, the seek-pending autorenew glyph and the loading spinner all take `PLAYBACK_LEGEND`, the playback amber, as one legend position. The spinner was `#262626`, about 1.15:1 on a dark face. Green stays reserved for readouts.
+- **Glyph size (the recipe's second authorized geometry):** `PRIMARY_GLYPH_SIZE` sets 2.8rem (44.8px, from 33.6px) in the full player and 1.875rem (30px, from 24px, the jump glyphs' size) collapsed. It sizes the glyph inside the unchanged box only. The 4E geometry test now allows exactly these two `font-size` selectors besides the readout.
+- **Primary status without color:** larger box, central position, squared key, double bezel with return ring, deeper drop and a large solid glyph. A grayscale render keeps Play/Pause clearly primary against the jump, chapter and utility keys.
+
+Measured on the emulator (412×842 CSS px, Book A paused, same session before and after):
+
+| Surface / state            | Ink (CSS px), % of box | Clearance to bezel | Amber vs face in the glyph rows | Face top (no ink reaches it) |
+| -------------------------- | ---------------------- | ------------------ | ------------------------------- | ---------------------------- |
+| Full, Play                 | 18.7 × 22.9, 29 × 35%  | 18.6               | 8.8:1                           | 5.8:1                        |
+| Full, Pause                | 22.1 × 25.9, 34 × 40%  | 17.0               | 8.6:1                           | 5.8:1                        |
+| Full, seek-pending         | 34.7 × 30.1 (turning)  | 12.9               | 8.3:1                           |                              |
+| Full, loading spinner      | 15.6 × 15.6            | 20.1               | 9.2:1                           |                              |
+| Full, pressed (Play/Pause) | as resting             | as resting         | 10.5–10.6:1                     | 10.5:1                       |
+| Mini, Play                 | 12.6 × 15.6, 31 × 39%  | 9.8                | 9.5:1                           | 7.4:1                        |
+| Mini, Pause                | 14.9 × 17.5, 37 × 44%  | 8.7                | 9.4:1                           | 7.4:1                        |
+| Mini, seek-pending         | 24.4 × 19.8 (turning)  | 5.6                | 9.3:1                           |                              |
+| Mini, loading spinner      | 15.6 × 14.9            | 7.9                | 10.0:1                          |                              |
+| Mini, pressed (Play/Pause) | as resting             | as resting         | 11.0:1                          | 11.0:1                       |
+
+- Every legend state clears the gate's 7:1 target against the face behind it. The sheen's lightest band, the top 3px of the face, measures 5.8:1 (full) against the amber, but no glyph ink can reach it: the glyph box starts 10px down. The test checks the token math at the glyph box's top edge (7.65:1 full, 8.3:1 mini).
+- Play's ink sits 2.1px (full) and 1px (mini) right of center: that is the icon's own optical offset, unchanged from before. Pause has more ink (8.4% vs 6.1% of the full box) and still keeps 17px of clearance.
+- Geometry: the 65×65 and 40×40 boxes, every jump and chapter key, the 22-role Dark-vs-LLAMA check (0 differences, and 0 against `5a18d5d2`) and the 120px mini-player are unchanged. During a seek the button's box stays 65×65 / 40×40 and the glyph turns around the key's center. In the mini-player the ring leaves 4–5px of visual gap to the jump keys.
+- Dark, Black and Light: identical to `5a18d5d2` in rest, pressed, loading and geometry (computed paint and bounds compared). Only the seek spin moved to the glyph.
+
+`tests/theme-llama.test.mjs` keeps the contract:
+
+- the spin is on the glyph and not on `.play-btn`;
+- `PRIMARY_KEY` is squared on `RADIUS.key`, with its dark face, exact bezel layers and exact pressed treatment;
+- amber covers Play/Pause, seek-pending and the spinner, and never green;
+- the glyph sizes are exact and are the only geometry besides the readout;
+- the 7:1 token math holds;
+- the rules compile under the LLAMA root and outrank the player's own glyph rules;
+- Dark, Black and Light get no rules.
+
+Every new contract was mutation-tested (round radius, glyph sizes, amber, face depth, drop, inner shade, return ring).
+
+**Not the final fidelity gate.** Phase 4H covers only the primary control. The rest of the non-widget control area moves closer to the mockup in later, separately authorized passes, listed in `docs/future-work.md` under "LLAMA non-widget control fidelity (after Phase 4H)".
 
 ## Content-derived color (intentionally not tokens)
 

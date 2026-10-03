@@ -111,6 +111,16 @@ Found while implementing Gate H. Toasts use vue-toastification's own stylesheet,
 
 Observed once during the Gate H audit on the emulator, not investigated. After a cold launch from the launcher, native prepared a session but logged "No listeners found for event onPlaybackSession", so the WebView did not see the session until the page was reloaded. It may be specific to that launch path. Reproduce it before treating it as a bug. The Galaxy S26 Ultra cold launch during the Phase 2C final acceptance did not reproduce it (no session was restored until Play was pressed, as designed).
 
+## LLAMA non-widget control fidelity (after Phase 4H)
+
+User direction recorded in Phase 4H. Phase 4H completed only the primary Play/Pause control and was not the final LLAMA visual-fidelity gate. The user wants the rest of the non-widget player controls to move closer to the approved mockup. A later audit should compare the complete non-widget control area against the mockup, keeping the real app authoritative for layout, behavior, touch targets and accessibility:
+
+- **Transport and secondary controls:** rewind, forward and chapter previous/next. Physical key depth, bezel consistency with the new primary key, glyph scale and weight, grouping, and their relationship to the primary key.
+- **Utility controls:** queue, bookmark, sleep and chapters/list. Physical key treatment and the neutral legend hierarchy.
+- **Top player chrome (a separate, later pass):** collapse, cast, overflow and the DIRECT / playback-method display.
+
+The semantic rule stays: playback and transport legends are amber, utility legends are neutral. Not every control becomes amber. None of this is implemented.
+
 ## Seek handle touch target
 
 Found on the Galaxy S26 Ultra during the Phase 2C final acceptance; inherited and the same in every theme (not introduced by LLAMA). Relatively **high priority** accessibility/usability work.

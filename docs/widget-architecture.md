@@ -146,7 +146,7 @@ On the emulator's Pixel launcher, all of these fit: one row (360×104dp, WIDE), 
 Resource-level paint only, LLAMA only. The accepted Phase 4B player has dark secondary keys with amber playback legends and a lighter silver Play/Pause. The widget keeps the same hierarchy:
 
 - **Secondary keys (rewind, fast-forward):** `widget_llama_button` is now a dark key. Its face is deeper than the chassis (`surface.recessed` at 85% over `surface.base`, the collapsed player's depth), with a soft sheen (lit top, shaded bottom), the same lit top/left and dark bottom/right edges as before, and a cut-in face while pressed (the bevel inverts and the shade falls from the top). The legend tint is `widget_llama_played`, the playback amber.
-- **Primary key (Play/Pause):** `widget_llama_button_primary` is the earlier lighter steel key, byte-for-byte except its comment, and its glyph stays near-white. It is still the lightest key, as the silver Play/Pause is in the app. The renderer is unchanged: it still only swaps the play/pause glyph resource, so no key paint is set from Kotlin.
+- **Primary key (Play/Pause):** (superseded by Phase 4H below) `widget_llama_button_primary` is the earlier lighter steel key, byte-for-byte except its comment, and its glyph stays near-white. It is still the lightest key, as the silver Play/Pause is in the app. The renderer is unchanged: it still only swaps the play/pause glyph resource, so no key paint is set from Kotlin.
 - **Generated colors:** the face, lit top, shaded bottom and pressed shade are `widget_llama_key_face`, `_key_lit`, `_key_shade` and `_key_pressed_shade`. They come from `scripts/generate-widget-theme.js` (`keyColors`) with fixed blend factors, so they trace to the theme tokens like every other widget color, and the stale-file test covers them.
 - **Geometry:** both key drawables have identical items, offsets and 4dp corners, and the layouts changed only the `android:background` of Play/Pause and the `android:tint` of rewind and fast-forward (three attribute lines per layout). Across 19 Robolectric cases (COMPACT, WIDE, FULL, EXPANDED, LARGE, font scale 1.3, Standard) every bound and text-fit field is identical before and after, every LLAMA pixel change lies inside the three key boxes, and the Standard renders are pixel-identical.
 - **Unavailable state:** the widget has none. The three keys are always enabled, and the renderer hides the controls as a whole when there is nothing to control, so there is no disabled paint to maintain.
@@ -154,6 +154,22 @@ Resource-level paint only, LLAMA only. The accepted Phase 4B player has dark sec
 Measured contrast (generated colors, confirmed on rendered pixels): amber on the resting key 9.8–11.5:1, on the pressed key 11.1–11.8:1; the near-white Play/Pause glyph 6.4:1 on its key (9.7:1 pressed); the secondary key face against the chassis 1.04:1 at the lit top and 1.19:1 at the face; the primary face against the secondary face 2.4:1. `tests/widget-theme.test.mjs` keeps the contract: generated colors, the legend split, the drawable structure, frozen key geometry attributes, and untouched Standard resources.
 
 A held touch on a launcher widget starts the launcher's own long-press (drag) mode, so the pressed state is verified from the Robolectric pressed renders, not the emulator launcher.
+
+## LLAMA primary key parity (Phase 4H)
+
+Resource-level paint only, LLAMA only. The app's Play/Pause became a dark squared primary key with an amber legend (`docs/theme-architecture.md`, Phase 4H), and the widget's center key follows it:
+
+- **Dark primary face:** `widget_llama_button_primary` uses the secondary key's dark sheen face (`widget_llama_key_lit` → `_key_face` → `_key_shade`). It no longer uses the lighter steel (`widget_llama_raised` / `_content`).
+- **Primary bezel:** from the outside in, a lit return ring (`edge_light_35`), a 1dp dark channel (`edge_dark`), the lit top/left (`edge_light_55`) and dark bottom/right inner edge, then the face, inset 3dp. The secondary key has no ring and a 1dp bevel. Pressed keeps the ring and channel, inverts the inner edge (dark top/left, lit bottom/right) and cuts the face in (`_key_pressed_shade` falling from the top). All corners stay 4dp.
+- **Amber glyph:** Play/Pause is tinted `widget_llama_played`, like the jump keys. The existing `ic_media_play_dark` / `ic_media_pause_dark` bitmaps, their padding and the renderer are unchanged.
+- **Primary status:** central position, the ring and channel, and the solid amber glyph. The three keys keep their equal widths, as before. The drawable has no drop shadow: a widget background cannot paint outside the view, and the key bounds are frozen.
+- **Geometry:** layer insets only paint inside the view. Every key's size, margin and padding comes from the layout, and the only layout change is the Play/Pause `android:tint`, one line in each of the five LLAMA layouts. Across 40 Robolectric renders (LLAMA and Standard; COMPACT, WIDE, FULL, EXPANDED, LARGE; paused, playing and pressed) every bound and text-fit field is identical to `5a18d5d2`, and all 20 Standard renders are pixel-identical. `WidgetContainmentTest`: 8/8.
+
+Measured contrast of the amber glyph against the face in its own rows (rendered): 10.6–10.7:1 resting and 11.3–11.4:1 pressed. From the generated colors, the worst face point (the lit top, which the glyph does not reach) is 9.75:1. Before, the near-white glyph on the steel key was 6.4:1. Glyph ink is 7.6×9.5dp (Play, COMPACT) to 19.4×22.9dp (Pause, LARGE), unchanged.
+
+`widget_llama_raised` and `widget_llama_content` stay in the generated palette, which mirrors every token, but no widget resource uses them anymore. Lint reports them as two `UnusedResources` warnings (143 → 145).
+
+`tests/widget-theme.test.mjs` keeps the contract: the exact layer structure in both states, the dark face, the amber tint on all three transport keys, 7:1 on every generated face color, the unchanged bitmaps and padding, and untouched Standard resources.
 
 ## Galaxy S26 Ultra findings (One UI, first real-device pass)
 
