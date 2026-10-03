@@ -74,6 +74,7 @@ module.exports = {
     plugin(({ addBase }) => {
       addBase(themeEngine.builtinThemeRules())
       addBase(themePresets.builtinPresentationRules())
+      addBase(themePresets.builtinPresentationMediaRules())
     })
   ]
 }

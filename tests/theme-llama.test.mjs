@@ -1166,3 +1166,68 @@ test('Phase 4E readout compiles through Tailwind under the LLAMA root only', asy
     for (const selector of m[1].split(',')) if (selector.includes('.fullscreen .title-author-texts') || selector.includes('.total-track ~')) assert.ok(selector.trim().startsWith(`${root} `), selector.trim())
   }
 })
+
+// --- Phase 4E-R1: short-screen readout with the total-track display ---
+
+const COMPACT_QUERY = '(orientation: portrait) and (max-height: 824px)'
+
+test('Phase 4E-R1 short-screen readout is one LLAMA-only media rule on the total-track readout selector', () => {
+  const P = presets.PRIMITIVES
+  const root = engine.themeSelector('llama')
+  assert.deepEqual(presets.EQUIPMENT_MEDIA_RULES.length, 1)
+  const media = presets.presentationMediaRules([llama()])
+  assert.deepEqual(Object.keys(media), [`@media ${COMPACT_QUERY}`])
+  assert.deepEqual(media[`@media ${COMPACT_QUERY}`], { [`${root} ${READOUT_ABOVE_TOTAL_TRACK}`]: { ...P.METADATA_READOUT_COMPACT } })
+  assert.deepEqual(presets.builtinPresentationMediaRules(), media)
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationMediaRules([engine.getTheme(id)]), {}, id)
+  // A theme that fails validation or uses another finish contributes nothing
+  const dark = engine.getTheme('dark').tokens
+  assert.deepEqual(presets.presentationMediaRules([engine.validateTheme({ id: 'rig', labelKey: 'LabelRig', colorScheme: 'dark', tokens: { ...dark, 'presentation.finish': 'chrome' } }, dark).theme]), {})
+  // The reference 842px-tall screen is outside the query, so the accepted Phase 4E readout is unchanged there
+  assert.ok(824 < 842)
+})
+
+test('Phase 4E-R1 compact readout keeps the well, column and neutral text; only its vertical extent changes', () => {
+  const P = presets.PRIMITIVES
+  const C = P.METADATA_READOUT_COMPACT
+  assert.ok(Object.isFrozen(C))
+  assert.deepEqual(Object.keys(C).sort(), ['bottom', 'box-shadow', 'display', 'flex-direction', 'justify-content', 'min-height', 'padding'])
+  for (const value of Object.values(C)) assert.match(value, /^[a-z0-9 .,%()/+-]+$/i, value)
+  // Same recessed well; a 1px seam all round and the plate and its lips as side rails only (no vertical offset or spread)
+  assert.ok(C['box-shadow'].startsWith(`${P.RECESSED_WELL}, `))
+  const outer = C['box-shadow'].slice(P.RECESSED_WELL.length + 2).split(/, (?=-?\d)/)
+  assert.deepEqual(outer, ['0 0 0 1px rgb(var(--color-edge-dark))', '-4px 0 0 0 rgb(var(--color-bg))', '4px 0 0 0 rgb(var(--color-bg))', '-5px 0 0 0 rgb(var(--color-edge-light) / 0.35)', '5px 0 0 0 rgb(var(--color-edge-dark))', '0 2px 4px rgb(0 0 0 / 0.4)'])
+  for (const value of Object.values(C)) assert.doesNotMatch(value, /--color-(track-cursor|accent|success|warning)/)
+  assert.equal(C.color, undefined)
+  // Horizontal inset, face, radius and column are inherited from the Phase 4E rule (not overridden here)
+  assert.equal(C.padding, '0 12px')
+  for (const p of ['left', 'width', 'background-color', 'border-radius']) assert.equal(C[p], undefined, p)
+  // Text centered in a fixed band instead of a vertical inset; text larger than the band grows the box (min-height, never height)
+  assert.deepEqual([C.display, C['flex-direction'], C['justify-content']], ['flex', 'column', 'center'])
+  assert.equal(C.height, undefined)
+  assert.equal(C['max-height'], undefined)
+  // Exact geometry: 2px of chassis plus the 1px seam above the total-track display at font scale 1.3 (215px + 25px line + 4px channel)
+  assert.equal(C.bottom, '247px')
+  assert.equal(247, 215 + 25 + 4 + 2 + 1)
+  // Band below the height-limited artwork (its bottom 320px up = 50% + 120px - coverH / 2): its 2px frame, 3px of chassis,
+  // the 1px seam and the 247px bottom; capped at 70px where the artwork is not yet height-limited
+  assert.equal(C['min-height'], 'min(calc(50% - var(--cover-image-height) / 2 - 133px), 70px)')
+  assert.equal(120 - 2 - 3 - 1 - 247, -133)
+})
+
+test('Phase 4E-R1 compact readout compiles through Tailwind inside its media query, under the LLAMA root only', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const at = css.indexOf(`@media ${COMPACT_QUERY} {`)
+  assert.ok(at >= 0)
+  assert.equal(css.indexOf(`@media ${COMPACT_QUERY} {`, at + 1), -1)
+  const block = css.slice(at, css.indexOf('}\n}', at) + 3)
+  assert.match(block, /html\[data-theme='llama'\] \.fullscreen \.total-track ~ \.title-author-texts \{[\s\S]*bottom: 247px;[\s\S]*min-height: min\(calc\(50% - var\(--cover-image-height\) \/ 2 - 133px\), 70px\);/)
+  assert.equal((block.match(/\{/g) || []).length, 2)
+  // The unconditional Phase 4E rules are still emitted as before
+  assert.match(css, /html\[data-theme='llama'\] \.fullscreen \.total-track ~ \.title-author-texts \{\s*bottom: max\(calc\(50% - var\(--cover-image-height\) \/ 2 \+ 28px\), 249px\);\s*\}/)
+})

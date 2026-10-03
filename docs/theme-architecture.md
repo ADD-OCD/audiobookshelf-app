@@ -88,7 +88,7 @@ LLAMA is an original Audiobookshelf+ theme inspired by the material language of 
 - It is a built-in like the others (`id: 'llama'`, label `LabelThemeLlama`, `colorScheme: 'dark'`, `equipment` + `theme`). It appears last in Settings through the registry.
 - It styles the existing UI only. Layout, geometry, controls and behavior are unchanged, with one authorized exception: the full player's metadata readout (Phase 4E, below).
 
-The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. The single exception is the full-player metadata readout's own box (`left`, `width`, `padding`, `bottom` on `.fullscreen .title-author-texts`, and `bottom` with the total-track display shown); a test allows geometry properties on exactly those two selectors and nowhere else. It covers:
+The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. The single exception is the full-player metadata readout's own box (`left`, `width`, `padding`, `bottom` on `.fullscreen .title-author-texts`, and `bottom` with the total-track display shown, plus its short-screen variant in `EQUIPMENT_MEDIA_RULES`); a test allows geometry properties on exactly those selectors and nowhere else. It covers:
 
 - bevelled chassis on the app bar, bookshelf navigation, dialogs/menus and the drawer, with the selected tab shown as a pressed key plus an accent underline;
 - steel buttons over their semantic colors (pressed = inset), bordered icon buttons as steel keys (borderless icon buttons stay bare glyphs), and a steel play button;
@@ -519,7 +519,21 @@ Measured on the emulator (412×842 CSS px, Book A paused; the before values are 
 - Long chapter titles and long book titles (fallback) scroll in the marquee inside the 340px content box. The marquee's fade mask stays inside the well. Long authors keep their ellipsis. With an empty author the readout holds the title only. Arabic, Hebrew, Japanese and Thai fit inside the readout with no clipped marks at both scales. Tapping the readout still opens the item page.
 - Rendered contrast rises because the face is darker than the chassis: title 16.7:1 (13.7:1 before), author 9.0:1 (7.9:1 before), at both font scales.
 
-Known limit: on portrait screens shorter than about 842 CSS px, with the total-track display on and an enlarged font scale, there isn't room between the artwork and the total-track display for the readout and its plate. At 412×731 and font scale 1.3 the readout covers the artwork's bottom edge by about 12px. The text stays fully readable, and the total-track display and deck are not covered. At font scale 1.0 the same screen fits (about 3px of chassis on each side). The original block already had only 4.7px there. In landscape the player's own `!important` rule keeps the block at the right half's full width, so the readout runs to the screen's right edge. It stays clear of the deck.
+**Short screens with the total-track display (Phase 4E-R1).** Below about 792 CSS px the artwork is height-limited (`coverH = height - 400`), so its bottom sits a fixed 320px above the viewport bottom. The total-track display's top is at 244px at font scale 1.3, which leaves a constant 76px band. The full readout needs 77.5px plus its plate. A sweep at 412px width, font scale 1.3, total track on, showed the plate overlapping the artwork frame below about 815px: −2.4px at 812, −7.3px at 802, and a constant −12.4px from 793 down to 679. At 821 it cleared by only 2.1px.
+
+- One media rule handles it: `EQUIPMENT_MEDIA_RULES`, emitted by `presentationMediaRules` through the Tailwind theme plugin, under the LLAMA root only. It applies to `@media (orientation: portrait) and (max-height: 824px)` on the total-track readout selector only. The 842px reference screen, total track off, landscape, the collapsed player and Dark, Black and Light are outside it.
+- `METADATA_READOUT_COMPACT` keeps the readout's face, well, radius, 24px column, horizontal inset and neutral text. Only the vertical extent changes:
+  - the plate becomes side rails (a 1px seam all round, with the plate and its lips offset sideways only);
+  - the vertical inset is replaced by a fixed band height with the text centered in it (`display: flex`, column, centered);
+  - `bottom: 247px` puts the readout 2px plus the seam above the total-track display at font scale 1.3;
+  - `min-height: min(calc(50% - var(--cover-image-height) / 2 - 133px), 70px)` is the band under the artwork's 2px frame with 3px of chassis (67px where the artwork is height-limited), capped at 70px above that.
+- It uses `min-height` and never `height`, so text larger than the band grows the box upward and is never clipped. Font scale is not visible to CSS, so 1.0 gets the same band, with about 8px around the text.
+- Results, at 412 wide with the total track on:
+  - at font scale 1.3, from 822px down to 669px: at least 3px of chassis under the artwork frame (3px wherever the artwork is height-limited, 15px at 822px) and 2px above the total-track display;
+  - at font scale 1.0: 3px and 7.8px.
+  - With the total track off, the same screens keep the Phase 4E readout (23.6px under the artwork, 24px above the deck at 1.0).
+
+In landscape the player's own `!important` rule keeps the block at the right half's full width, so the readout runs to the screen's right edge. It stays 10px clear of the deck.
 
 `tests/theme-llama.test.mjs` keeps the contract:
 
@@ -528,7 +542,8 @@ Known limit: on portrait screens shorter than about 842 CSS px, with the total-t
 - the player's own geometry it rests on is unchanged;
 - the title and author are never colored, amber or phosphor;
 - text contrast holds on the face;
-- the rules compile under the LLAMA root only.
+- the rules compile under the LLAMA root only;
+- the short-screen variant is a single LLAMA-only media rule with exact values that changes only the vertical extent.
 
 ## Content-derived color (intentionally not tokens)
 

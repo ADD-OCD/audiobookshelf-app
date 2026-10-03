@@ -150,6 +150,25 @@ const METADATA_READOUT_LAYOUT = Object.freeze({
 // A px value: the system font scale zooms text in the WebView but not rem/em lengths, so CSS cannot follow the line's
 // growth; on the 842px-tall reference screen the anchor already clears it at font scale 1.3
 const METADATA_READOUT_ABOVE_TOTAL_TRACK = Object.freeze({ bottom: `max(${READOUT_ANCHOR}, 249px)` })
+// Short portrait screens with the total-track display (Phase 4E-R1). Below about 792px the artwork is height-limited, so
+// its bottom (and its 2px frame) sits a fixed 320px above the viewport bottom, and the total-track display's top is at
+// 244px at font scale 1.3: a 76px band that cannot hold the readout plus its plate (the overlap appears below ~825px).
+// There the readout keeps its well, column and side plate but loses the plate's vertical extent: a 1px seam all round,
+// the plate and its lips as side rails only, and the vertical inset replaced by a fixed band height with the text
+// centered in it. The band height leaves 3px of chassis under the artwork frame (320 - 2 - 3 - 1 - 247 = 67px; capped
+// at 70px between 792 and 824px), and its bottom sits 2px plus the seam above the total-track display at font scale
+// 1.3. Text larger than the band grows the box upward rather than being clipped. Font scale is not visible to CSS, so
+// font scale 1.0 gets the same band, with more room around the text
+const METADATA_READOUT_COMPACT_QUERY = '(orientation: portrait) and (max-height: 824px)'
+const METADATA_READOUT_COMPACT = Object.freeze({
+  'box-shadow': `${RECESSED_WELL}, 0 0 0 1px rgb(var(--color-edge-dark)), -4px 0 0 0 rgb(var(--color-bg)), 4px 0 0 0 rgb(var(--color-bg)), -5px 0 0 0 rgb(var(--color-edge-light) / 0.35), 5px 0 0 0 rgb(var(--color-edge-dark)), 0 2px 4px rgb(0 0 0 / 0.4)`,
+  display: 'flex',
+  'flex-direction': 'column',
+  'justify-content': 'center',
+  padding: '0 12px',
+  bottom: '247px',
+  'min-height': 'min(calc(50% - var(--cover-image-height) / 2 - 133px), 70px)'
+})
 
 const PRIMITIVES = Object.freeze({
   RADIUS,
@@ -175,7 +194,8 @@ const PRIMITIVES = Object.freeze({
   PLAYBACK_GLYPH_WEIGHT,
   METADATA_READOUT,
   METADATA_READOUT_LAYOUT,
-  METADATA_READOUT_ABOVE_TOTAL_TRACK
+  METADATA_READOUT_ABOVE_TOTAL_TRACK,
+  METADATA_READOUT_COMPACT
 })
 
 const EQUIPMENT_RULES = [
@@ -439,4 +459,24 @@ function presentationRules(themes) {
 
 const builtinPresentationRules = () => presentationRules(engine.THEMES)
 
-module.exports = { presentationRules, builtinPresentationRules, equipmentDerivedDeclarations, EQUIPMENT_RULES, PRIMITIVES }
+// Equipment rules that apply only under a fixed media query: [query, selector suffix, declarations]. Kept apart from
+// EQUIPMENT_RULES so every unconditional rule stays a flat selector map; the only entry is the short-screen readout
+const EQUIPMENT_MEDIA_RULES = [[METADATA_READOUT_COMPACT_QUERY, '.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_COMPACT]]
+
+/** Fixed media-conditional presentation rules for the given validated themes ({ query: { selector: declarations } }). */
+function presentationMediaRules(themes) {
+  const rules = {}
+  for (const theme of themes) {
+    if (theme.tokens['presentation.finish'] !== 'equipment') continue
+    const root = engine.themeSelector(theme.id)
+    for (const [query, suffix, declarations] of EQUIPMENT_MEDIA_RULES) {
+      const media = `@media ${query}`
+      rules[media] = { ...(rules[media] || {}), [`${root} ${suffix}`]: { ...declarations } }
+    }
+  }
+  return rules
+}
+
+const builtinPresentationMediaRules = () => presentationMediaRules(engine.THEMES)
+
+module.exports = { presentationRules, builtinPresentationRules, presentationMediaRules, builtinPresentationMediaRules, equipmentDerivedDeclarations, EQUIPMENT_RULES, EQUIPMENT_MEDIA_RULES, PRIMITIVES }
