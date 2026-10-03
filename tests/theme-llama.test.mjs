@@ -1048,3 +1048,121 @@ test('Phase 4B rules compile through Tailwind under the LLAMA root only', async 
   }
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
 })
+
+// --- Phase 4E: full-player metadata readout (the recipe's one authorized geometry) ---
+
+const READOUT = '.fullscreen .title-author-texts'
+const READOUT_ABOVE_TOTAL_TRACK = '.fullscreen .total-track ~ .title-author-texts'
+const READOUT_LAYOUT_PROPERTIES = { [READOUT]: ['left', 'width', 'padding', 'bottom'], [READOUT_ABOVE_TOTAL_TRACK]: ['bottom'] }
+
+test('Phase 4E readout is a recessed well in a bezel plate: frozen, paint-only, from the shared primitives', () => {
+  const P = presets.PRIMITIVES
+  assert.ok(Object.isFrozen(P.METADATA_READOUT))
+  assert.deepEqual(Object.keys(P.METADATA_READOUT).sort(), ['background-color', 'border-radius', 'box-shadow'])
+  for (const [property, value] of Object.entries(P.METADATA_READOUT)) {
+    assert.match(property, PAINT_ONLY, property)
+    assert.match(value, SAFE_VALUE, `${property}: ${value}`)
+  }
+  // The display face is the recessed token with the shared recessed-well edges, on the key radius
+  assert.equal(P.METADATA_READOUT['background-color'], 'rgb(var(--color-recessed))')
+  assert.equal(P.METADATA_READOUT['border-radius'], P.RADIUS.key)
+  assert.ok(P.METADATA_READOUT['box-shadow'].startsWith(`${P.RECESSED_WELL}, `))
+  // The plate around it is drawn with outer shadows only (no border, so no layout): a dark seam, a deck-colored
+  // plate, a lit upper-left lip, a dark lower-right lip and a soft drop
+  const outer = P.METADATA_READOUT['box-shadow'].slice(P.RECESSED_WELL.length + 2).split(/, (?=-?\d)/)
+  assert.deepEqual(outer, ['0 0 0 1px rgb(var(--color-edge-dark))', '0 0 0 3px rgb(var(--color-bg))', '-1px -1px 0 3px rgb(var(--color-edge-light) / 0.35)', '1px 1px 0 3px rgb(var(--color-edge-dark))', '0 3px 8px 3px rgb(0 0 0 / 0.4)'])
+  // Related to the seek well but distinct from it: the seek display has no plate and no outer shadow
+  const rules = presets.presentationRules([llama()])
+  const root = engine.themeSelector('llama')
+  assert.equal(rules[`${root} .fullscreen #playerTrack`]['box-shadow'], undefined)
+  assert.notDeepEqual(rules[`${root} .fullscreen #playerTrack`], rules[`${root} ${READOUT}`])
+})
+
+test('Phase 4E geometry is the only geometry in the recipe, limited to the full-player readout and named properties', () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  const P = presets.PRIMITIVES
+  for (const [selector, declarations] of Object.entries(rules)) {
+    const suffix = selector.slice(root.length + 1)
+    const geometry = Object.keys(declarations).filter((p) => GEOMETRY_PROPERTY.test(p))
+    assert.deepEqual(geometry, READOUT_LAYOUT_PROPERTIES[suffix] || [], selector)
+  }
+  assert.deepEqual(rules[`${root} ${READOUT}`], { ...P.METADATA_READOUT, ...P.METADATA_READOUT_LAYOUT })
+  assert.deepEqual(rules[`${root} ${READOUT_ABOVE_TOTAL_TRACK}`], { ...P.METADATA_READOUT_ABOVE_TOTAL_TRACK })
+  assert.ok(Object.isFrozen(P.METADATA_READOUT_LAYOUT) && Object.isFrozen(P.METADATA_READOUT_ABOVE_TOTAL_TRACK))
+  for (const value of [...Object.values(P.METADATA_READOUT_LAYOUT), ...Object.values(P.METADATA_READOUT_ABOVE_TOTAL_TRACK)]) assert.match(value, /^[a-z0-9 .,%()/+-]+$/i, value)
+  // Exact values (no tolerances): the readout spans the seek wells' 24px column, has a 6px/12px inner inset and sits
+  // 22px below the original block's anchor, so it grows toward the free band rather than toward the artwork; its floor
+  // (200px deck + 4px plate + 6px) never applies in portrait and keeps the landscape readout off the deck
+  assert.deepEqual({ ...P.METADATA_READOUT_LAYOUT }, { left: '24px', width: 'calc(100% - 48px)', padding: '6px 12px', bottom: 'max(calc(50% - var(--cover-image-height) / 2 + 28px), 210px)' })
+  assert.deepEqual({ ...P.METADATA_READOUT_ABOVE_TOTAL_TRACK }, { bottom: 'max(calc(50% - var(--cover-image-height) / 2 + 28px), 249px)' })
+})
+
+test('Phase 4E layout rests on the existing player geometry, which is unchanged', async () => {
+  const player = await read('../components/app/AudioPlayer.vue')
+  const style = player.slice(player.indexOf('<style>'))
+  // The original block: its fullscreen anchor (+50px; the readout uses +28px, 22px lower), width, collapsed placement,
+  // and the landscape override, which keeps priority (!important) over the readout's left/width
+  assert.match(style, /\.fullscreen \.title-author-texts \{\s*bottom: calc\(50% - var\(--cover-image-height\) \/ 2 \+ 50px\);\s*width: 80%;\s*left: 10%;/)
+  assert.match(style, /\.title-author-texts \{[^}]*width: var\(--title-author-width-collapsed\);\s*bottom: 76px;\s*left: var\(--title-author-left-offset-collapsed\);/)
+  assert.match(style, /@media \(orientation: landscape\) \{\s*\.fullscreen \.title-author-texts \{\s*left: 50% !important;\s*width: 50% !important;/)
+  // The readout's column matches the seek wells (px-6 = 24px); its clearance covers the total-track display at the
+  // default font scale (215px offset + 19.2px line + 4px channel) plus the 4px plate and 6px of chassis
+  assert.match(player, /<div id="playerTrack" class="absolute left-0 w-full px-6">/)
+  assert.match(player, /class="absolute total-track w-full z-30 px-6"/)
+  assert.match(style, /\.total-track \{\s*bottom: 215px;/)
+  assert.ok(249 >= 215 + 19.2 + 4 + 4 + 6)
+  assert.ok(210 >= 200 + 4 + 6)
+  // Title/author markup, marquee wrapper and text classes are unchanged (the readout needs no template change)
+  assert.match(player, /<div class="title-author-texts absolute z-30 left-0 right-0 overflow-hidden" @click="clickTitleAndAuthor">\s*<div ref="titlewrapper" class="overflow-hidden relative">\s*<p class="title-text whitespace-nowrap"><\/p>\s*<\/div>\s*<p class="author-text text-fg text-opacity-75 truncate">\{\{ authorName \}\}<\/p>/)
+  // Protected sizes: mini 120px, full panel 200px, play 65/40
+  assert.match(style, /\.playerContainer \{\s*height: 120px;\s*\}/)
+  assert.match(style, /\.fullscreen \.playerContainer \{\s*height: 200px;\s*\}/)
+  assert.match(style, /#playerControls \.play-btn \{[^}]*height: 40px;\s*width: 40px;/)
+  assert.match(style, /\.fullscreen #playerControls \.play-btn \{\s*height: 65px;\s*width: 65px;/)
+})
+
+test('Phase 4E metadata stays neutral: no LLAMA rule colors the title or author, no amber or phosphor on the readout', () => {
+  const root = engine.themeSelector('llama')
+  const rules = presets.presentationRules([llama()])
+  for (const [selector, declarations] of Object.entries(rules)) {
+    if (!/title-author|title-text|author-text|titlewrapper/.test(selector)) continue
+    // Only the full-player readout rules, never the collapsed player's block
+    assert.ok([`${root} ${READOUT}`, `${root} ${READOUT_ABOVE_TOTAL_TRACK}`].includes(selector), selector)
+    assert.equal(declarations.color, undefined, selector)
+    for (const value of Object.values(declarations)) assert.doesNotMatch(value, /--color-(track-cursor|accent|success|warning)/, selector)
+  }
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationRules([engine.getTheme(id)]), {}, id)
+})
+
+test('Phase 4E title and author keep their contrast on the recessed readout', () => {
+  const t = llama().tokens
+  const face = t['surface.recessed']
+  // Title: the inherited default text color; author: text-fg at 75% opacity (both unchanged)
+  const author = t['text.primary'].map((c, i) => c * 0.75 + face[i] * 0.25)
+  assert.ok(contrast(t['text.default'], face) >= 4.5)
+  assert.ok(contrast(author, face) >= 4.5)
+  // ...and higher than on the chassis they sat on before
+  assert.ok(contrast(t['text.default'], face) > contrast(t['text.default'], t['surface.base']))
+})
+
+test('Phase 4E readout compiles through Tailwind under the LLAMA root only', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  const block = (selector) => {
+    const i = css.indexOf(`${selector} {`)
+    assert.ok(i >= 0, selector)
+    return css.slice(i, css.indexOf('}', i))
+  }
+  const root = "html[data-theme='llama']"
+  assert.match(block(`${root} ${READOUT}`), /padding: 6px 12px;[\s\S]*bottom: max\(calc\(50% - var\(--cover-image-height\) \/ 2 \+ 28px\), 210px\)/)
+  assert.match(block(`${root} ${READOUT_ABOVE_TOTAL_TRACK}`), /bottom: max\(calc\(50% - var\(--cover-image-height\) \/ 2 \+ 28px\), 249px\)/)
+  // Every compiled rule for the readout's selectors is under the LLAMA root
+  for (const m of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{/g)) {
+    for (const selector of m[1].split(',')) if (selector.includes('.fullscreen .title-author-texts') || selector.includes('.total-track ~')) assert.ok(selector.trim().startsWith(`${root} `), selector.trim())
+  }
+})

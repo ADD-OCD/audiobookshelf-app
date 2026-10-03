@@ -123,7 +123,60 @@ const CURRENT_MARKER = 'inset 2px 0 0 rgb(var(--color-track-cursor))'
 const INSET_SLOT = 'inset 1px 1px 0 rgb(var(--color-edge-dark)), inset -1px -1px 0 rgb(var(--color-edge-light) / 0.3)'
 const THUMB_EDGE = '0 0 0 1px rgb(var(--color-edge-dark)), 0 1px 2px rgb(0 0 0 / 0.6)'
 
-const PRIMITIVES = Object.freeze({ RADIUS, ELEVATION, RAISED_BEVEL, PRESSED_BEVEL, RECESSED_WELL, STEEL_SHEEN, PRIMARY_STEEL, PRIMARY_STEEL_PRESSED, CHASSIS_SHEEN, ARTWORK_FRAME, ENGRAVED_SEPARATOR, ENGRAVED_SEPARATOR_TOP, RECESSED_FACE, KEY_CAP, KEY_CAP_PRESSED, SELECTED_KEY, PLAYER_KEY, PLAYER_KEY_PRESSED, PLAYER_KEY_FACE_MINI, PLAYBACK_LEGEND, PLAYBACK_GLYPH_WEIGHT })
+// Full-player metadata readout (Phase 4E): the title/author block becomes a recessed display mounted in a bezel plate
+// on the chassis. The well is the shared recessed well; the plate (deck color, lit upper-left lip, dark lower-right
+// lip, soft drop) is drawn with outer shadows, so it sits around the box and adds no layout. The seek well has no
+// plate, which keeps the two displays related but distinct. Text colors are not touched: title and author stay neutral
+const METADATA_READOUT = Object.freeze({
+  'background-color': 'rgb(var(--color-recessed))',
+  'border-radius': RADIUS.key,
+  'box-shadow': `${RECESSED_WELL}, 0 0 0 1px rgb(var(--color-edge-dark)), 0 0 0 3px rgb(var(--color-bg)), -1px -1px 0 3px rgb(var(--color-edge-light) / 0.35), 1px 1px 0 3px rgb(var(--color-edge-dark)), 0 3px 8px 3px rgb(0 0 0 / 0.4)`
+})
+// The one authorized geometry in the recipe (Phase 4E, LLAMA full player only): the readout spans the seek wells'
+// column (24px gutters), gets an inner inset, and sits 22px lower in the free band above the deck so that it can grow
+// without reaching the artwork. Bottom-anchored like the original block (the same property, so the expand/collapse
+// transition is kept). Its floor keeps the plate clear of the 200px deck (plate 4px + 6px of chassis): portrait never
+// reaches it (the band leaves at least 28px), but in landscape the block sits beside the artwork right on the deck and
+// would otherwise cover the seek timestamps. With the total-track display shown, the readout also stays clear of it
+const READOUT_ANCHOR = 'calc(50% - var(--cover-image-height) / 2 + 28px)'
+const METADATA_READOUT_LAYOUT = Object.freeze({
+  left: '24px',
+  width: 'calc(100% - 48px)',
+  padding: '6px 12px',
+  bottom: `max(${READOUT_ANCHOR}, 210px)`
+})
+// Clearance over the total-track display on screens too short for the anchor alone: its 215px offset plus its height at
+// the default font scale (a 19.2px timestamp line and the 4px channel), plus 10px (the plate's 4px and 6px of chassis).
+// A px value: the system font scale zooms text in the WebView but not rem/em lengths, so CSS cannot follow the line's
+// growth; on the 842px-tall reference screen the anchor already clears it at font scale 1.3
+const METADATA_READOUT_ABOVE_TOTAL_TRACK = Object.freeze({ bottom: `max(${READOUT_ANCHOR}, 249px)` })
+
+const PRIMITIVES = Object.freeze({
+  RADIUS,
+  ELEVATION,
+  RAISED_BEVEL,
+  PRESSED_BEVEL,
+  RECESSED_WELL,
+  STEEL_SHEEN,
+  PRIMARY_STEEL,
+  PRIMARY_STEEL_PRESSED,
+  CHASSIS_SHEEN,
+  ARTWORK_FRAME,
+  ENGRAVED_SEPARATOR,
+  ENGRAVED_SEPARATOR_TOP,
+  RECESSED_FACE,
+  KEY_CAP,
+  KEY_CAP_PRESSED,
+  SELECTED_KEY,
+  PLAYER_KEY,
+  PLAYER_KEY_PRESSED,
+  PLAYER_KEY_FACE_MINI,
+  PLAYBACK_LEGEND,
+  PLAYBACK_GLYPH_WEIGHT,
+  METADATA_READOUT,
+  METADATA_READOUT_LAYOUT,
+  METADATA_READOUT_ABOVE_TOTAL_TRACK
+})
 
 const EQUIPMENT_RULES = [
   // Navigation chrome: bevelled chassis strips
@@ -242,6 +295,10 @@ const EQUIPMENT_RULES = [
   ['.total-track p.font-mono', { color: 'rgb(var(--color-accent))' }],
   ['#playerContent span.font-mono', { color: 'rgb(var(--color-accent))' }],
   ['#streamContainer p.tracking-widest', { color: 'rgb(var(--color-accent) / 0.85)' }],
+  // Full-player metadata readout (title/chapter and author): recessed display in a bezel plate, plus its authorized
+  // metadata-only layout. The collapsed player's block (no .fullscreen) is untouched
+  ['.fullscreen .title-author-texts', { ...METADATA_READOUT, ...METADATA_READOUT_LAYOUT }],
+  ['.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_ABOVE_TOTAL_TRACK],
   // Transport: steel play button, raised; pressed = inset (other transport glyphs keep their look)
   ['#playerControls .play-btn', { 'background-image': PRIMARY_STEEL, 'box-shadow': `${RAISED_BEVEL}, 0 2px 4px rgb(0 0 0 / 0.55)` }],
   ['#playerControls .play-btn:active', { 'background-image': PRIMARY_STEEL_PRESSED, 'box-shadow': PRESSED_BEVEL }],
