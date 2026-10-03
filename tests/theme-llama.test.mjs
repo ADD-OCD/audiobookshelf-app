@@ -1278,3 +1278,18 @@ test('Phase 4E-R2 landscape rule compiles through Tailwind inside its media quer
   assert.equal(blocks.length, 1)
   assert.match(blocks[0], /^\s*html\[data-theme='llama'\] \.fullscreen \.total-track ~ \.title-author-texts \{\s*margin-left: 24px;\s*max-width: calc\(50% - 135px\);\s*\}\s*$/)
 })
+
+// --- Phase 4H: primary Play/Pause control ---
+
+test('Phase 4H: a pending seek spins only the play glyph; the play button face never rotates (every theme)', async () => {
+  const player = await read('../components/app/AudioPlayer.vue')
+  const template = player.slice(0, player.indexOf('</template>'))
+  const button = template.match(/<div class="play-btn [^>]*>/)[0]
+  assert.doesNotMatch(button, /animate-spin/)
+  // Same click, hit target and handlers as before: only the animation moved
+  assert.match(button, /@mousedown\.prevent @mouseup\.prevent @click\.stop="playPauseClick"/)
+  const glyph = template.match(/<span v-if="!showLoadingState" class="material-symbols fill"[^>]*>[^<]*<\/span>/)[0]
+  assert.match(glyph, /:class="\{[^}]*'animate-spin': seekLoading[^}]*\}"/)
+  assert.match(glyph, />\{\{ seekLoading \? 'autorenew' : !isPlaying \? 'play_arrow' : 'pause' \}\}</)
+  assert.equal((template.match(/'animate-spin': seekLoading/g) || []).length, 1)
+})
