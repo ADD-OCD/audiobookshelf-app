@@ -1170,13 +1170,21 @@ test('Phase 4E readout compiles through Tailwind under the LLAMA root only', asy
 // --- Phase 4E-R1: short-screen readout with the total-track display ---
 
 const COMPACT_QUERY = '(orientation: portrait) and (max-height: 824px)'
+const LANDSCAPE_QUERY = '(orientation: landscape)'
 
 test('Phase 4E-R1 short-screen readout is one LLAMA-only media rule on the total-track readout selector', () => {
   const P = presets.PRIMITIVES
   const root = engine.themeSelector('llama')
-  assert.deepEqual(presets.EQUIPMENT_MEDIA_RULES.length, 1)
+  // Exactly the readout's two total-track variants: short portrait (R1) and landscape (R2), in that order
+  assert.deepEqual(
+    presets.EQUIPMENT_MEDIA_RULES.map(([query, suffix]) => [query, suffix]),
+    [
+      [COMPACT_QUERY, READOUT_ABOVE_TOTAL_TRACK],
+      [LANDSCAPE_QUERY, READOUT_ABOVE_TOTAL_TRACK]
+    ]
+  )
   const media = presets.presentationMediaRules([llama()])
-  assert.deepEqual(Object.keys(media), [`@media ${COMPACT_QUERY}`])
+  assert.deepEqual(Object.keys(media), [`@media ${COMPACT_QUERY}`, `@media ${LANDSCAPE_QUERY}`])
   assert.deepEqual(media[`@media ${COMPACT_QUERY}`], { [`${root} ${READOUT_ABOVE_TOTAL_TRACK}`]: { ...P.METADATA_READOUT_COMPACT } })
   assert.deepEqual(presets.builtinPresentationMediaRules(), media)
   for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationMediaRules([engine.getTheme(id)]), {}, id)
@@ -1230,4 +1238,43 @@ test('Phase 4E-R1 compact readout compiles through Tailwind inside its media que
   assert.equal((block.match(/\{/g) || []).length, 2)
   // The unconditional Phase 4E rules are still emitted as before
   assert.match(css, /html\[data-theme='llama'\] \.fullscreen \.total-track ~ \.title-author-texts \{\s*bottom: max\(calc\(50% - var\(--cover-image-height\) \/ 2 \+ 28px\), 249px\);\s*\}/)
+})
+
+// --- Phase 4E-R2: landscape readout with the total-track display ---
+
+test('Phase 4E-R2 landscape readout only ends before the top-bar controls: LLAMA-only, total-track readout only, two properties', async () => {
+  const P = presets.PRIMITIVES
+  const L = P.METADATA_READOUT_LANDSCAPE
+  const root = engine.themeSelector('llama')
+  assert.ok(Object.isFrozen(L))
+  // Horizontal only: no vertical placement, padding, paint or text color; the readout keeps the Phase 4E look and floor
+  assert.deepEqual({ ...L }, { 'margin-left': '24px', 'max-width': 'calc(50% - 135px)' })
+  const media = presets.presentationMediaRules([llama()])
+  assert.deepEqual(media[`@media ${LANDSCAPE_QUERY}`], { [`${root} ${READOUT_ABOVE_TOTAL_TRACK}`]: { ...L } })
+  for (const id of ['dark', 'black', 'light']) assert.deepEqual(presets.presentationMediaRules([engine.getTheme(id)]), {}, id)
+  // Landscape only: the portrait R1 query and every portrait rule are untouched by it
+  assert.doesNotMatch(LANDSCAPE_QUERY, /portrait|height/)
+  assert.deepEqual(media[`@media ${COMPACT_QUERY}`], { [`${root} ${READOUT_ABOVE_TOTAL_TRACK}`]: { ...P.METADATA_READOUT_COMPACT } })
+  // The arithmetic: the cast control's 64px right offset (right-16) plus its 39px width at font scale 1.3, the 4px plate
+  // and 4px of chassis (111px), and the 24px left margin that aligns the readout with the seek well (px-6)
+  assert.equal(24 + 64 + 39 + 4 + 4, 135)
+  const player = await read('../components/app/AudioPlayer.vue')
+  assert.match(player, /<div v-show="showCastBtn" class="top-6 right-16 absolute cursor-pointer">\s*<span class="material-symbols text-3xl"/)
+  assert.match(player, /<div class="top-6 right-4 absolute cursor-pointer">\s*<span class="material-symbols text-3xl"/)
+  // The player's landscape rule it limits (max-width still applies under an !important width) is unchanged
+  const style = player.slice(player.indexOf('<style>'))
+  assert.match(style, /@media \(orientation: landscape\) \{\s*\.fullscreen \.title-author-texts \{\s*left: 50% !important;\s*width: 50% !important;/)
+})
+
+test('Phase 4E-R2 landscape rule compiles through Tailwind inside its media query, under the LLAMA root only', async () => {
+  const postcss = require('postcss')
+  const tailwind = require('tailwindcss')
+  const config = require('../tailwind.config.js')
+  const source = await read('../assets/tailwind.css')
+  const content = config.content.map((glob) => new URL(`../${glob}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'))
+  const { css } = await postcss([tailwind({ ...config, content })]).process(source, { from: undefined })
+  // Find the media block that holds the readout rule (the player's own landscape rules live in component CSS, not here)
+  const blocks = [...css.matchAll(/@media \(orientation: landscape\) \{([\s\S]*?)\n\}/g)].map((m) => m[1]).filter((b) => b.includes('title-author-texts'))
+  assert.equal(blocks.length, 1)
+  assert.match(blocks[0], /^\s*html\[data-theme='llama'\] \.fullscreen \.total-track ~ \.title-author-texts \{\s*margin-left: 24px;\s*max-width: calc\(50% - 135px\);\s*\}\s*$/)
 })

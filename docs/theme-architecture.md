@@ -88,7 +88,7 @@ LLAMA is an original Audiobookshelf+ theme inspired by the material language of 
 - It is a built-in like the others (`id: 'llama'`, label `LabelThemeLlama`, `colorScheme: 'dark'`, `equipment` + `theme`). It appears last in Settings through the registry.
 - It styles the existing UI only. Layout, geometry, controls and behavior are unchanged, with one authorized exception: the full player's metadata readout (Phase 4E, below).
 
-The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. The single exception is the full-player metadata readout's own box (`left`, `width`, `padding`, `bottom` on `.fullscreen .title-author-texts`, and `bottom` with the total-track display shown, plus its short-screen variant in `EQUIPMENT_MEDIA_RULES`); a test allows geometry properties on exactly those selectors and nowhere else. It covers:
+The equipment recipe (`EQUIPMENT_RULES` in `theme/presets.js`, emitted only under `html[data-theme='llama']`) is **paint-only**: `box-shadow`, `background-image`, `background-color`, `background-clip`, `border-radius`, `color` and `outline`. It never changes border widths, padding, transforms or layout. The single exception is the full-player metadata readout's own box (`left`, `width`, `padding`, `bottom` on `.fullscreen .title-author-texts`, and `bottom` with the total-track display shown, plus its short-screen and landscape variants in `EQUIPMENT_MEDIA_RULES`); a test allows geometry properties on exactly those selectors and nowhere else. It covers:
 
 - bevelled chassis on the app bar, bookshelf navigation, dialogs/menus and the drawer, with the selected tab shown as a pressed key plus an accent underline;
 - steel buttons over their semantic colors (pressed = inset), bordered icon buttons as steel keys (borderless icon buttons stay bare glyphs), and a steel play button;
@@ -533,7 +533,14 @@ Measured on the emulator (412×842 CSS px, Book A paused; the before values are 
   - at font scale 1.0: 3px and 7.8px.
   - With the total track off, the same screens keep the Phase 4E readout (23.6px under the artwork, 24px above the deck at 1.0).
 
-In landscape the player's own `!important` rule keeps the block at the right half's full width, so the readout runs to the screen's right edge. It stays 10px clear of the deck.
+**Landscape with the total-track display (Phase 4E-R2).** In landscape the block sits in the right half (the player's own `left: 50%; width: 50%`, both `!important`), between the top-bar controls and the total-track display. With the total track on at font scale 1.3, the 249px floor put the readout at y 40.8–115.2 (915×364). That covered the lower part of the cast and overflow controls (y 24–63): 15 of 25 hit points on each resolved to the readout, so a tap there opened the item page. Under the controls, above the total-track display, there are only 57px at font scale 1.3, less than the 62px of landscape text, so no vertical placement or compaction fits there.
+
+- A second media rule (`(orientation: landscape)`, the same total-track readout selector) adds `METADATA_READOUT_LANDSCAPE`: `margin-left: 24px` and `max-width: calc(50% - 135px)`. `max-width` still limits the `!important` width.
+- The readout keeps its vertical placement, paint and text. It starts in line with the seek well (x 481.5) and ends 111px short of the right edge: the cast control's 64px offset plus its 39px width at font scale 1.3, the 4px plate and 4px of chassis. At 915px wide that is 322.5px.
+- Results at 1.3: the cast and overflow controls resolve to themselves on every point outside the DIRECT label's box. Real taps on their lower parts open the overflow menu and reach the cast handler (before the fix, both opened the item page). A tap on the readout still opens the item page. The total-track and deck clearances are unchanged (5.0 and 49px). Font scale 1.0 gets the same column, with the readout below the controls' row.
+- Long titles, Arabic and Thai scroll in the marquee in the narrower readout, and long authors keep their ellipsis.
+- With the total track off, the landscape readout keeps the right half's full width and runs to the screen's right edge, as in Phase 4E (deferred). It stays 16.8px below the controls at 1.3 and 10px above the deck.
+- Pre-existing and not changed: the DIRECT playback-method label's box spans the full width (y 16–31, 16–35.5 at font scale 1.3) above the top-bar controls, so taps on their upper part reach the label. In landscape the artwork (from y 50) also covers the lower part of the collapse control. Dark behaves the same.
 
 `tests/theme-llama.test.mjs` keeps the contract:
 
@@ -543,7 +550,8 @@ In landscape the player's own `!important` rule keeps the block at the right hal
 - the title and author are never colored, amber or phosphor;
 - text contrast holds on the face;
 - the rules compile under the LLAMA root only;
-- the short-screen variant is a single LLAMA-only media rule with exact values that changes only the vertical extent.
+- the short-screen variant is a LLAMA-only media rule with exact values that changes only the vertical extent;
+- the landscape variant is a LLAMA-only media rule with exact values that changes only the horizontal extent.
 
 ## Content-derived color (intentionally not tokens)
 

@@ -169,6 +169,15 @@ const METADATA_READOUT_COMPACT = Object.freeze({
   bottom: '247px',
   'min-height': 'min(calc(50% - var(--cover-image-height) / 2 - 133px), 70px)'
 })
+// Landscape with the total-track display (Phase 4E-R2). The block sits in the right half (the player's own landscape
+// rule: left 50%, width 50%, both !important), between the top-bar controls and the total-track display. At font scale
+// 1.3 the band under the cast and overflow controls (63px down) and above the total-track display (120px down) is 57px,
+// less than the text alone (62px), so the readout cannot go below them; it stays where the 249px floor puts it and ends
+// before them instead. max-width still limits the !important width: the cast control's 64px right offset plus its width
+// at font scale 1.3 (39px), the 4px plate and 4px of chassis leave the readout 111px short of the right edge, and a 24px
+// margin aligns its left edge with the seek well (50% - 24px - 111px). Vertical placement and paint are unchanged
+const METADATA_READOUT_LANDSCAPE_QUERY = '(orientation: landscape)'
+const METADATA_READOUT_LANDSCAPE = Object.freeze({ 'margin-left': '24px', 'max-width': 'calc(50% - 135px)' })
 
 const PRIMITIVES = Object.freeze({
   RADIUS,
@@ -195,7 +204,8 @@ const PRIMITIVES = Object.freeze({
   METADATA_READOUT,
   METADATA_READOUT_LAYOUT,
   METADATA_READOUT_ABOVE_TOTAL_TRACK,
-  METADATA_READOUT_COMPACT
+  METADATA_READOUT_COMPACT,
+  METADATA_READOUT_LANDSCAPE
 })
 
 const EQUIPMENT_RULES = [
@@ -460,8 +470,12 @@ function presentationRules(themes) {
 const builtinPresentationRules = () => presentationRules(engine.THEMES)
 
 // Equipment rules that apply only under a fixed media query: [query, selector suffix, declarations]. Kept apart from
-// EQUIPMENT_RULES so every unconditional rule stays a flat selector map; the only entry is the short-screen readout
-const EQUIPMENT_MEDIA_RULES = [[METADATA_READOUT_COMPACT_QUERY, '.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_COMPACT]]
+// EQUIPMENT_RULES so every unconditional rule stays a flat selector map; the entries are the readout's short-screen and
+// landscape variants with the total-track display
+const EQUIPMENT_MEDIA_RULES = [
+  [METADATA_READOUT_COMPACT_QUERY, '.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_COMPACT],
+  [METADATA_READOUT_LANDSCAPE_QUERY, '.fullscreen .total-track ~ .title-author-texts', METADATA_READOUT_LANDSCAPE]
+]
 
 /** Fixed media-conditional presentation rules for the given validated themes ({ query: { selector: declarations } }). */
 function presentationMediaRules(themes) {
